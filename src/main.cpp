@@ -1,8 +1,7 @@
 #include <stdio.h>
 #include <malloc.h>
 
-#include <stdint.h>
-typedef int32_t i32;
+#include "common.h"
 
 static char *read_file(char *path)
 {
