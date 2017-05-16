@@ -1,5 +1,7 @@
 #pragma once
 
+#include <assert.h>
+
 #include <stdint.h>
 typedef int32_t i32;
 typedef uint32_t u32;
