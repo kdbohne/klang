@@ -2,13 +2,13 @@ BINARY_NAME=klang
 BINARY_DIR=bin
 BUILD_DIR=build
 
-COMPILER=clang
+COMPILER=clang++
 COMPILER_FLAGS=-m64 -std=c++11 -O0 -g -DPLATFORM_LINUX \
 			   -Isrc \
 			   -fno-exceptions -fno-rtti \
 			   -Werror -Wall -Wpedantic -Wshadow \
 			   -Wno-missing-braces -Wno-unused-function -Wno-unused-parameter -Wno-unused-variable
-LINKER_FLAGS=-m64 -fuse-ld=gold -Lbin
+LINKER_FLAGS=-m64 -fuse-ld=gold
 
 SOURCES:=$(wildcard src/*.cpp)
 HEADERS:=$(wildcard src/*.h)

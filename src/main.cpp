@@ -2,6 +2,7 @@
 #include <malloc.h>
 
 #include "common.h"
+#include "array.h"
 
 static char *read_file(char *path)
 {
@@ -35,6 +36,17 @@ int main(int argc, char *argv[])
     if (argc < 2)
     {
         print_help();
+        return 0;
+    }
+
+    Array<i32> test;
+    test.add(4);
+    test.add(32);
+    test.add(-17);
+
+    foreach(test)
+    {
+        printf("%d\n", it);
     }
 
     for (int i = 1; i < argc; ++i)
