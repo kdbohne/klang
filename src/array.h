@@ -28,9 +28,7 @@ struct Array
     ~Array()
     {
         if (data)
-        {
             free(data);
-        }
     }
 
     void grow_if_needed()

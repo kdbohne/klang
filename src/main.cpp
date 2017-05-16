@@ -3,6 +3,8 @@
 
 #include "common.h"
 #include "array.h"
+#include "token.h"
+#include "lex.h"
 
 struct AstRoot;
 struct AstFunc;
@@ -87,20 +89,15 @@ int main(int argc, char *argv[])
         return 0;
     }
 
-    Array<i32> test;
-    test.add(4);
-    test.add(32);
-    test.add(-17);
-
-    foreach(test)
-    {
-        printf("%d\n", it);
-    }
-
     for (int i = 1; i < argc; ++i)
     {
         char *file = read_file(argv[i]);
-        printf("%s\n", file);
+
+        Array<Token> tokens = lex_file(file);
+        foreach(tokens)
+        {
+            printf("%u: %.*s\n", it.type, it.length, it.string);
+        }
     }
 
     return 0;
