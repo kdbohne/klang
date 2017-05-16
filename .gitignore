@@ -1,2 +1,7 @@
 bin
 build
+
+*.config
+*.creator*
+*.files
+*.includes
