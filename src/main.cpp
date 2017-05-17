@@ -42,6 +42,8 @@ int main(int argc, char *argv[])
         return 0;
     }
 
+    AstNode *root = ast_allocate(AST_ROOT);
+
     for (int i = 1; i < argc; ++i)
     {
         char *file = read_file(argv[i]);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common.h"
+#include "array.h"
 
 struct AstRoot;
 struct AstFunc;
@@ -49,3 +50,5 @@ struct AstNode
         AstLit lit;
     };
 };
+
+AstNode *ast_allocate(AstNodeType type);
