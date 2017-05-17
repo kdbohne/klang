@@ -14,6 +14,7 @@ enum TokenType : u32
     TOKEN_CLOSE_BRACE,
 
     TOKEN_SEMI,
+    TOKEN_COMMA,
 
     TOKEN_PLUS,
     TOKEN_MINUS,

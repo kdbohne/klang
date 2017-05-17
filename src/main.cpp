@@ -6,6 +6,7 @@
 #include "token.h"
 #include "ast.h"
 #include "lex.h"
+#include "parse.h"
 
 static char *read_file(char *path)
 {
@@ -42,7 +43,7 @@ int main(int argc, char *argv[])
         return 0;
     }
 
-    AstNode *root = ast_allocate(AST_ROOT);
+    AstRoot *root = ast_alloc(AstRoot);
 
     for (int i = 1; i < argc; ++i)
     {
@@ -53,7 +54,11 @@ int main(int argc, char *argv[])
         {
             printf("%u: %.*s\n", it.type, it.length, it.string);
         }
+
+        parse_file(root, &tokens);
     }
+
+    printf("Parsed %d funcs\n", root->funcs.count);
 
     return 0;
 }
