@@ -101,18 +101,18 @@ static void eat_whitespace(Lexer *lexer)
 
 static bool token_matches(Token token, const char *str)
 {
-    while (token.length > 0)
+    while (token.len > 0)
     {
-        if (!(*str) || (*token.string != *str))
+        if (!(*str) || (*token.str != *str))
             return false;
 
-        --token.length;
+        --token.len;
 
-        ++token.string;
+        ++token.str;
         ++str;
     }
 
-    // The strings match up to the length of the token, but
+    // The strings match up to the len of the token, but
     // 'string' could continue on, meaning they do not match.
     return !(*str);
 }
@@ -122,39 +122,39 @@ static Token get_token(Lexer *lexer)
     eat_whitespace(lexer);
 
     Token token = {};
-    token.type = TOKEN_UNKNOWN;
-    token.length = 1;
-    token.string = lexer->cursor;
+    token.type = TOK_UNKNOWN;
+    token.len = 1;
+    token.str = lexer->cursor;
 
     char c = *lexer->cursor;
     advance(lexer);
 
     switch (c)
     {
-        case '\0': { token.type = TOKEN_EOF;         break; }
-        case '(':  { token.type = TOKEN_OPEN_PAREN;  break; }
-        case ')':  { token.type = TOKEN_CLOSE_PAREN; break; }
-        case '{':  { token.type = TOKEN_OPEN_BRACE;  break; }
-        case '}':  { token.type = TOKEN_CLOSE_BRACE; break; }
-        case ';':  { token.type = TOKEN_SEMI;        break; }
-        case ',':  { token.type = TOKEN_COMMA;       break; }
+        case '\0': { token.type = TOK_EOF;         break; }
+        case '(':  { token.type = TOK_OPEN_PAREN;  break; }
+        case ')':  { token.type = TOK_CLOSE_PAREN; break; }
+        case '{':  { token.type = TOK_OPEN_BRACE;  break; }
+        case '}':  { token.type = TOK_CLOSE_BRACE; break; }
+        case ';':  { token.type = TOK_SEMI;        break; }
+        case ',':  { token.type = TOK_COMMA;       break; }
 
-        case '+':  { token.type = TOKEN_PLUS;        break; }
-        case '*':  { token.type = TOKEN_ASTERISK;    break; }
-        case '/':  { token.type = TOKEN_SLASH;       break; }
+        case '+':  { token.type = TOK_PLUS;        break; }
+        case '*':  { token.type = TOK_ASTERISK;    break; }
+        case '/':  { token.type = TOK_SLASH;       break; }
 
         case '-': 
         {
             if (*lexer->cursor == '>')
             {
-                token.type = TOKEN_R_ARROW;
-                token.length = 2;
+                token.type = TOK_R_ARROW;
+                token.len = 2;
 
                 advance(lexer);
             }
             else
             {
-                token.type = TOKEN_MINUS;
+                token.type = TOK_MINUS;
             }
 
             break;
@@ -164,8 +164,8 @@ static Token get_token(Lexer *lexer)
         {
             if (*lexer->cursor == '=')
             {
-                token.type = TOKEN_COLON_EQ;
-                token.length = 2;
+                token.type = TOK_COLON_EQ;
+                token.len = 2;
 
                 advance(lexer);
             }
@@ -184,9 +184,9 @@ static Token get_token(Lexer *lexer)
 
             advance(lexer);
 
-            token.type = TOKEN_STR;
-            token.length = lexer->cursor - token.string - 1;
-            ++token.string;
+            token.type = TOK_STR;
+            token.len = lexer->cursor - token.str - 1;
+            ++token.str;
 
             break;
         }
@@ -198,11 +198,11 @@ static Token get_token(Lexer *lexer)
                 while (is_letter(*lexer->cursor) || is_number(*lexer->cursor) || (*lexer->cursor == '_'))
                     advance(lexer);
 
-                token.type = TOKEN_IDENT;
-                token.length = lexer->cursor - token.string;
+                token.type = TOK_IDENT;
+                token.len = lexer->cursor - token.str;
 
                 if (token_matches(token, "fn"))
-                    token.type = TOKEN_KEY_FN;
+                    token.type = TOK_KEY_FN;
             }
             else if (is_number(c))
             {
@@ -228,12 +228,12 @@ static Token get_token(Lexer *lexer)
                     // FIXME: set flag
                 }
 
-                token.type = TOKEN_NUM;
-                token.length = lexer->cursor - token.string;
+                token.type = TOK_NUM;
+                token.len = lexer->cursor - token.str;
             }
             else
             {
-                token.type = TOKEN_UNKNOWN;
+                token.type = TOK_UNKNOWN;
             }
 
             break;
@@ -257,7 +257,7 @@ Array<Token> lex_file(char *source)
         Token token = get_token(&lexer);
         tokens.add(token);
 
-        if (token.type == TOKEN_EOF)
+        if (token.type == TOK_EOF)
             break;
     }
 

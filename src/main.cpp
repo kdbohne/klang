@@ -52,7 +52,7 @@ int main(int argc, char *argv[])
         Array<Token> tokens = lex_file(file);
         foreach(tokens)
         {
-            printf("%u: %.*s\n", it.type, it.length, it.string);
+            printf("%u: %.*s\n", it.type, it.len, it.str);
         }
 
         parse_file(root, &tokens);

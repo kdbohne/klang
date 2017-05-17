@@ -52,10 +52,10 @@ static BinOp get_bin_op(TokenType type)
 {
     switch (type)
     {
-        case TOKEN_PLUS:     return BIN_ADD;
-        case TOKEN_MINUS:    return BIN_SUB;
-        case TOKEN_ASTERISK: return BIN_MUL;
-        case TOKEN_SLASH:    return BIN_DIV;
+        case TOK_PLUS:     return BIN_ADD;
+        case TOK_MINUS:    return BIN_SUB;
+        case TOK_ASTERISK: return BIN_MUL;
+        case TOK_SLASH:    return BIN_DIV;
         default:
         {
             assert(false);
@@ -71,12 +71,12 @@ static AstExpr *parse_expr(Parser *parser)
     Token tok = next(parser);
     switch (tok.type)
     {
-        case TOKEN_IDENT:
+        case TOK_IDENT:
         {
             lhs = make_ident(tok);
             break;
         }
-        case TOKEN_NUM:
+        case TOK_NUM:
         {
             // FIXME: check for int vs float
             lhs = make_lit_int(tok);
@@ -84,16 +84,16 @@ static AstExpr *parse_expr(Parser *parser)
 
             break;
         }
-        case TOKEN_STR:
+        case TOK_STR:
         {
             lhs = make_lit_str(tok);
             break;
         }
-        case TOKEN_OPEN_PAREN:
+        case TOK_OPEN_PAREN:
         {
             eat(parser);
             lhs = parse_expr(parser);
-            expect(parser, TOKEN_CLOSE_PAREN);
+            expect(parser, TOK_CLOSE_PAREN);
 
             break;
         }
@@ -107,10 +107,10 @@ static AstExpr *parse_expr(Parser *parser)
     TokenType next = peek(parser);
     switch (next)
     {
-        case TOKEN_PLUS:
-        case TOKEN_MINUS:
-        case TOKEN_ASTERISK:
-        case TOKEN_SLASH:
+        case TOK_PLUS:
+        case TOK_MINUS:
+        case TOK_ASTERISK:
+        case TOK_SLASH:
         {
             eat(parser);
 
@@ -132,7 +132,7 @@ static AstStmt *parse_stmt(Parser *parser)
 {
     AstExpr *expr = parse_expr(parser);
 
-    if (peek(parser) == TOKEN_COLON_EQ)
+    if (peek(parser) == TOK_COLON_EQ)
     {
         eat(parser);
 
@@ -140,12 +140,12 @@ static AstStmt *parse_stmt(Parser *parser)
         decl->lhs = expr;
         decl->rhs = parse_expr(parser);
 
-        expect(parser, TOKEN_SEMI);
+        expect(parser, TOK_SEMI);
 
         return decl;
     }
 
-    if (peek(parser) == TOKEN_SEMI)
+    if (peek(parser) == TOK_SEMI)
     {
         eat(parser);
 
@@ -167,10 +167,10 @@ static AstBlock *parse_block(Parser *parser)
 {
     AstBlock *block = ast_alloc(AstBlock);
 
-    expect(parser, TOKEN_OPEN_BRACE);
+    expect(parser, TOK_OPEN_BRACE);
     while (true)
     {
-        if (peek(parser) == TOKEN_CLOSE_BRACE)
+        if (peek(parser) == TOK_CLOSE_BRACE)
             break;
 
         AstStmt *stmt = parse_stmt(parser);
@@ -180,7 +180,7 @@ static AstBlock *parse_block(Parser *parser)
         else
             block->stmts.add(stmt);
     }
-    expect(parser, TOKEN_CLOSE_BRACE);
+    expect(parser, TOK_CLOSE_BRACE);
 
     return block;
 }
@@ -189,14 +189,14 @@ static AstFunc *parse_func(Parser *parser)
 {
     AstFunc *func = ast_alloc(AstFunc);
 
-    expect(parser, TOKEN_KEY_FN);
-    Token ident = expect(parser, TOKEN_IDENT);
+    expect(parser, TOK_KEY_FN);
+    Token ident = expect(parser, TOK_IDENT);
 
     // Parse parameter list.
-    expect(parser, TOKEN_OPEN_PAREN);
+    expect(parser, TOK_OPEN_PAREN);
     while (true)
     {
-        if (peek(parser) == TOKEN_CLOSE_PAREN)
+        if (peek(parser) == TOK_CLOSE_PAREN)
             break;
 
         Token name_tok = next(parser);
@@ -207,11 +207,11 @@ static AstFunc *parse_func(Parser *parser)
         func->params.add(name);
         func->params.add(type);
 
-        eat_optional(parser, TOKEN_COMMA);
+        eat_optional(parser, TOK_COMMA);
     }
-    expect(parser, TOKEN_CLOSE_PAREN);
+    expect(parser, TOK_CLOSE_PAREN);
 
-    if (eat_optional(parser, TOKEN_R_ARROW))
+    if (eat_optional(parser, TOK_R_ARROW))
     {
         Token ret = next(parser);
         func->ret = make_ident(ret);
@@ -230,7 +230,7 @@ void parse_file(AstRoot *root, Array<Token> *tokens)
 
     while (true)
     {
-        if (peek(&parser) == TOKEN_EOF)
+        if (peek(&parser) == TOK_EOF)
             break;
 
         AstFunc *func = parse_func(&parser);

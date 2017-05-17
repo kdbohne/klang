@@ -4,36 +4,36 @@
 
 enum TokenType : u32
 {
-    TOKEN_IDENT,
-    TOKEN_NUM,
-    TOKEN_STR,
+    TOK_IDENT,
+    TOK_NUM,
+    TOK_STR,
 
-    TOKEN_OPEN_PAREN,
-    TOKEN_CLOSE_PAREN,
-    TOKEN_OPEN_BRACE,
-    TOKEN_CLOSE_BRACE,
+    TOK_OPEN_PAREN,
+    TOK_CLOSE_PAREN,
+    TOK_OPEN_BRACE,
+    TOK_CLOSE_BRACE,
 
-    TOKEN_SEMI,
-    TOKEN_COMMA,
+    TOK_SEMI,
+    TOK_COMMA,
 
-    TOKEN_PLUS,
-    TOKEN_MINUS,
-    TOKEN_ASTERISK,
-    TOKEN_SLASH,
+    TOK_PLUS,
+    TOK_MINUS,
+    TOK_ASTERISK,
+    TOK_SLASH,
 
-    TOKEN_COLON_EQ,
-    TOKEN_R_ARROW,
+    TOK_COLON_EQ,
+    TOK_R_ARROW,
 
-    TOKEN_KEY_FN,
+    TOK_KEY_FN,
 
-    TOKEN_EOF,
-    TOKEN_UNKNOWN,
+    TOK_EOF,
+    TOK_UNKNOWN,
 };
 
 struct Token
 {
     TokenType type;
 
-    char *string;
-    i32 length;
+    char *str;
+    i32 len;
 };
