@@ -11,6 +11,6 @@ fn add(a i32, b i32) -> i32
 fn main()
 {
     x := 3;
-//    y := inc(x);
-//    z := add(x, y);
+    y := inc(x);
+    z := add(x, y);
 }

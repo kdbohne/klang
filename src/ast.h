@@ -20,6 +20,7 @@ enum AstNodeType : u32
     AST_EXPR_IDENT,
     AST_EXPR_LIT,
     AST_EXPR_BIN,
+    AST_EXPR_FUNC_CALL,
 
     // Stmt
     AST_STMT_EXPR,
@@ -46,7 +47,7 @@ struct AstExpr : AstNode
 
 struct AstIdent : AstExpr
 {
-    char *string;
+    char *str;
 };
 
 enum LitType : u32
@@ -80,6 +81,12 @@ struct AstBin : AstExpr
     AstExpr *lhs;
     AstExpr *rhs;
     BinOp op;
+};
+
+struct AstFuncCall : AstExpr
+{
+    AstIdent *name;
+    Array<AstExpr *> args;
 };
 
 struct AstStmt : AstNode

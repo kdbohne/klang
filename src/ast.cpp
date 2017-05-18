@@ -29,7 +29,7 @@ AstNode *ast_alloc(AstNodeType type)
 }
 #endif
 
-static char *make_string_from_token(Token tok)
+static char *make_str_from_token(Token tok)
 {
     // TODO: better allocation strategy
     char *str = (char *)malloc(tok.len + 1);
@@ -63,7 +63,7 @@ static float make_float_from_token(Token tok)
 AstIdent *make_ident(Token tok)
 {
     AstIdent *ident = ast_alloc(AstIdent);
-    ident->string = make_string_from_token(tok);
+    ident->str = make_str_from_token(tok);
 
     return ident;
 }
@@ -90,7 +90,7 @@ AstLit *make_lit_str(Token tok)
 {
     AstLit *lit = ast_alloc(AstLit);
     lit->type = LIT_STR;
-    lit->value_str = make_string_from_token(tok);
+    lit->value_str = make_str_from_token(tok);
 
     return lit;
 }

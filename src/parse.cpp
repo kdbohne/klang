@@ -119,6 +119,31 @@ static AstExpr *parse_expr(Parser *parser)
 
             return make_bin(lhs, rhs, op);
         }
+        case TOK_OPEN_PAREN:
+        {
+            eat(parser);
+
+            AstFuncCall *call = ast_alloc(AstFuncCall);
+            call->name = static_cast<AstIdent *>(lhs);
+            assert(call->name);
+
+            if (peek(parser) != TOK_CLOSE_PAREN)
+            {
+                while (true)
+                {
+                    if (peek(parser) == TOK_CLOSE_PAREN)
+                        break;
+
+                    eat_optional(parser, TOK_COMMA);
+
+                    AstExpr *arg = parse_expr(parser);
+                    call->args.add(arg);
+                }
+            }
+            expect(parser, TOK_CLOSE_PAREN);
+
+            break;
+        }
         default:
         {
             break;
