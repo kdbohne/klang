@@ -71,7 +71,7 @@ AstIdent *make_ident(Token tok)
 AstLit *make_lit_int(Token tok)
 {
     AstLit *lit = ast_alloc(AstLit);
-    lit->type = LIT_INT;
+    lit->lit_type = LIT_INT;
     lit->value_int = make_int_from_token(tok);
 
     return lit;
@@ -80,7 +80,7 @@ AstLit *make_lit_int(Token tok)
 AstLit *make_lit_float(Token tok)
 {
     AstLit *lit = ast_alloc(AstLit);
-    lit->type = LIT_FLOAT;
+    lit->lit_type = LIT_FLOAT;
     lit->value_float = make_float_from_token(tok);
 
     return lit;
@@ -89,7 +89,7 @@ AstLit *make_lit_float(Token tok)
 AstLit *make_lit_str(Token tok)
 {
     AstLit *lit = ast_alloc(AstLit);
-    lit->type = LIT_STR;
+    lit->lit_type = LIT_STR;
     lit->value_str = make_str_from_token(tok);
 
     return lit;

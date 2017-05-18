@@ -33,20 +33,27 @@ enum AstNodeType : u32
 
 struct AstNode
 {
+    AstNode(AstNodeType type_) : type(type_) {}
+
     AstNodeType type;
 };
 
 struct AstRoot : AstNode
 {
+    AstRoot() : AstNode(AST_ROOT) {}
+
     Array<AstFunc *> funcs;
 };
 
 struct AstExpr : AstNode
 {
+    AstExpr(AstNodeType type_) : AstNode(type_) {}
 };
 
 struct AstIdent : AstExpr
 {
+    AstIdent() : AstExpr(AST_EXPR_IDENT) {}
+
     char *str;
 };
 
@@ -59,7 +66,9 @@ enum LitType : u32
 
 struct AstLit : AstExpr
 {
-    LitType type;
+    AstLit() : AstExpr(AST_EXPR_LIT) {}
+
+    LitType lit_type;
     union
     {
         u64 value_int;
@@ -78,6 +87,8 @@ enum BinOp : u32
 
 struct AstBin : AstExpr
 {
+    AstBin() : AstExpr(AST_EXPR_BIN) {}
+
     AstExpr *lhs;
     AstExpr *rhs;
     BinOp op;
@@ -85,32 +96,43 @@ struct AstBin : AstExpr
 
 struct AstFuncCall : AstExpr
 {
+    AstFuncCall() : AstExpr(AST_EXPR_FUNC_CALL) {}
+
     AstIdent *name;
     Array<AstExpr *> args;
 };
 
 struct AstStmt : AstNode
 {
+    AstStmt(AstNodeType type_) : AstNode(type_) {}
 };
 
 struct AstStmtExpr : AstStmt
 {
+    AstStmtExpr() : AstStmt(AST_STMT_EXPR) {}
+
     AstExpr *expr;
 };
 
 struct AstStmtSemi : AstStmt
 {
+    AstStmtSemi() : AstStmt(AST_STMT_SEMI) {}
+
     AstExpr *expr;
 };
 
 struct AstStmtDecl : AstStmt
 {
+    AstStmtDecl() : AstStmt(AST_STMT_DECL) {}
+
     AstExpr *lhs;
     AstExpr *rhs;
 };
 
 struct AstFunc : AstNode
 {
+    AstFunc() : AstNode(AST_FUNC) {}
+
     AstIdent *name;
     Array<AstIdent *> params;
     AstIdent *ret;
@@ -120,6 +142,8 @@ struct AstFunc : AstNode
 
 struct AstBlock : AstNode
 {
+    AstBlock() : AstNode(AST_BLOCK) {}
+
     Array<AstStmt *> stmts;
     AstExpr *expr;
 };
