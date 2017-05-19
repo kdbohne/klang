@@ -1,6 +1,7 @@
 #pragma once
 
-#include <assert.h>
+void assert_(bool cond, const char *cond_str, const char *file, unsigned line);
+#define assert(cond) assert_(cond, #cond, __FILE__, __LINE__)
 
 #include <stdint.h>
 typedef int32_t i32;

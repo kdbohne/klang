@@ -45,7 +45,7 @@ static u64 make_int_from_token(Token tok)
     // TODO: what size should this buffer be?
     static char buf[64];
 
-    assert(tok.len < (sizeof(buf) / sizeof(buf[0])));
+    assert(tok.len < (i32)(sizeof(buf) / sizeof(buf[0])));
     strncpy(buf, tok.str, tok.len);
     buf[tok.len] = '\0';
 
