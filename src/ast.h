@@ -149,7 +149,7 @@ struct AstBlock : AstNode
 };
 
 // TODO: this is really bad; use a pool allocator (one for each type?)
-#define ast_alloc(Type) ((Type *)calloc(1, sizeof(Type)))
+#define ast_alloc(Type) (new Type())
 
 AstIdent *make_ident(Token tok);
 AstLit *make_lit_int(Token tok);
