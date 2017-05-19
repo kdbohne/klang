@@ -170,7 +170,7 @@ static llvm::BasicBlock *gen_block(AstBlock *block, llvm::Function *func = NULL)
             case AST_STMT_EXPR:
             {
                 // FIXME: this shouldn't happen, right? A block should only
-                // have one, StmtExpr, and it is stored in block->expr.
+                // have one StmtExpr, and it is stored in block->expr.
                 assert(false);
                 break;
             }

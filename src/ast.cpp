@@ -104,3 +104,145 @@ AstBin *make_bin(AstExpr *lhs, AstExpr *rhs, BinOp op)
     
     return bin;
 }
+
+#include <stdio.h>
+static i32 indent;
+
+static void debug_dump_expr(AstExpr *expr)
+{
+    switch (expr->type)
+    {
+        case AST_EXPR_IDENT:
+        {
+            auto ident = static_cast<AstIdent *>(expr);
+            fprintf(stderr, "%s", ident->str);
+            break;
+        }
+        case AST_EXPR_LIT:
+        {
+            auto lit = static_cast<AstLit *>(expr);
+            switch (lit->lit_type)
+            {
+//                case LIT_INT:   { fprintf(stderr, "%lld", (i64)lit->value_int); break; }
+                case LIT_INT:   { fprintf(stderr, "%d", (i32)lit->value_int); break; }
+                case LIT_FLOAT: { fprintf(stderr, "%f", lit->value_float);    break; }
+                case LIT_STR:   { fprintf(stderr, "%s", lit->value_str);      break; }
+                default:
+                {
+                    assert(false);
+                    break;
+                }
+            }
+
+            break;
+        }
+        case AST_EXPR_BIN:
+        {
+            auto bin = static_cast<AstBin *>(expr);
+            debug_dump_expr(bin->lhs);
+
+            switch (bin->op)
+            {
+                case BIN_ADD: { fprintf(stderr, " + "); break; }
+                case BIN_SUB: { fprintf(stderr, " - "); break; }
+                case BIN_MUL: { fprintf(stderr, " * "); break; }
+                case BIN_DIV: { fprintf(stderr, " / "); break; }
+                default:
+                {
+                    assert(false);
+                    break;
+                }
+            }
+
+            debug_dump_expr(bin->rhs);
+
+            break;
+        }
+        case AST_EXPR_FUNC_CALL:
+        {
+            auto call = static_cast<AstFuncCall *>(expr);
+
+            fprintf(stderr, "%s(", call->name->str);
+            for (int i = 0; i < call->args.count; ++i)
+            {
+                debug_dump_expr(call->args[i]);
+
+                if (i < call->args.count - 1)
+                    fprintf(stderr, ", ");
+            }
+            fprintf(stderr, ")");
+
+            break;
+        }
+        default:
+        {
+            assert(false);
+            break;
+        }
+    }
+}
+
+void debug_dump(AstRoot *root)
+{
+    fprintf(stderr, "root:\n");
+    indent += 4;
+
+    foreach(root->funcs)
+    {
+        fprintf(stderr, "%*sfn %s(", indent, "", it->name->str);
+        for (int i = 0; i < it->params.count; i += 2)
+        {
+            fprintf(stderr, "%s ", it->params[i + 0]->str);
+            fprintf(stderr, "%s",  it->params[i + 1]->str);
+
+            if (i + 2 < it->params.count)
+                fprintf(stderr, ", ");
+        }
+        fprintf(stderr, ")\n");
+        indent += 4;
+
+        AstBlock *blk = it->block;
+        for (int i = 0; i < blk->stmts.count; ++i)
+        {
+            fprintf(stderr, "%*s", indent, "");
+
+            switch (blk->stmts[i]->type)
+            {
+                case AST_STMT_EXPR:
+                {
+                    auto stmt = static_cast<AstStmtExpr *>(blk->stmts[i]);
+                    debug_dump_expr(stmt->expr);
+                    fprintf(stderr, "\n");
+
+                    break;
+                }
+                case AST_STMT_SEMI:
+                {
+                    auto stmt = static_cast<AstStmtSemi *>(blk->stmts[i]);
+                    debug_dump_expr(stmt->expr);
+                    fprintf(stderr, ";\n");
+
+                    break;
+                }
+                case AST_STMT_DECL:
+                {
+                    auto stmt = static_cast<AstStmtDecl *>(blk->stmts[i]);
+
+                    debug_dump_expr(stmt->lhs);
+                    fprintf(stderr, " := ");
+                    debug_dump_expr(stmt->rhs);
+                    fprintf(stderr, "\n");
+
+                    break;
+                }
+                default:
+                {
+                    assert(false);
+                    break;
+                }
+            }
+        }
+
+        indent -= 4;
+    }
+}

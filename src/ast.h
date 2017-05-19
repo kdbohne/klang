@@ -156,3 +156,5 @@ AstLit *make_lit_int(Token tok);
 AstLit *make_lit_float(Token tok);
 AstLit *make_lit_str(Token tok);
 AstBin *make_bin(AstExpr *lhs, AstExpr *rhs, BinOp op);
+
+void debug_dump(AstRoot *root);
