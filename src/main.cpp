@@ -13,10 +13,7 @@ static char *read_file(char *path)
 {
     FILE *file = fopen(path, "r");
     if (!file)
-    {
-        fprintf(stderr, "Error: missing input file \"%s\"\n", path);
         return NULL;
-    }
 
     fseek(file, 0, SEEK_END);
     int length = ftell(file);
@@ -48,7 +45,13 @@ int main(int argc, char *argv[])
 
     for (int i = 1; i < argc; ++i)
     {
-        char *file = read_file(argv[i]);
+        char *path = argv[i];
+        char *file = read_file(path);
+        if (!file)
+        {
+            fprintf(stderr, "Error: missing input file \"%s\"\n", path);
+            return 1;
+        }
 
         Array<Token> tokens = lex_file(file);
 #if 0
