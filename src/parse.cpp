@@ -199,13 +199,21 @@ static AstBlock *parse_block(Parser *parser)
             break;
 
         AstStmt *stmt = parse_stmt(parser);
-
-        if (AstStmtExpr *se = static_cast<AstStmtExpr *>(stmt))
-            block->expr = se->expr;
-        else
-            block->stmts.add(stmt);
+        block->stmts.add(stmt);
     }
     expect(parser, TOK_CLOSE_BRACE);
+
+    if (block->stmts.count > 0)
+    {
+        AstStmt *last = block->stmts[block->stmts.count - 1];
+        if (last->type == AST_STMT_EXPR)
+        {
+            AstStmtExpr *se = static_cast<AstStmtExpr *>(last);
+            block->expr = se->expr;
+
+            --block->stmts.count;
+        }
+    }
 
     return block;
 }
