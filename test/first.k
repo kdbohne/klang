@@ -1,9 +1,9 @@
-fn inc(x i32) -> i32
+fn inc(x i64) -> i64
 {
     x + 1
 }
 
-fn add(a i32, b i32) -> i32
+fn add(a i64, b i64) -> i64
 {
     a + b
 }

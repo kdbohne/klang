@@ -216,6 +216,7 @@ static AstFunc *parse_func(Parser *parser)
 
     expect(parser, TOK_KEY_FN);
     Token ident = expect(parser, TOK_IDENT);
+    func->name = make_ident(ident);
 
     // Parse parameter list.
     expect(parser, TOK_OPEN_PAREN);

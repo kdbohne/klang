@@ -7,6 +7,7 @@
 #include "ast.h"
 #include "lex.h"
 #include "parse.h"
+#include "llvm.h"
 
 static char *read_file(char *path)
 {
@@ -50,15 +51,15 @@ int main(int argc, char *argv[])
         char *file = read_file(argv[i]);
 
         Array<Token> tokens = lex_file(file);
+#if 0
         foreach(tokens)
-        {
             printf("%u: %.*s\n", it.type, it.len, it.str);
-        }
+#endif
 
         parse_file(root, &tokens);
     }
 
-    printf("Parsed %d funcs\n", root->funcs.count);
+    llvm_gen_ir(root);
 
     return 0;
 }
