@@ -199,6 +199,8 @@ void debug_dump(AstRoot *root)
                 fprintf(stderr, ", ");
         }
         fprintf(stderr, ")\n");
+
+        fprintf(stderr, "%*s{\n", indent, "");
         indent += 4;
 
         AstBlock *blk = it->block;
@@ -241,8 +243,17 @@ void debug_dump(AstRoot *root)
                     break;
                 }
             }
+
+            if (blk->expr)
+            {
+                fprintf(stderr, "%*s", indent, "");
+                debug_dump_expr(blk->expr);
+                fprintf(stderr, "\n");
+            }
         }
 
         indent -= 4;
+        fprintf(stderr, "%*s}\n", indent, "");
+        fprintf(stderr, "\n");
     }
 }
