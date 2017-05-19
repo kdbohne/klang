@@ -233,7 +233,7 @@ void debug_dump(AstRoot *root)
                     debug_dump_expr(stmt->lhs);
                     fprintf(stderr, " := ");
                     debug_dump_expr(stmt->rhs);
-                    fprintf(stderr, "\n");
+                    fprintf(stderr, ";\n");
 
                     break;
                 }
@@ -243,13 +243,13 @@ void debug_dump(AstRoot *root)
                     break;
                 }
             }
+        }
 
-            if (blk->expr)
-            {
-                fprintf(stderr, "%*s", indent, "");
-                debug_dump_expr(blk->expr);
-                fprintf(stderr, "\n");
-            }
+        if (blk->expr)
+        {
+            fprintf(stderr, "%*s", indent, "");
+            debug_dump_expr(blk->expr);
+            fprintf(stderr, "\n");
         }
 
         indent -= 4;
