@@ -71,4 +71,9 @@ struct Array
     {
         return &data[count];
     }
+
+    T &operator[](i32 i)
+    {
+        return data[i];
+    }
 };

@@ -1,8 +1,8 @@
 #include <stdio.h>
 #include <malloc.h>
 
-#include "common.h"
-#include "array.h"
+#include "core/common.h"
+#include "core/array.h"
 #include "token.h"
 #include "ast.h"
 #include "lex.h"

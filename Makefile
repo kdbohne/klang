@@ -9,9 +9,14 @@ COMPILER_FLAGS=-m64 -std=c++11 -O0 -g -DPLATFORM_LINUX \
 			   -Werror -Wall -Wpedantic -Wshadow \
 			   -Wno-missing-braces -Wno-unused-function -Wno-unused-parameter -Wno-unused-variable
 LINKER_FLAGS=-m64 -fuse-ld=gold
+LLVM_COMPILER_FLAGS:=$(shell llvm-config --cxxflags | sed s/-Wno-maybe-uninitialized//g)
+LLVM_LINKER_FLAGS:=$(shell llvm-config --ldflags --libs core)
 
-SOURCES:=$(wildcard src/*.cpp)
-HEADERS:=$(wildcard src/*.h)
+COMPILER_FLAGS:=$(LLVM_COMPILER_FLAGS) $(COMPILER_FLAGS)
+LINKER_FLAGS:=$(LLVM_LINKER_FLAGS) $(LINKER_FLAGS)
+
+SOURCES:=$(wildcard src/*.cpp src/core/*.cpp)
+HEADERS:=$(wildcard src/*.h src/core/*.h)
 OBJECTS:=$(patsubst src/%.cpp, $(BUILD_DIR)/%.o, $(SOURCES))
 
 .PHONY: default
@@ -22,7 +27,7 @@ main: $(OBJECTS)
 	@$(COMPILER) $(COMPILER_FLAGS) $(LINKER_FLAGS) $(OBJECTS) -o $(BINARY_DIR)/$(BINARY_NAME)
 
 $(BUILD_DIR)/%.o: src/%.cpp $(HEADERS)
-	@mkdir -p build
+	@mkdir -p build build/core
 	@$(COMPILER) $(COMPILER_FLAGS) -c $< -o $@
 
 .PHONY: clean

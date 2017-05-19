@@ -1,5 +1,5 @@
 #include "parse.h"
-#include "common.h"
+#include "core/common.h"
 #include "ast.h"
 
 struct Parser

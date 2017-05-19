@@ -1,7 +1,7 @@
 #pragma once
 
-#include "common.h"
-#include "array.h"
+#include "core/common.h"
+#include "core/array.h"
 #include "token.h"
 
 extern "C"
