@@ -142,7 +142,7 @@ static AstExpr *parse_expr(Parser *parser)
             }
             expect(parser, TOK_CLOSE_PAREN);
 
-            break;
+            return call;
         }
         default:
         {
