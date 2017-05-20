@@ -13,7 +13,8 @@ llvm::LLVMContext context;
 llvm::Module module("Module", context);
 llvm::IRBuilder<> builder(context);
 
-HashMap<llvm::Value *> symbols;
+HashMap<llvm::Function *> funcs;
+HashMap<llvm::AllocaInst *> vars;
 
 llvm::Type *get_type_by_name(const char *name)
 {
@@ -22,7 +23,7 @@ llvm::Type *get_type_by_name(const char *name)
         return llvm::Type::getInt32Ty(context);
     if (strings_match(name, "i64"))
         return llvm::Type::getInt64Ty(context);
-    
+
     assert(false);
     return NULL;
 }
@@ -104,12 +105,10 @@ static llvm::Value *gen_expr(AstExpr *expr)
         case AST_EXPR_IDENT:
         {
             AstIdent *ident = static_cast<AstIdent *>(expr);
-            assert(symbols.get(ident->str) == NULL);
+            auto var = vars.get(ident->str);
+            assert(var != NULL);
 
-            llvm::Value *value = NULL; // FIXME
-            symbols.set(ident->str, value);
-
-            break;
+            return builder.CreateLoad(*var, ident->str);
         }
         case AST_EXPR_LIT:
         {
@@ -125,22 +124,21 @@ static llvm::Value *gen_expr(AstExpr *expr)
         {
             AstFuncCall *call = static_cast<AstFuncCall *>(expr);
 
+            Array<llvm::Value *> args_;
             llvm::ArrayRef<llvm::Value *> args = llvm::None;
             if (call->args.count > 0)
             {
-                Array<llvm::Value *> args_;
                 foreach(call->args)
                     args_.add(gen_expr(it));
 
                 args = llvm::ArrayRef<llvm::Value *>(args_.data, args_.count);
             }
 
-            auto func_ptr = symbols.get(call->name->str);
+            auto func_ptr = funcs.get(call->name->str);
             assert(func_ptr);
 
-            builder.CreateCall(*func_ptr, args, llvm::Twine(call->name->str));
-
-            break;
+//            return builder.CreateCall(*func_ptr, args, llvm::Twine(call->name->str));
+            return builder.CreateCall(*func_ptr, args, "calltmp");
         }
         default:
         {
@@ -158,63 +156,121 @@ static llvm::AllocaInst *create_alloca(llvm::Function *func, llvm::Type *type, c
     return tmp.CreateAlloca(type, 0, llvm::Twine(name));
 }
 
-static llvm::BasicBlock *gen_block(AstBlock *block, llvm::Function *func = NULL)
+static llvm::Value *gen_stmt(AstStmt *stmt, llvm::Function *func)
 {
-    auto bb = llvm::BasicBlock::Create(context, "block", func);
-
-    builder.SetInsertPoint(bb);
-
-    foreach(block->stmts)
+    switch (stmt->type)
     {
-        switch (it->type)
+        case AST_STMT_EXPR:
         {
-            case AST_STMT_EXPR:
-            {
-                // FIXME: this shouldn't happen, right? A block should only
-                // have one StmtExpr, and it is stored in block->expr.
-                assert(false);
-                break;
-            }
-            case AST_STMT_SEMI:
-            {
-                auto stmt = static_cast<AstStmtSemi *>(it);
-                auto expr = gen_expr(stmt->expr);
+            // FIXME: this shouldn't happen, right? A block should only
+            // have one StmtExpr, and it is stored in block->expr.
+            assert(false);
+            break;
+        }
+        case AST_STMT_SEMI:
+        {
+            auto semi = static_cast<AstStmtSemi *>(stmt);
+            auto expr = gen_expr(semi->expr);
 
-                // FIXME: now what?
+            // FIXME: now what?
 
-                break;
-            }
-            case AST_STMT_DECL:
-            {
-                auto decl = static_cast<AstStmtDecl *>(it);
-                auto lhs = gen_expr(decl->lhs);
-                auto rhs = gen_expr(decl->lhs);
+            break;
+        }
+        case AST_STMT_DECL:
+        {
+            auto decl = static_cast<AstStmtDecl *>(stmt);
 
-                // TODO: multiple decls, patterns, etc.
-                assert(decl->lhs->type == AST_IDENT);
-                auto ident = static_cast<AstIdent *>(decl->lhs);
+            // TODO: multiple decls, patterns, etc.
+            assert(decl->lhs->type == AST_EXPR_IDENT);
+            auto ident = static_cast<AstIdent *>(decl->lhs);
 
-                // TODO: arbitrary types
-                auto type = llvm::Type::getInt64Ty(context);
-                auto alloca = create_alloca(func, type, ident->str);
-                
-                builder.CreateStore(rhs, alloca);
+//            auto lhs = gen_expr(decl->lhs);
+            auto rhs = gen_expr(decl->rhs);
 
-                // TODO: now what?
+            // TODO: arbitrary types
+            auto type = llvm::Type::getInt64Ty(context);
+            auto alloca = create_alloca(func, type, ident->str);
 
-                break;
-            }
-            default:
-            {
-                assert(false);
-                break;
-            }
+            builder.CreateStore(rhs, alloca);
+
+            assert(vars.get(ident->str) == NULL);
+            vars.set(ident->str, alloca);
+
+            break;
+        }
+        default:
+        {
+            assert(false);
+            break;
         }
     }
 
-    if (block->expr)
+    return NULL;
+}
+
+static llvm::Function *gen_func(AstFunc *func)
+{
+    llvm::Type *ret_type = NULL;
+    if (func->ret)
+        ret_type = get_type_by_name(func->ret->str);
+    else
+        ret_type = llvm::Type::getVoidTy(context);
+
+    llvm::FunctionType *type = NULL;
+    if (func->params.count > 0)
     {
-        auto ret = gen_expr(block->expr);
+        Array<llvm::Type *> params_;
+        for (int i = 0; i < func->params.count; i += 2)
+        {
+            AstIdent *param_type = func->params[i + 1];
+            params_.add(get_type_by_name(param_type->str));
+        }
+
+        auto params = llvm::ArrayRef<llvm::Type *>(params_.data, params_.count);
+        type = llvm::FunctionType::get(ret_type, params, false);
+    }
+    else
+    {
+        type = llvm::FunctionType::get(ret_type, false);
+    }
+
+    // TODO: which linkage?
+    auto llvm_func = llvm::Function::Create(type, llvm::Function::ExternalLinkage, llvm::Twine(func->name->str), &module);
+
+    auto bb = llvm::BasicBlock::Create(context, "block", llvm_func);
+    builder.SetInsertPoint(bb);
+
+    // Save current var table.
+    auto vars_old = vars;
+
+    if (func->params.count > 0)
+    {
+        int i = 0;
+        for (auto &arg : llvm_func->args())
+        {
+            AstIdent *name = func->params[i];
+            i += 2;
+
+            arg.setName(name->str);
+
+            assert(arg.getType() == llvm::Type::getInt64Ty(context));
+            auto alloca = create_alloca(llvm_func, arg.getType(), name->str);
+
+            builder.CreateStore(&arg, alloca);
+
+            vars.set(name->str, alloca);
+        }
+    }
+
+    assert(funcs.get(func->name->str) == NULL);
+    funcs.set(func->name->str, llvm_func);
+
+    foreach(func->block->stmts)
+        gen_stmt(it, llvm_func);
+
+    if (func->block->expr)
+    {
+        auto ret = gen_expr(func->block->expr);
         builder.CreateRet(ret);
     }
     else
@@ -222,42 +278,10 @@ static llvm::BasicBlock *gen_block(AstBlock *block, llvm::Function *func = NULL)
         builder.CreateRetVoid();
     }
 
-    return bb;
-}
-
-static llvm::Function *gen_func(AstFunc *func)
-{
-    llvm::Type *ret = NULL;
-    if (func->ret)
-        ret = get_type_by_name(func->ret->str);
-    else
-        ret = llvm::Type::getVoidTy(context);
-
-    llvm::FunctionType *type = NULL;
-    if (func->params.count > 0)
-    {
-        Array<llvm::Type *> params_;
-        for (int i = 1; i < func->params.count; i += 2)
-        {
-            AstIdent *param_type = func->params[i];
-            params_.add(get_type_by_name(param_type->str));
-        }
-
-        auto params = llvm::ArrayRef<llvm::Type *>(params_.data, params_.count);
-        type = llvm::FunctionType::get(ret, params, false);
-    }
-    else
-    {
-        type = llvm::FunctionType::get(ret, false);
-    }
-    
-    // TODO: which linkage?
-    auto name = llvm::Twine(func->name->str);
-    auto llvm_func = llvm::Function::Create(type, llvm::Function::ExternalLinkage, name, &module);
-
-    auto block = gen_block(func->block, llvm_func);
-
     llvm::verifyFunction(*llvm_func);
+
+    // Pop args from var table.
+    vars = vars_old;
 
     return llvm_func;
 }
@@ -272,6 +296,6 @@ void llvm_gen_ir(AstRoot *ast)
     auto main = module.getFunction("main");
     assert(main != NULL);
 
-//    module.print(llvm::errs(), NULL);
-    module.dump();
+    module.print(llvm::errs(), NULL);
+//    module.dump();
 }

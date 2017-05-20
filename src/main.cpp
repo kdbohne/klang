@@ -62,7 +62,7 @@ int main(int argc, char *argv[])
         parse_file(root, &tokens);
     }
 
-    debug_dump(root);
+//    debug_dump(root);
 
     llvm_gen_ir(root);
 

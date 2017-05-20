@@ -212,10 +212,12 @@ void debug_dump(AstRoot *root)
             {
                 case AST_STMT_EXPR:
                 {
+#if 0
                     auto stmt = static_cast<AstStmtExpr *>(blk->stmts[i]);
                     debug_dump_expr(stmt->expr);
                     fprintf(stderr, "\n");
-
+#endif
+                    assert(false);
                     break;
                 }
                 case AST_STMT_SEMI:
