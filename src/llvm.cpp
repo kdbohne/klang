@@ -296,6 +296,6 @@ void llvm_gen_ir(AstRoot *ast)
     auto main = module.getFunction("main");
     assert(main != NULL);
 
-    module.print(llvm::errs(), NULL);
+    module.print(llvm::outs(), NULL);
 //    module.dump();
 }
