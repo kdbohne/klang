@@ -1,11 +1,12 @@
-#include "llvm.h"
-#include "ast.h"
-#include "core/hash_map.h"
-
 #include <llvm/IR/Verifier.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/IRBuilder.h>
+
+#undef assert
+#include "llvm.h"
+#include "ast.h"
+#include "core/hash_map.h"
 
 llvm::LLVMContext context;
 //llvm::Module *module = new llvm::Module("Module", context);

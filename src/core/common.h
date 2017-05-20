@@ -1,6 +1,7 @@
 #pragma once
 
 void assert_(bool cond, const char *cond_str, const char *file, unsigned line);
+#undef assert
 #define assert(cond) assert_(cond, #cond, __FILE__, __LINE__)
 
 #include <stdint.h>
