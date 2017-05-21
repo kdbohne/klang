@@ -54,7 +54,7 @@ struct AstIdent : AstExpr
 {
     AstIdent() : AstExpr(AST_EXPR_IDENT) {}
 
-    char *str;
+    char *str = NULL;
 };
 
 enum LitType : u32
@@ -71,7 +71,7 @@ struct AstLit : AstExpr
     LitType lit_type;
     union
     {
-        u64 value_int;
+        u64 value_int = 0;
         float value_float;
         char *value_str;
     };
@@ -89,16 +89,16 @@ struct AstBin : AstExpr
 {
     AstBin() : AstExpr(AST_EXPR_BIN) {}
 
-    AstExpr *lhs;
-    AstExpr *rhs;
-    BinOp op;
+    AstExpr *lhs = NULL;
+    AstExpr *rhs = NULL;
+    BinOp op = (BinOp)0;
 };
 
 struct AstFuncCall : AstExpr
 {
     AstFuncCall() : AstExpr(AST_EXPR_FUNC_CALL) {}
 
-    AstIdent *name;
+    AstIdent *name = NULL;
     Array<AstExpr *> args;
 };
 
@@ -111,33 +111,33 @@ struct AstStmtExpr : AstStmt
 {
     AstStmtExpr() : AstStmt(AST_STMT_EXPR) {}
 
-    AstExpr *expr;
+    AstExpr *expr = NULL;
 };
 
 struct AstStmtSemi : AstStmt
 {
     AstStmtSemi() : AstStmt(AST_STMT_SEMI) {}
 
-    AstExpr *expr;
+    AstExpr *expr = NULL;
 };
 
 struct AstStmtDecl : AstStmt
 {
     AstStmtDecl() : AstStmt(AST_STMT_DECL) {}
 
-    AstExpr *lhs;
-    AstExpr *rhs;
+    AstExpr *lhs = NULL;
+    AstExpr *rhs = NULL;
 };
 
 struct AstFunc : AstNode
 {
     AstFunc() : AstNode(AST_FUNC) {}
 
-    AstIdent *name;
+    AstIdent *name = NULL;
     Array<AstIdent *> params;
-    AstIdent *ret;
+    AstIdent *ret = NULL;
 
-    AstBlock *block;
+    AstBlock *block = NULL;
 };
 
 struct AstBlock : AstNode
@@ -145,7 +145,7 @@ struct AstBlock : AstNode
     AstBlock() : AstNode(AST_BLOCK) {}
 
     Array<AstStmt *> stmts;
-    AstExpr *expr;
+    AstExpr *expr = NULL;
 };
 
 // TODO: this is really bad; use a pool allocator (one for each type?)
