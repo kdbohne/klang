@@ -13,4 +13,8 @@ fn main()
     x := 3;
     y := inc(x);
     z := add(x, y);
+
+    print(x);
+    print(y);
+    print(z);
 }

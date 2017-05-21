@@ -128,6 +128,14 @@ static llvm::Value *gen_expr(AstExpr *expr)
             llvm::ArrayRef<llvm::Value *> args = llvm::None;
             if (call->args.count > 0)
             {
+                // TODO: nicer way of doing this
+                if (strings_match(call->name->str, "print"))
+                {
+//                    auto array = llvm::ConstantDataArray::getString(context, "%d\n");
+                    auto array = builder.CreateGlobalStringPtr("%d\n", "tmpstr");
+                    args_.add(array);
+                }
+
                 foreach(call->args)
                     args_.add(gen_expr(it));
 
@@ -137,8 +145,14 @@ static llvm::Value *gen_expr(AstExpr *expr)
             auto func_ptr = funcs.get(call->name->str);
             assert(func_ptr);
 
-//            return builder.CreateCall(*func_ptr, args, llvm::Twine(call->name->str));
-            return builder.CreateCall(*func_ptr, args, "calltmp");
+            auto func = *func_ptr;
+
+            if (func->getReturnType() == llvm::Type::getVoidTy(context))
+                return builder.CreateCall(func, args, "");
+            else
+                return builder.CreateCall(func, args, "calltmp");
+
+//            return builder.CreateCall(func, args, llvm::Twine(call->name->str));
         }
         default:
         {
@@ -286,8 +300,27 @@ static llvm::Function *gen_func(AstFunc *func)
     return llvm_func;
 }
 
+static void make_builtin_funcs()
+{
+    auto ret_void = llvm::Type::getVoidTy(context);
+
+    {
+        Array<llvm::Type *> params_;
+        params_.add(llvm::Type::getInt8PtrTy(context));
+        params_.add(llvm::Type::getInt64Ty(context));
+        auto params = llvm::ArrayRef<llvm::Type *>(params_.data, params_.count);
+
+        auto type = llvm::FunctionType::get(ret_void, params, false);
+        auto func = llvm::Function::Create(type, llvm::Function::ExternalLinkage, llvm::Twine("printf"), &module);
+
+        funcs.set("print", func);
+    }
+}
+
 void llvm_gen_ir(AstRoot *ast)
 {
+    make_builtin_funcs();
+
     foreach(ast->funcs)
     {
         llvm::Function *func = gen_func(it);
