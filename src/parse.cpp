@@ -231,6 +231,9 @@ static AstFunc *parse_func(Parser *parser)
 {
     AstFunc *func = ast_alloc(AstFunc);
 
+    if (eat_optional(parser, TOK_KEY_EXTERN))
+        func->flags |= FUNC_EXTERN;
+
     expect(parser, TOK_KEY_FN);
     Token ident = expect(parser, TOK_IDENT);
     func->name = make_ident(ident);
@@ -258,6 +261,13 @@ static AstFunc *parse_func(Parser *parser)
     {
         Token ret = next(parser);
         func->ret = make_ident(ret);
+    }
+
+    // Extern functions are just a declaration; there is no body.
+    if (func->flags & FUNC_EXTERN)
+    {
+        expect(parser, TOK_SEMI);
+        return func;
     }
 
     func->block = parse_block(parser);

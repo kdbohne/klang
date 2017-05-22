@@ -1,3 +1,5 @@
+extern fn print(x i64);
+
 fn inc(x i64) -> i64
 {
     x + 1

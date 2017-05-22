@@ -201,8 +201,11 @@ static Token get_token(Lexer *lexer)
                 token.type = TOK_IDENT;
                 token.len = lexer->cursor - token.str;
 
+                // TODO: optimize
                 if (token_matches(token, "fn"))
                     token.type = TOK_KEY_FN;
+                else if (token_matches(token, "extern"))
+                    token.type = TOK_KEY_EXTERN;
             }
             else if (is_number(c))
             {

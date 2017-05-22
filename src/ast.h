@@ -129,9 +129,16 @@ struct AstStmtDecl : AstStmt
     AstExpr *rhs = NULL;
 };
 
+enum AstFuncFlags
+{
+    FUNC_EXTERN = 0x1,
+};
+
 struct AstFunc : AstNode
 {
     AstFunc() : AstNode(AST_FUNC) {}
+
+    u32 flags;
 
     AstIdent *name = NULL;
     Array<AstIdent *> params;

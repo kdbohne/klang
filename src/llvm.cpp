@@ -128,6 +128,7 @@ static llvm::Value *gen_expr(AstExpr *expr)
             llvm::ArrayRef<llvm::Value *> args = llvm::None;
             if (call->args.count > 0)
             {
+#if 0
                 // TODO: nicer way of doing this
                 if (strings_match(call->name->str, "print"))
                 {
@@ -135,6 +136,7 @@ static llvm::Value *gen_expr(AstExpr *expr)
                     auto array = builder.CreateGlobalStringPtr("%d\n", "tmpstr");
                     args_.add(array);
                 }
+#endif
 
                 foreach(call->args)
                     args_.add(gen_expr(it));

@@ -23,6 +23,7 @@ const char *token_type_strings[]
     "r arrow",
 
     "key fn",
+    "key extern",
 
     "eof",
     "unknown",
