@@ -8,6 +8,13 @@ struct Parser
     i32 index;
 };
 
+#include <stdio.h>
+#define report_error(parser, str, ...) \
+{ \
+    fprintf(stderr, "Parse error: " str "\n", __VA_ARGS__); \
+    fprintf(stderr, "(TODO: print tokens here)\n"); \
+}
+
 static TokenType peek(Parser *parser)
 {
     assert(parser->index < parser->tokens->count);
@@ -25,6 +32,7 @@ static Token expect(Parser *parser, TokenType type)
     Token token = next(parser);
     if (token.type != type)
     {
+        report_error(parser, "Expected token type %d, got type %d.", type, token.type);
         assert(false);
     }
 
