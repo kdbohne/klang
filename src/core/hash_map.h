@@ -57,37 +57,28 @@ struct HashMap
 
         while (true)
         {
-            if (keys[i] == key)
+            if ((keys[i] == key) || (keys[i] == HASH_MAP_EMPTY_KEY))
             {
+                keys[i] = key;
                 values[i] = value;
-                break;
-            }
-
-            if (keys[i] == HASH_MAP_EMPTY_KEY)
-            {
-                // TODO: error message
-                assert(false);
                 break;
             }
 
             i = (i + 1) % HASH_MAP_CAPACITY;
             if (i == i_start)
-            {
-                // TODO: error message
-                assert(false);
                 break;
-            }
         }
     }
 
-    // Set an existing key's value.
+    // Set the value of an existing key, or add a new key-value pair if it
+    // doesn't already exist.
     void set(const char *str, T &value)
     {
         u64 hash = hash_djb2(str);
         set_(hash, value);
     }
 
-    void insert_(u64 key, T &value)
+    bool insert_(u64 key, T &value)
     {
         i32 i = (i32)(key % HASH_MAP_CAPACITY);
         i32 i_start = i;
@@ -103,18 +94,20 @@ struct HashMap
 
             i = (i + 1) % HASH_MAP_CAPACITY;
             if (i == i_start)
-            {
-                // TODO: error message
-                assert(false);
-                break;
-            }
+                return false;
         }
+
+        return true;
     }
 
     // Insert a new key-value pair.
     void insert(const char *str, T &value)
     {
         u64 hash = hash_djb2(str);
-        insert_(hash, value);
+        if (!insert_(hash, value))
+        {
+            fprintf(stderr, "Failed to insert key '%s', as it already exists. (Use set() if you want to set an existing key)", str);
+            assert(false);
+        }
     }
 };
