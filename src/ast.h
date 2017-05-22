@@ -138,7 +138,7 @@ struct AstFunc : AstNode
 {
     AstFunc() : AstNode(AST_FUNC) {}
 
-    u32 flags;
+    u32 flags = 0;
 
     AstIdent *name = NULL;
     Array<AstIdent *> params;
