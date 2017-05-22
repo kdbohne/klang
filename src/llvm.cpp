@@ -323,6 +323,9 @@ void llvm_gen_ir(AstRoot *ast)
 
     foreach(ast->funcs)
     {
+        if (it->flags & FUNC_EXTERN)
+            continue;
+
         llvm::Function *func = gen_func(it);
     }
 
