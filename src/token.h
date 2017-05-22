@@ -29,6 +29,7 @@ enum TokenType : u32
     TOK_EOF,
     TOK_UNKNOWN,
 };
+extern const char *token_type_strings[];
 
 struct Token
 {

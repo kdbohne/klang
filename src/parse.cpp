@@ -32,7 +32,8 @@ static Token expect(Parser *parser, TokenType type)
     Token token = next(parser);
     if (token.type != type)
     {
-        report_error(parser, "Expected token type %d, got type %d.", type, token.type);
+        report_error(parser, "Expected token \"%s\", got \"%s\".",
+                     token_type_strings[type], token_type_strings[token.type]);
         assert(false);
     }
 
