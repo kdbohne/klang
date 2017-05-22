@@ -106,7 +106,7 @@ static llvm::Value *gen_expr(AstExpr *expr)
         {
             AstIdent *ident = static_cast<AstIdent *>(expr);
             auto var = vars.get(ident->str);
-            assert(var != NULL);
+            assert(var);
 
             return builder.CreateLoad(*var, ident->str);
         }
@@ -209,8 +209,7 @@ static llvm::Value *gen_stmt(AstStmt *stmt, llvm::Function *func)
 
             builder.CreateStore(rhs, alloca);
 
-            assert(vars.get(ident->str) == NULL);
-            vars.set(ident->str, alloca);
+            vars.insert(ident->str, alloca);
 
             break;
         }
@@ -278,8 +277,7 @@ static llvm::Function *gen_func(AstFunc *func)
         }
     }
 
-    assert(funcs.get(func->name->str) == NULL);
-    funcs.set(func->name->str, llvm_func);
+    funcs.insert(func->name->str, llvm_func);
 
     foreach(func->block->stmts)
         gen_stmt(it, llvm_func);

@@ -57,6 +57,43 @@ struct HashMap
 
         while (true)
         {
+            if (keys[i] == key)
+            {
+                values[i] = value;
+                break;
+            }
+
+            if (keys[i] == HASH_MAP_EMPTY_KEY)
+            {
+                // TODO: error message
+                assert(false);
+                break;
+            }
+
+            i = (i + 1) % HASH_MAP_CAPACITY;
+            if (i == i_start)
+            {
+                // TODO: error message
+                assert(false);
+                break;
+            }
+        }
+    }
+
+    // Set an existing key's value.
+    void set(const char *str, T &value)
+    {
+        u64 hash = hash_djb2(str);
+        set_(hash, value);
+    }
+
+    void insert_(u64 key, T &value)
+    {
+        i32 i = (i32)(key % HASH_MAP_CAPACITY);
+        i32 i_start = i;
+
+        while (true)
+        {
             if (keys[i] == HASH_MAP_EMPTY_KEY)
             {
                 keys[i] = key;
@@ -74,9 +111,10 @@ struct HashMap
         }
     }
 
-    void set(const char *str, T &value)
+    // Insert a new key-value pair.
+    void insert(const char *str, T &value)
     {
         u64 hash = hash_djb2(str);
-        set_(hash, value);
+        insert_(hash, value);
     }
 };
