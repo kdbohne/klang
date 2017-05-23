@@ -12,6 +12,7 @@ extern "C"
     char *strncpy(char *dest, const char *src, u64 n);
 
     i64 strtoll(const char *nptr, char **endptr, int base);
+    float strtof(const char *nptr, char **endptr);
 }
 
 #if 0
@@ -56,8 +57,16 @@ static u64 make_int_from_token(Token tok)
 
 static float make_float_from_token(Token tok)
 {
-    // FIXME
-    return 0.0f;
+    // TODO: what size should this buffer be?
+    static char buf[64];
+
+    assert(tok.len < (i32)(sizeof(buf) / sizeof(buf[0])));
+    strncpy(buf, tok.str, tok.len);
+    buf[tok.len] = '\0';
+
+    float num = strtof(buf, NULL);
+
+    return num;
 }
 
 AstIdent *make_ident(Token tok)
