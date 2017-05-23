@@ -3,6 +3,7 @@
 #include "core/common.h"
 #include "core/array.h"
 #include "token.h"
+#include "type.h"
 
 struct AstFunc;
 struct AstBlock;
@@ -33,6 +34,7 @@ struct AstNode
     AstNode(AstNodeType type_) : type(type_) {}
 
     AstNodeType type = AST_ERR;
+    TypeDefn type_defn;
 };
 
 struct AstRoot : AstNode

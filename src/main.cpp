@@ -63,6 +63,8 @@ int main(int argc, char *argv[])
     }
 
 //    debug_dump(root);
+    if (!type_check(root))
+        return 1;
 
     llvm_gen_ir(root);
 
