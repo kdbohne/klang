@@ -23,6 +23,10 @@ llvm::Type *get_type_by_name(const char *name)
         return llvm::Type::getInt32Ty(context);
     if (strings_match(name, "i64"))
         return llvm::Type::getInt64Ty(context);
+    if (strings_match(name, "f32"))
+        return llvm::Type::getFloatTy(context);
+    if (strings_match(name, "f64"))
+        return llvm::Type::getDoubleTy(context);
 
     assert(false);
     return NULL;
