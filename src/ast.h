@@ -87,6 +87,7 @@ enum BinOp : u32
 
     BIN_ERR,
 };
+extern const char *bin_op_strings[];
 
 struct AstExprBin : AstExpr
 {
