@@ -34,7 +34,7 @@ struct AstNode
     AstNode(AstNodeType type_) : type(type_) {}
 
     AstNodeType type = AST_ERR;
-    TypeDefn type_defn;
+    TypeDefn *type_defn = NULL;
 };
 
 struct AstRoot : AstNode

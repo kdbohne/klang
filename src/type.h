@@ -11,5 +11,6 @@ struct TypeDefn
 extern TypeDefn global_type_defns[];
 
 void register_type_defn(const char *name);
+TypeDefn *get_type_defn(const char *name);
 
 bool type_check(AstRoot *root);
