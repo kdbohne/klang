@@ -5,7 +5,7 @@ fn inc(x i64) -> i64
 
 fn add(a i64, b i64) -> i64
 {
-    a + b
+    a + b;
 }
 
 fn main()
@@ -15,6 +15,7 @@ fn main()
     z := add(x, y);
 
     f := 3.14159;
-
     str := "test string";
+
+    err := add(f, str);
 }
