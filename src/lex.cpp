@@ -99,16 +99,16 @@ static void eat_whitespace(Lexer *lexer)
     }
 }
 
-static bool token_matches(Token token, const char *str)
+static bool token_matches(Token tok, const char *str)
 {
-    while (token.len > 0)
+    while (tok.len > 0)
     {
-        if (!(*str) || (*token.str != *str))
+        if (!(*str) || (*tok.str != *str))
             return false;
 
-        --token.len;
+        --tok.len;
 
-        ++token.str;
+        ++tok.str;
         ++str;
     }
 
@@ -121,40 +121,40 @@ static Token get_token(Lexer *lexer)
 {
     eat_whitespace(lexer);
 
-    Token token = {};
-    token.type = TOK_UNKNOWN;
-    token.len = 1;
-    token.str = lexer->cursor;
+    Token tok = {};
+    tok.type = TOK_UNKNOWN;
+    tok.len = 1;
+    tok.str = lexer->cursor;
 
     char c = *lexer->cursor;
     advance(lexer);
 
     switch (c)
     {
-        case '\0': { token.type = TOK_EOF;         break; }
-        case '(':  { token.type = TOK_OPEN_PAREN;  break; }
-        case ')':  { token.type = TOK_CLOSE_PAREN; break; }
-        case '{':  { token.type = TOK_OPEN_BRACE;  break; }
-        case '}':  { token.type = TOK_CLOSE_BRACE; break; }
-        case ';':  { token.type = TOK_SEMI;        break; }
-        case ',':  { token.type = TOK_COMMA;       break; }
+        case '\0': { tok.type = TOK_EOF;         break; }
+        case '(':  { tok.type = TOK_OPEN_PAREN;  break; }
+        case ')':  { tok.type = TOK_CLOSE_PAREN; break; }
+        case '{':  { tok.type = TOK_OPEN_BRACE;  break; }
+        case '}':  { tok.type = TOK_CLOSE_BRACE; break; }
+        case ';':  { tok.type = TOK_SEMI;        break; }
+        case ',':  { tok.type = TOK_COMMA;       break; }
 
-        case '+':  { token.type = TOK_PLUS;        break; }
-        case '*':  { token.type = TOK_ASTERISK;    break; }
-        case '/':  { token.type = TOK_SLASH;       break; }
+        case '+':  { tok.type = TOK_PLUS;        break; }
+        case '*':  { tok.type = TOK_ASTERISK;    break; }
+        case '/':  { tok.type = TOK_SLASH;       break; }
 
         case '-': 
         {
             if (*lexer->cursor == '>')
             {
-                token.type = TOK_R_ARROW;
-                token.len = 2;
+                tok.type = TOK_R_ARROW;
+                tok.len = 2;
 
                 advance(lexer);
             }
             else
             {
-                token.type = TOK_MINUS;
+                tok.type = TOK_MINUS;
             }
 
             break;
@@ -164,8 +164,8 @@ static Token get_token(Lexer *lexer)
         {
             if (*lexer->cursor == '=')
             {
-                token.type = TOK_COLON_EQ;
-                token.len = 2;
+                tok.type = TOK_COLON_EQ;
+                tok.len = 2;
 
                 advance(lexer);
             }
@@ -184,9 +184,9 @@ static Token get_token(Lexer *lexer)
 
             advance(lexer);
 
-            token.type = TOK_STR;
-            token.len = lexer->cursor - token.str - 1;
-            ++token.str;
+            tok.type = TOK_STR;
+            tok.len = lexer->cursor - tok.str - 1;
+            ++tok.str;
 
             break;
         }
@@ -198,14 +198,14 @@ static Token get_token(Lexer *lexer)
                 while (is_letter(*lexer->cursor) || is_number(*lexer->cursor) || (*lexer->cursor == '_'))
                     advance(lexer);
 
-                token.type = TOK_IDENT;
-                token.len = lexer->cursor - token.str;
+                tok.type = TOK_IDENT;
+                tok.len = lexer->cursor - tok.str;
 
                 // TODO: optimize
-                if (token_matches(token, "fn"))
-                    token.type = TOK_KEY_FN;
-                else if (token_matches(token, "extern"))
-                    token.type = TOK_KEY_EXTERN;
+                if (token_matches(tok, "fn"))
+                    tok.type = TOK_KEY_FN;
+                else if (token_matches(tok, "extern"))
+                    tok.type = TOK_KEY_EXTERN;
             }
             else if (is_number(c))
             {
@@ -227,21 +227,21 @@ static Token get_token(Lexer *lexer)
                 }
 
                 if (is_float)
-                    token.flags |= TOKEN_IS_FLOAT;
+                    tok.flags |= TOKEN_IS_FLOAT;
 
-                token.type = TOK_NUM;
-                token.len = lexer->cursor - token.str;
+                tok.type = TOK_NUM;
+                tok.len = lexer->cursor - tok.str;
             }
             else
             {
-                token.type = TOK_UNKNOWN;
+                tok.type = TOK_UNKNOWN;
             }
 
             break;
         }
     }
 
-    return token;
+    return tok;
 }
 
 Array<Token> lex_file(char *source)
@@ -255,10 +255,10 @@ Array<Token> lex_file(char *source)
 
     while (true)
     {
-        Token token = get_token(&lexer);
-        tokens.add(token);
+        Token tok = get_token(&lexer);
+        tokens.add(tok);
 
-        if (token.type == TOK_EOF)
+        if (tok.type == TOK_EOF)
             break;
     }
 
