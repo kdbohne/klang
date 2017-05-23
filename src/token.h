@@ -34,8 +34,8 @@ extern const char *token_type_strings[];
 
 struct Token
 {
-    TokenType type;
+    TokenType type = TOK_UNKNOWN;
 
-    char *str;
-    i32 len;
+    char *str = NULL;
+    i32 len = 0;
 };
