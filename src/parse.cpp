@@ -109,6 +109,8 @@ static AstExpr *parse_expr(Parser *parser)
         }
         default:
         {
+            report_error(parser, "Expected lhs expression, but got token \"%s\": \"%.*s\".",
+                         token_type_strings[tok.type], tok.len, tok.str);
             assert(false);
             break;
         }
