@@ -268,9 +268,7 @@ static llvm::Function *gen_func(AstFunc *func)
 
             arg.setName(name->str);
 
-            assert(arg.getType() == llvm::Type::getInt64Ty(context));
             auto alloca = create_alloca(llvm_func, arg.getType(), name->str);
-
             builder.CreateStore(&arg, alloca);
 
             vars.set(name->str, alloca);
