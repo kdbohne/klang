@@ -69,44 +69,44 @@ static float make_float_from_token(Token tok)
     return num;
 }
 
-AstIdent *make_ident(Token tok)
+AstExprIdent *make_ident(Token tok)
 {
-    AstIdent *ident = ast_alloc(AstIdent);
+    AstExprIdent *ident = ast_alloc(AstExprIdent);
     ident->str = make_str_from_token(tok);
 
     return ident;
 }
 
-AstLit *make_lit_int(Token tok)
+AstExprLit *make_lit_int(Token tok)
 {
-    AstLit *lit = ast_alloc(AstLit);
+    AstExprLit *lit = ast_alloc(AstExprLit);
     lit->lit_type = LIT_INT;
     lit->value_int = make_int_from_token(tok);
 
     return lit;
 }
 
-AstLit *make_lit_float(Token tok)
+AstExprLit *make_lit_float(Token tok)
 {
-    AstLit *lit = ast_alloc(AstLit);
+    AstExprLit *lit = ast_alloc(AstExprLit);
     lit->lit_type = LIT_FLOAT;
     lit->value_float = make_float_from_token(tok);
 
     return lit;
 }
 
-AstLit *make_lit_str(Token tok)
+AstExprLit *make_lit_str(Token tok)
 {
-    AstLit *lit = ast_alloc(AstLit);
+    AstExprLit *lit = ast_alloc(AstExprLit);
     lit->lit_type = LIT_STR;
     lit->value_str = make_str_from_token(tok);
 
     return lit;
 }
 
-AstBin *make_bin(AstExpr *lhs, AstExpr *rhs, BinOp op)
+AstExprBin *make_bin(AstExpr *lhs, AstExpr *rhs, BinOp op)
 {
-    AstBin *bin = ast_alloc(AstBin);
+    AstExprBin *bin = ast_alloc(AstExprBin);
     bin->lhs = lhs;
     bin->rhs = rhs;
     bin->op = op;
@@ -123,13 +123,13 @@ static void debug_dump_expr(AstExpr *expr)
     {
         case AST_EXPR_IDENT:
         {
-            auto ident = static_cast<AstIdent *>(expr);
+            auto ident = static_cast<AstExprIdent *>(expr);
             fprintf(stderr, "%s", ident->str);
             break;
         }
         case AST_EXPR_LIT:
         {
-            auto lit = static_cast<AstLit *>(expr);
+            auto lit = static_cast<AstExprLit *>(expr);
             switch (lit->lit_type)
             {
 //                case LIT_INT:   { fprintf(stderr, "%lld", (i64)lit->value_int); break; }
@@ -147,7 +147,7 @@ static void debug_dump_expr(AstExpr *expr)
         }
         case AST_EXPR_BIN:
         {
-            auto bin = static_cast<AstBin *>(expr);
+            auto bin = static_cast<AstExprBin *>(expr);
             debug_dump_expr(bin->lhs);
 
             switch (bin->op)
@@ -167,9 +167,9 @@ static void debug_dump_expr(AstExpr *expr)
 
             break;
         }
-        case AST_EXPR_FUNC_CALL:
+        case AST_EXPR_CALL:
         {
-            auto call = static_cast<AstFuncCall *>(expr);
+            auto call = static_cast<AstExprCall *>(expr);
 
             fprintf(stderr, "%s(", call->name->str);
             for (int i = 0; i < call->args.count; ++i)

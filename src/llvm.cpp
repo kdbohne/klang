@@ -34,7 +34,7 @@ llvm::Type *get_type_by_name(const char *name)
 
 static llvm::Value *gen_expr(AstExpr *expr);
 
-static llvm::Value *gen_lit(AstLit *lit)
+static llvm::Value *gen_lit(AstExprLit *lit)
 {
     switch (lit->lit_type)
     {
@@ -63,7 +63,7 @@ static llvm::Value *gen_lit(AstLit *lit)
     return NULL;
 }
 
-static llvm::Value *gen_bin(AstBin *bin)
+static llvm::Value *gen_bin(AstExprBin *bin)
 {
     auto lhs = gen_expr(bin->lhs);
     auto rhs = gen_expr(bin->rhs);
@@ -109,7 +109,7 @@ static llvm::Value *gen_expr(AstExpr *expr)
     {
         case AST_EXPR_IDENT:
         {
-            AstIdent *ident = static_cast<AstIdent *>(expr);
+            auto ident = static_cast<AstExprIdent *>(expr);
             auto var = vars.get(ident->str);
             assert(var);
 
@@ -117,17 +117,17 @@ static llvm::Value *gen_expr(AstExpr *expr)
         }
         case AST_EXPR_LIT:
         {
-            AstLit *lit = static_cast<AstLit *>(expr);
+            auto lit = static_cast<AstExprLit *>(expr);
             return gen_lit(lit);
         }
         case AST_EXPR_BIN:
         {
-            AstBin *bin = static_cast<AstBin *>(expr);
+            auto bin = static_cast<AstExprBin *>(expr);
             return gen_bin(bin);
         }
-        case AST_EXPR_FUNC_CALL:
+        case AST_EXPR_CALL:
         {
-            AstFuncCall *call = static_cast<AstFuncCall *>(expr);
+            auto call = static_cast<AstExprCall *>(expr);
 
             Array<llvm::Value *> args_;
             llvm::ArrayRef<llvm::Value *> args = llvm::None;
@@ -203,7 +203,7 @@ static llvm::Value *gen_stmt(AstStmt *stmt, llvm::Function *func)
 
             // TODO: multiple decls, patterns, etc.
             assert(decl->lhs->type == AST_EXPR_IDENT);
-            auto ident = static_cast<AstIdent *>(decl->lhs);
+            auto ident = static_cast<AstExprIdent *>(decl->lhs);
 
             auto rhs = gen_expr(decl->rhs);
             auto alloca = create_alloca(func, rhs->getType(), ident->str);
@@ -238,7 +238,7 @@ static llvm::Function *gen_func(AstFunc *func)
         Array<llvm::Type *> params_;
         for (int i = 0; i < func->params.count; i += 2)
         {
-            AstIdent *param_type = func->params[i + 1];
+            AstExprIdent *param_type = func->params[i + 1];
             params_.add(get_type_by_name(param_type->str));
         }
 
@@ -264,7 +264,7 @@ static llvm::Function *gen_func(AstFunc *func)
         int i = 0;
         for (auto &arg : llvm_func->args())
         {
-            AstIdent *name = func->params[i];
+            AstExprIdent *name = func->params[i];
             i += 2;
 
             arg.setName(name->str);

@@ -135,8 +135,8 @@ static AstExpr *parse_expr(Parser *parser)
         {
             eat(parser);
 
-            AstFuncCall *call = ast_alloc(AstFuncCall);
-            call->name = static_cast<AstIdent *>(lhs);
+            AstExprCall *call = ast_alloc(AstExprCall);
+            call->name = static_cast<AstExprIdent *>(lhs);
             assert(call->name);
 
             if (peek(parser) != TOK_CLOSE_PAREN)
@@ -251,8 +251,8 @@ static AstFunc *parse_func(Parser *parser)
         Token name_tok = next(parser);
         Token type_tok = next(parser);
 
-        AstIdent *name = make_ident(name_tok);
-        AstIdent *type = make_ident(type_tok);
+        AstExprIdent *name = make_ident(name_tok);
+        AstExprIdent *type = make_ident(type_tok);
         func->params.add(name);
         func->params.add(type);
 
