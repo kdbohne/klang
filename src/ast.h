@@ -62,13 +62,15 @@ enum LitType : u32
     LIT_INT,
     LIT_FLOAT,
     LIT_STR,
+
+    LIT_ERR,
 };
 
 struct AstLit : AstExpr
 {
     AstLit() : AstExpr(AST_EXPR_LIT) {}
 
-    LitType lit_type;
+    LitType lit_type = LIT_ERR;
     union
     {
         u64 value_int = 0;
