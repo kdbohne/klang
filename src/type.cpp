@@ -1,6 +1,14 @@
 #include "type.h"
-#include "core/string.h"
 #include "ast.h"
+#include "core/string.h"
+#include "core/hash_map.h"
+
+#include <stdio.h>
+#define report_error(str, ...) \
+{ \
+    fprintf(stderr, "Type error: " str, __VA_ARGS__); \
+    ++global_error_count; \
+}
 
 // TODO: size?
 TypeDefn global_type_defns[512];
@@ -8,11 +16,84 @@ static i32 global_type_defns_count;
 
 static i32 global_error_count;
 
-#include <stdio.h>
-#define report_error(str, ...) \
-{ \
-    fprintf(stderr, "Type error: " str, __VA_ARGS__); \
-    ++global_error_count; \
+static void dump_type_defns()
+{
+    for (int i = 0; i < global_type_defns_count; ++i)
+    {
+        TypeDefn *defn = &global_type_defns[i];
+        fprintf(stderr, "%s\n", defn->name);
+    }
+}
+
+// TODO: size?
+static Scope scope_pool[512];
+static i32 scope_pool_count;
+
+static Scope *make_scope(Scope *parent)
+{
+    assert(scope_pool_count < (i32)(sizeof(scope_pool) / sizeof(scope_pool[0])));
+
+    Scope *scope = &scope_pool[scope_pool_count++];
+    scope->parent = parent;
+
+    return scope;
+}
+
+static AstFunc *scope_get_func(Scope *scope, const char *name)
+{
+    assert(scope != NULL);
+
+    auto func_ptr = scope->funcs.get(name);
+    if (func_ptr)
+        return *func_ptr;
+
+    if (scope->parent)
+        return scope_get_func(scope->parent, name);
+
+    return NULL;
+}
+
+static AstExprIdent *scope_get_var(Scope *scope, const char *name)
+{
+    assert(scope != NULL);
+
+    auto var_ptr = scope->vars.get(name);
+    if (var_ptr)
+        return *var_ptr;
+
+    if (scope->parent)
+        return scope_get_var(scope->parent, name);
+
+    return NULL;
+}
+
+static void scope_add_func(Scope *scope, const char *name, AstFunc *func)
+{
+    assert(scope != NULL);
+
+    auto existing = scope_get_func(scope, name);
+    if (existing)
+    {
+        report_error("Redeclaring existing function \"%s\".\n", name);
+        return;
+    }
+
+    scope->funcs.insert(name, func);
+}
+
+static void scope_add_var(Scope *scope, const char *name, AstExprIdent *var)
+{
+    assert(scope != NULL);
+
+    auto existing = scope_get_var(scope, name);
+    if (existing)
+    {
+        report_error("Redeclaring existing identifier \"%s\".\n", name);
+        return;
+    }
+
+    var->scope = scope;
+    scope->vars.insert(name, var);
 }
 
 void register_type_defn(const char *name)
@@ -107,8 +188,12 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
     {
         case AST_EXPR_IDENT:
         {
-            // FIXME
-            return NULL;
+            auto ident = static_cast<AstExprIdent *>(expr);
+
+            auto var = scope_get_var(expr->scope, ident->str);
+            assert(var);
+
+            return var->type_defn;
         }
         case AST_EXPR_LIT:
         {
@@ -144,42 +229,71 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
         case AST_EXPR_BIN:
         {
             auto bin = static_cast<AstExprBin *>(expr);
+            auto lhs = bin->lhs;
+            auto rhs = bin->rhs;
 
-            auto lhs = determine_expr_type(bin->lhs);
-            auto rhs = determine_expr_type(bin->rhs);
+            lhs->scope = bin->scope;
+            rhs->scope = bin->scope;
+
+            lhs->type_defn = determine_expr_type(lhs);
+            rhs->type_defn = determine_expr_type(rhs);
 
             // TODO: should this check be done here?
-            if (lhs != rhs)
+            if (lhs->type_defn != rhs->type_defn)
             {
-                report_error("Type mismatch in binary operation:\n    %s %s %s",
-                             lhs->name, bin_op_strings[bin->op], rhs->name);
+                report_error("Type mismatch in binary operation:\n    %s %s %s\n",
+                             lhs->type_defn->name, bin_op_strings[bin->op], rhs->type_defn->name);
             }
 
-            // NOTE: returning LHS regardless of whether types match or not.
-            return lhs;
+            // NOTE: setting type to LHS regardless of whether types match or not.
+            bin->type_defn = lhs->type_defn;
+
+            return bin->type_defn;
         }
         case AST_EXPR_CALL:
         {
             auto call = static_cast<AstExprCall *>(expr);
+            foreach(call->args)
+            {
+                it->scope = call->scope;
+                it->type_defn = determine_expr_type(it);
+            }
 
-            // FIXME
-#if 0
-            auto func = funcs.get(call->name);
-#if 1
-            assert(func);
-#else
+            auto func = scope_get_func(call->scope, call->name->str);
+
+            int params_count = func->params.count / 2;
+            if (call->args.count != params_count)
+            {
+                report_error("Invalid number of arguments passed to \"%s\": %d vs %d.\n",
+                             func->name->str, call->args.count, params_count);
+            }
+            else
+            {
+                for (int i = 0; i < params_count; ++i)
+                {
+                    auto type = func->params[i*2 + 1];
+                    auto type_defn = get_type_defn(type->str);
+
+                    auto arg = call->args[i];
+
+                    if (arg->type_defn != type_defn)
+                    {
+                        report_error("Type mismatch in argument %d of \"%s\" call. Expected %s, got %s.\n",
+                                     i, func->name->str, type_defn->name, arg->type_defn->name);
+                    }
+                }
+            }
+
             if (!func)
             {
                 // TODO: dependency issue
+                assert(false);
             }
-#endif
 
             if (!func->ret || !func->ret->type_defn)
                 report_error("Attempting to assign void return value from function \"%s\".\n", func->name->str);
 
             return func->ret->type_defn;
-#endif
-            return NULL;
         }
         default:
         {
@@ -193,26 +307,92 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
 
 static void determine_stmt_type(AstStmt *stmt)
 {
+    switch (stmt->type)
+    {
+        case AST_STMT_EXPR:
+        {
+            auto expr = static_cast<AstStmtExpr *>(stmt);
+            expr->expr->scope = expr->scope;
+
+            determine_expr_type(expr->expr);
+
+            break;
+        }
+        case AST_STMT_SEMI:
+        {
+            auto semi = static_cast<AstStmtSemi *>(stmt);
+            semi->expr->scope = semi->scope;
+
+            determine_expr_type(semi->expr);
+
+            break;
+        }
+        case AST_STMT_DECL:
+        {
+            auto decl = static_cast<AstStmtDecl *>(stmt);
+            decl->lhs->scope = decl->scope;
+            decl->rhs->scope = decl->scope;
+
+            // TODO: multiple decls, patterns, etc.
+            assert(decl->lhs->type == AST_EXPR_IDENT);
+            auto lhs = static_cast<AstExprIdent *>(decl->lhs);
+
+            auto type = determine_expr_type(decl->rhs);
+            lhs->type_defn = type;
+
+            scope_add_var(lhs->scope, lhs->str, lhs);
+
+            break;
+        }
+        default:
+        {
+            assert(false);
+            break;
+        }
+    }
 }
 
 static void determine_block_type(AstBlock *blk)
 {
     foreach(blk->stmts)
+    {
+        it->scope = blk->scope;
         determine_stmt_type(it);
+    }
 
     if (blk->expr)
+    {
+        blk->expr->scope = blk->scope;
         determine_expr_type(blk->expr);
+    }
 }
 
 static void determine_node_types(AstRoot *root)
 {
+    root->scope = make_scope(NULL);
+
     foreach(root->funcs)
     {
+        scope_add_func(root->scope, it->name->str, it);
+        it->scope = make_scope(root->scope);
+
+        for (int i = 0; i < it->params.count; i += 2)
+        {
+            auto name = it->params[i + 0];
+            auto type = it->params[i + 1];
+
+            name->type_defn = get_type_defn(type->str);
+            scope_add_var(it->scope, name->str, name);
+        }
+
         if (it->ret)
             it->ret->type_defn = get_type_defn(it->ret->str);
 
         if (it->block)
+        {
+            it->block->scope = it->scope;
             determine_block_type(it->block);
+        }
     }
 }
 

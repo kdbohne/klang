@@ -2,6 +2,7 @@
 
 #include "common.h"
 #include "string.h"
+#include <stdio.h> // TODO: remove
 
 // TODO: what size?
 #define HASH_MAP_CAPACITY 4096

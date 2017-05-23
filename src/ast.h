@@ -2,11 +2,21 @@
 
 #include "core/common.h"
 #include "core/array.h"
+#include "core/hash_map.h"
 #include "token.h"
 #include "type.h"
 
 struct AstFunc;
 struct AstBlock;
+struct AstExprIdent;
+
+struct Scope
+{
+    HashMap<AstFunc *> funcs;
+    HashMap<AstExprIdent *> vars;
+
+    Scope *parent = NULL;
+};
 
 enum AstNodeType : u32
 {
@@ -34,7 +44,9 @@ struct AstNode
     AstNode(AstNodeType type_) : type(type_) {}
 
     AstNodeType type = AST_ERR;
+
     TypeDefn *type_defn = NULL;
+    Scope *scope = NULL;
 };
 
 struct AstRoot : AstNode
@@ -145,7 +157,7 @@ struct AstFunc : AstNode
     u32 flags = 0;
 
     AstExprIdent *name = NULL;
-    Array<AstExprIdent *> params;
+    Array<AstExprIdent *> params; // TODO: params type instead of two elems per param
     AstExprIdent *ret = NULL;
 
     AstBlock *block = NULL;
