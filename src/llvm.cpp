@@ -46,7 +46,7 @@ static llvm::Value *gen_lit(AstLit *lit)
         }
         case LIT_STR:
         {
-            // FIXME
+            return llvm::ConstantDataArray::getString(context, lit->value_str);
         }
         default:
         {
@@ -200,12 +200,8 @@ static llvm::Value *gen_stmt(AstStmt *stmt, llvm::Function *func)
             assert(decl->lhs->type == AST_EXPR_IDENT);
             auto ident = static_cast<AstIdent *>(decl->lhs);
 
-//            auto lhs = gen_expr(decl->lhs);
             auto rhs = gen_expr(decl->rhs);
-
-            // TODO: arbitrary types
-            auto type = llvm::Type::getInt64Ty(context);
-            auto alloca = create_alloca(func, type, ident->str);
+            auto alloca = create_alloca(func, rhs->getType(), ident->str);
 
             builder.CreateStore(rhs, alloca);
 

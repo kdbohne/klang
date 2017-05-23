@@ -1,5 +1,3 @@
-extern fn print(x i64);
-
 fn inc(x i64) -> i64
 {
     x + 1
@@ -16,7 +14,5 @@ fn main()
     y := inc(x);
     z := add(x, y);
 
-    print(x);
-    print(y);
-    print(z);
+    str := "test string";
 }
