@@ -40,6 +40,7 @@ static llvm::Value *gen_lit(AstLit *lit)
     {
         case LIT_INT:
         {
+            // TODO: 32-bit
             // TODO: unsigned
             auto type = llvm::IntegerType::get(context, 64);
             return llvm::ConstantInt::get(type, lit->value_int, true);
