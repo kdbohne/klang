@@ -24,13 +24,15 @@ enum AstNodeType : u32
 
     AST_FUNC,
     AST_BLOCK,
+
+    AST_ERR,
 };
 
 struct AstNode
 {
     AstNode(AstNodeType type_) : type(type_) {}
 
-    AstNodeType type;
+    AstNodeType type = AST_ERR;
 };
 
 struct AstRoot : AstNode
