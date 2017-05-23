@@ -87,9 +87,10 @@ static AstExpr *parse_expr(Parser *parser)
         }
         case TOK_NUM:
         {
-            // FIXME: check for int vs float
-            lhs = make_lit_int(tok);
-//            lhs = make_lit_float(tok);
+            if (tok.flags & TOKEN_IS_FLOAT)
+                lhs = make_lit_float(tok);
+            else
+                lhs = make_lit_int(tok);
 
             break;
         }

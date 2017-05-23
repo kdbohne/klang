@@ -14,5 +14,7 @@ fn main()
     y := inc(x);
     z := add(x, y);
 
+    f = 3.14159;
+
     str := "test string";
 }

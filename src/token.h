@@ -32,8 +32,15 @@ enum TokenType : u32
 };
 extern const char *token_type_strings[];
 
+enum TokenFlags
+{
+    TOKEN_IS_FLOAT = 0x1,
+};
+
 struct Token
 {
+    u32 flags = 0;
+
     TokenType type = TOK_UNKNOWN;
 
     char *str = NULL;

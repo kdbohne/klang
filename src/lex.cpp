@@ -227,9 +227,7 @@ static Token get_token(Lexer *lexer)
                 }
 
                 if (is_float)
-                {
-                    // FIXME: set flag
-                }
+                    token.flags |= TOKEN_IS_FLOAT;
 
                 token.type = TOK_NUM;
                 token.len = lexer->cursor - token.str;
