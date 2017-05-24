@@ -296,19 +296,19 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
             }
             else
             {
-                foreach(func->params)
                 for (int i = 0; i < func->params.count; ++i)
                 {
                     auto param = func->params[i];
                     auto arg = call->args[i];
 
-                    auto type_defn = get_type_defn(param->type);
+                    arg->type_defn = determine_expr_type(arg);
 
-                    if (arg->type_defn != type_defn)
+                    // NOTE: the param type is only attached to the 'name' field of the param.
+                    if (arg->type_defn != param->name->type_defn)
                     {
                         report_error("Type mismatch in argument %d of \"%s\" call. Expected %s%s, got %s%s.\n",
                                      i, func->name->str,
-                                     (type_defn->flags & TYPE_DEFN_IS_POINTER) ? "*" : "", type_defn->name,
+                                     (param->name->type_defn->flags & TYPE_DEFN_IS_POINTER) ? "*" : "", param->name->type_defn->name,
                                      (arg->type_defn->flags & TYPE_DEFN_IS_POINTER) ? "*" : "", arg->type_defn->name);
                     }
                 }
