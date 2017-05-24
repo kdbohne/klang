@@ -100,18 +100,29 @@ void register_type_defn(const char *name)
 {
     assert(global_type_defns_count < (i32)(sizeof(global_type_defns) / sizeof(global_type_defns[0])));
 
-    if (get_type_defn(name, true) != NULL)
+    // Make sure there's not already a type defn with this name.
+    for (int i = 0; i < global_type_defns_count; ++i)
     {
-        // TODO: error message
-        assert(false);
-        return;
+        TypeDefn *defn = &global_type_defns[i];
+        if (strings_match(defn->name, name))
+        {
+            // TODO: error message
+            assert(false);
+            return;
+        }
     }
 
+    // Register two types: the plain type, and a pointer to the type.
     TypeDefn *defn = &global_type_defns[global_type_defns_count++];
     defn->name = string_duplicate(name);
+
+    TypeDefn *defn_ptr = &global_type_defns[global_type_defns_count++];
+//    defn_ptr->name = string_concatenate("*", name);
+    defn_ptr->name = defn->name;
+    defn_ptr->flags |= TYPE_DEFN_IS_POINTER;
 }
 
-TypeDefn *get_type_defn(const char *name, bool silent)
+TypeDefn *get_type_defn(const char *name)
 {
     // TODO: optimize if needed
     for (int i = 0; i < global_type_defns_count; ++i)
@@ -121,38 +132,38 @@ TypeDefn *get_type_defn(const char *name, bool silent)
             return defn;
     }
 
-    if (!silent)
-        report_error("Unknown type \"%s\".\n", name);
+    report_error("Unknown type \"%s\".\n", name);
 
     return NULL;
 }
 
-static void type_check_stmt(AstStmt *stmt)
+static TypeDefn *get_type_defn(AstExprType *type)
 {
-    switch (stmt->type)
+    // TODO: optimize if needed
+    for (int i = 0; i < global_type_defns_count; ++i)
     {
-        case AST_STMT_EXPR:
-        case AST_STMT_SEMI:
-        {
-            break;
-        }
-        case AST_STMT_DECL:
-        {
-            break;
-        }
-        default:
-        {
-            assert(false);
-            break;
-        }
+        TypeDefn *defn = &global_type_defns[i];
+        if ((type->flags & TYPE_DEFN_IS_POINTER) != (defn->flags & TYPE_DEFN_IS_POINTER))
+            continue;
+
+        if (strings_match(defn->name, type->name->str))
+            return defn;
     }
+
+    report_error("Unknown type \"%s%s\".\n",
+                 (type->flags & TYPE_DEFN_IS_POINTER) ? "*" : "",
+                 type->name->str);
+
+    return NULL;
 }
 
 static void type_check_func(AstFunc *func)
 {
     auto blk = func->block;
+#if 0
     foreach(blk->stmts)
         type_check_stmt(it);
+#endif
 
     if (func->ret && !blk->expr)
     {
@@ -260,40 +271,43 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
             }
 
             auto func = scope_get_func(call->scope, call->name->str);
+            if (!func)
+            {
+                // TODO: dependency issue
+                report_error("Calling undeclared function \"%s\".\n", call->name->str);
+                assert(false);
+            }
 
-            int params_count = func->params.count / 2;
-            if (call->args.count != params_count)
+            if (call->args.count != func->params.count)
             {
                 report_error("Invalid number of arguments passed to \"%s\": %d vs %d.\n",
-                             func->name->str, call->args.count, params_count);
+                             func->name->str, call->args.count, func->params.count);
             }
             else
             {
-                for (int i = 0; i < params_count; ++i)
+                foreach(func->params)
+                for (int i = 0; i < func->params.count; ++i)
                 {
-                    auto type = func->params[i*2 + 1];
-                    auto type_defn = get_type_defn(type->str);
-
+                    auto param = func->params[i];
                     auto arg = call->args[i];
+
+                    auto type_defn = get_type_defn(param->type);
 
                     if (arg->type_defn != type_defn)
                     {
-                        report_error("Type mismatch in argument %d of \"%s\" call. Expected %s, got %s.\n",
-                                     i, func->name->str, type_defn->name, arg->type_defn->name);
+                        report_error("Type mismatch in argument %d of \"%s\" call. Expected %s%s, got %s%s.\n",
+                                     i, func->name->str,
+                                     (type_defn->flags & TYPE_DEFN_IS_POINTER) ? "*" : "", type_defn->name,
+                                     (arg->type_defn->flags & TYPE_DEFN_IS_POINTER) ? "*" : "", arg->type_defn->name);
                     }
                 }
             }
 
-            if (!func)
-            {
-                // TODO: dependency issue
-                assert(false);
-            }
+            if (func->ret)
+                return func->ret->type_defn;
 
-            if (!func->ret || !func->ret->type_defn)
-                report_error("Attempting to assign void return value from function \"%s\".\n", func->name->str);
-
-            return func->ret->type_defn;
+            // TODO: static type defn for void instead of looking up every time
+            return get_type_defn("void");
         }
         default:
         {
@@ -340,6 +354,16 @@ static void determine_stmt_type(AstStmt *stmt)
             auto type = determine_expr_type(decl->rhs);
             lhs->type_defn = type;
 
+            // If the RHS is a function call, make sure the function actually returns a value.
+            if (decl->rhs->type == AST_EXPR_CALL)
+            {
+                auto call = static_cast<AstExprCall *>(decl->rhs);
+                auto func = scope_get_func(call->scope, call->name->str);
+
+                if (!func->ret || !func->ret->type_defn)
+                    report_error("Attempting to assign void return value from function \"%s\".\n", func->name->str);
+            }
+
             scope_add_var(lhs->scope, lhs->str, lhs);
 
             break;
@@ -376,13 +400,12 @@ static void determine_node_types(AstRoot *root)
         scope_add_func(root->scope, it->name->str, it);
         it->scope = make_scope(root->scope);
 
-        for (int i = 0; i < it->params.count; i += 2)
+        for (int i = 0; i < it->params.count; ++i)
         {
-            auto name = it->params[i + 0];
-            auto type = it->params[i + 1];
+            auto param = it->params[i];
 
-            name->type_defn = get_type_defn(type->str);
-            scope_add_var(it->scope, name->str, name);
+            param->name->type_defn = get_type_defn(param->type);
+            scope_add_var(it->scope, param->name->str, param->name);
         }
 
         if (it->ret)
@@ -398,6 +421,7 @@ static void determine_node_types(AstRoot *root)
 
 bool type_check(AstRoot *root)
 {
+    register_type_defn("void");
     register_type_defn("i32");
     register_type_defn("i64");
     register_type_defn("f32");
@@ -409,7 +433,12 @@ bool type_check(AstRoot *root)
     determine_node_types(root);
 
     foreach(root->funcs)
+    {
+        if (it->flags & FUNC_EXTERN)
+            continue;
+
         type_check_func(it);
+    }
 
     return (global_error_count == 0);
 }

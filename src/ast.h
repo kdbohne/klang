@@ -27,6 +27,8 @@ enum AstNodeType : u32
     AST_EXPR_LIT,
     AST_EXPR_BIN,
     AST_EXPR_CALL,
+    AST_EXPR_TYPE,
+    AST_EXPR_PARAM,
 
     // Stmt
     AST_STMT_EXPR,
@@ -118,6 +120,27 @@ struct AstExprCall : AstExpr
     Array<AstExpr *> args;
 };
 
+enum AstExprTypeFlags
+{
+    TYPE_IS_POINTER = 0x1,
+};
+
+struct AstExprType : AstExpr
+{
+    AstExprType() : AstExpr(AST_EXPR_TYPE) {}
+
+    u32 flags = 0;
+    AstExprIdent *name = NULL;
+};
+
+struct AstExprParam : AstExpr
+{
+    AstExprParam() : AstExpr(AST_EXPR_PARAM) {}
+
+    AstExprIdent *name = NULL;
+    AstExprType *type = NULL;
+};
+
 struct AstStmt : AstNode
 {
     AstStmt(AstNodeType type_) : AstNode(type_) {}
@@ -157,7 +180,7 @@ struct AstFunc : AstNode
     u32 flags = 0;
 
     AstExprIdent *name = NULL;
-    Array<AstExprIdent *> params; // TODO: params type instead of two elems per param
+    Array<AstExprParam *> params;
     AstExprIdent *ret = NULL;
 
     AstBlock *block = NULL;

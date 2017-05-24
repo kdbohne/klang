@@ -209,10 +209,10 @@ void debug_dump(AstRoot *root)
     foreach(root->funcs)
     {
         fprintf(stderr, "%*sfn %s(", indent, "", it->name->str);
-        for (int i = 0; i < it->params.count; i += 2)
+        for (int i = 0; i < it->params.count; ++i)
         {
-            fprintf(stderr, "%s ", it->params[i + 0]->str);
-            fprintf(stderr, "%s",  it->params[i + 1]->str);
+            fprintf(stderr, "%s ", it->params[i]->name->str);
+            fprintf(stderr, "%s",  it->params[i]->type->name->str);
 
             if (i + 2 < it->params.count)
                 fprintf(stderr, ", ");

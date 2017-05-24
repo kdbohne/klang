@@ -236,11 +236,8 @@ static llvm::Function *gen_func(AstFunc *func)
     if (func->params.count > 0)
     {
         Array<llvm::Type *> params_;
-        for (int i = 0; i < func->params.count; i += 2)
-        {
-            AstExprIdent *param_type = func->params[i + 1];
-            params_.add(get_type_by_name(param_type->str));
-        }
+        foreach(func->params)
+            params_.add(get_type_by_name(it->type->name->str));
 
         auto params = llvm::ArrayRef<llvm::Type *>(params_.data, params_.count);
         type = llvm::FunctionType::get(ret_type, params, false);
@@ -252,6 +249,10 @@ static llvm::Function *gen_func(AstFunc *func)
 
     // TODO: which linkage?
     auto llvm_func = llvm::Function::Create(type, llvm::Function::ExternalLinkage, llvm::Twine(func->name->str), &module);
+    funcs.insert(func->name->str, llvm_func);
+
+    if (func->flags & FUNC_EXTERN)
+        return llvm_func;
 
     auto bb = llvm::BasicBlock::Create(context, "block", llvm_func);
     builder.SetInsertPoint(bb);
@@ -264,19 +265,17 @@ static llvm::Function *gen_func(AstFunc *func)
         int i = 0;
         for (auto &arg : llvm_func->args())
         {
-            AstExprIdent *name = func->params[i];
-            i += 2;
+            AstExprParam *param = func->params[i];
+            ++i;
 
-            arg.setName(name->str);
+            arg.setName(param->name->str);
 
-            auto alloca = create_alloca(llvm_func, arg.getType(), name->str);
+            auto alloca = create_alloca(llvm_func, arg.getType(), param->name->str);
             builder.CreateStore(&arg, alloca);
 
-            vars.set(name->str, alloca);
+            vars.set(param->name->str, alloca);
         }
     }
-
-    funcs.insert(func->name->str, llvm_func);
 
     foreach(func->block->stmts)
         gen_stmt(it, llvm_func);
@@ -314,19 +313,30 @@ static void make_builtin_funcs()
 
         funcs.set("print", func);
     }
+
+    {
+        Array<llvm::Type *> params_;
+        params_.add(llvm::Type::getInt64PtrTy(context));
+        params_.add(llvm::Type::getInt64PtrTy(context));
+        params_.add(llvm::Type::getInt64PtrTy(context));
+        params_.add(llvm::Type::getInt64PtrTy(context));
+        params_.add(llvm::Type::getInt64PtrTy(context));
+        params_.add(llvm::Type::getInt64PtrTy(context));
+        auto params = llvm::ArrayRef<llvm::Type *>(params_.data, params_.count);
+
+        auto type = llvm::FunctionType::get(llvm::Type::getInt64PtrTy(context), params, false);
+        auto func = llvm::Function::Create(type, llvm::Function::ExternalLinkage, llvm::Twine("syscall"), &module);
+
+        funcs.set("syscall", func);
+    }
 }
 
 void llvm_gen_ir(AstRoot *ast)
 {
-    make_builtin_funcs();
+//    make_builtin_funcs();
 
     foreach(ast->funcs)
-    {
-        if (it->flags & FUNC_EXTERN)
-            continue;
-
-        llvm::Function *func = gen_func(it);
-    }
+        gen_func(it);
 
     auto main = module.getFunction("main");
     assert(main != NULL);

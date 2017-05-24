@@ -230,6 +230,28 @@ static AstBlock *parse_block(Parser *parser)
     return block;
 }
 
+static AstExprParam *parse_param(Parser *parser)
+{
+    Token name_tok = expect(parser, TOK_IDENT);
+
+    bool is_pointer = false;
+    if (eat_optional(parser, TOK_ASTERISK))
+        is_pointer = true;
+
+    Token type_tok = expect(parser, TOK_IDENT);
+
+    AstExprType *type = ast_alloc(AstExprType);
+    type->name = make_ident(type_tok);
+    if (is_pointer)
+        type->flags |= TYPE_IS_POINTER;
+
+    AstExprParam *param = ast_alloc(AstExprParam);
+    param->name = make_ident(name_tok);
+    param->type = type;
+
+    return param;
+}
+
 static AstFunc *parse_func(Parser *parser)
 {
     AstFunc *func = ast_alloc(AstFunc);
@@ -248,13 +270,8 @@ static AstFunc *parse_func(Parser *parser)
         if (peek(parser) == TOK_CLOSE_PAREN)
             break;
 
-        Token name_tok = next(parser);
-        Token type_tok = next(parser);
-
-        AstExprIdent *name = make_ident(name_tok);
-        AstExprIdent *type = make_ident(type_tok);
-        func->params.add(name);
-        func->params.add(type);
+        AstExprParam *param = parse_param(parser);
+        func->params.add(param);
 
         eat_optional(parser, TOK_COMMA);
     }
