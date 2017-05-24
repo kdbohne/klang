@@ -32,6 +32,38 @@ llvm::Type *get_type_by_name(const char *name)
     return NULL;
 }
 
+llvm::Type *get_type_by_expr(AstExprType *expr)
+{
+    auto name = expr->name->str;
+
+    // TODO: support arbitrary types
+    if (expr->flags & TYPE_IS_POINTER)
+    {
+        if (strings_match(name, "i32"))
+            return llvm::Type::getInt32PtrTy(context);
+        if (strings_match(name, "i64"))
+            return llvm::Type::getInt64PtrTy(context);
+        if (strings_match(name, "f32"))
+            return llvm::Type::getFloatPtrTy(context);
+        if (strings_match(name, "f64"))
+            return llvm::Type::getDoublePtrTy(context);
+    }
+    else
+    {
+        if (strings_match(name, "i32"))
+            return llvm::Type::getInt32Ty(context);
+        if (strings_match(name, "i64"))
+            return llvm::Type::getInt64Ty(context);
+        if (strings_match(name, "f32"))
+            return llvm::Type::getFloatTy(context);
+        if (strings_match(name, "f64"))
+            return llvm::Type::getDoubleTy(context);
+    }
+
+    assert(false);
+    return NULL;
+}
+
 static llvm::Value *gen_expr(AstExpr *expr);
 
 static llvm::Value *gen_lit(AstExprLit *lit)
@@ -103,6 +135,32 @@ static llvm::Value *gen_bin(AstExprBin *bin)
     return NULL;
 }
 
+static llvm::Value *gen_un(AstExprUn *un)
+{
+    auto expr = gen_expr(un->expr);
+
+    switch (un->op)
+    {
+        case UN_ADDR:
+        {
+//            auto type = llvm::PointerType::getUnqual(expr);
+//            return builder.CreateIntToPtr(expr, llvm::IntegerType::get(context, 64));
+//            return builder.CreateLoad(expr);
+
+            // NOTE: expr should be an ident, whose address is already computed with
+            // a CreateLoad() in the AST_EXPR_IDENT branch of gen_expr().
+            return expr;
+        }
+        default:
+        {
+            assert(false);
+            break;
+        }
+    }
+
+    return NULL;
+}
+
 static llvm::Value *gen_expr(AstExpr *expr)
 {
     switch (expr->type)
@@ -124,6 +182,11 @@ static llvm::Value *gen_expr(AstExpr *expr)
         {
             auto bin = static_cast<AstExprBin *>(expr);
             return gen_bin(bin);
+        }
+        case AST_EXPR_UN:
+        {
+            auto un = static_cast<AstExprUn *>(expr);
+            return gen_un(un);
         }
         case AST_EXPR_CALL:
         {
@@ -163,9 +226,15 @@ static llvm::Value *gen_expr(AstExpr *expr)
         }
         case AST_EXPR_CAST:
         {
-            // FIXME: this ignores the cast completely
             auto cast = static_cast<AstExprCast *>(expr);
-            return gen_expr(cast->expr);
+
+            auto src = gen_expr(cast->expr);
+//            auto dest = get_type_by_expr(cast->type); // TODO: why does this return a double pointer?
+            auto dest = get_type_by_name(cast->type->name->str);
+
+            // FIXME: signed vs unsigned?
+            auto opcode = llvm::CastInst::getCastOpcode(src, true, dest, true);
+            return builder.CreateCast(opcode, src, dest);
         }
         default:
         {

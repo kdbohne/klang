@@ -261,6 +261,17 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
 
             return bin->type_defn;
         }
+        case AST_EXPR_UN:
+        {
+            auto un = static_cast<AstExprUn *>(expr);
+
+            un->expr->scope = un->scope;
+
+            un->expr->type_defn = determine_expr_type(un->expr);
+            un->type_defn = un->expr->type_defn;
+
+            return un->type_defn;
+        }
         case AST_EXPR_CALL:
         {
             auto call = static_cast<AstExprCall *>(expr);
