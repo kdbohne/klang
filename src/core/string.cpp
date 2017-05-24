@@ -49,3 +49,21 @@ char *string_duplicate(const char *str)
 
     return dup;
 }
+
+char *string_concatenate(const char *a, const char *b)
+{
+    int len_a = string_length(a);
+    int len_b = string_length(b);
+    int len = len_a + len_b;
+
+    char *cat = (char *)malloc(len + 1);
+
+    for (int i = 0; i < len_a; ++i)
+        cat[i] = a[i];
+    for (int i = 0; i < len_b; ++i)
+        cat[len_a + i] = b[i];
+
+    cat[len] = '\0';
+
+    return cat;
+}
