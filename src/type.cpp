@@ -325,7 +325,7 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
             auto cast = static_cast<AstExprCast *>(expr);
             cast->type_defn = get_type_defn(cast->type);
 
-            break;
+            return cast->type_defn;
         }
         default:
         {
