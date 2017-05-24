@@ -139,11 +139,13 @@ static Token get_token(Lexer *lexer)
         case ';':  { tok.type = TOK_SEMI;        break; }
         case ',':  { tok.type = TOK_COMMA;       break; }
 
+        case '&':  { tok.type = TOK_AND;         break; }
+
         case '+':  { tok.type = TOK_PLUS;        break; }
         case '*':  { tok.type = TOK_ASTERISK;    break; }
         case '/':  { tok.type = TOK_SLASH;       break; }
 
-        case '-': 
+        case '-':
         {
             if (*lexer->cursor == '>')
             {

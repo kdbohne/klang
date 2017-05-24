@@ -139,6 +139,12 @@ static AstExpr *parse_expr(Parser *parser)
 
             break;
         }
+        case TOK_AND:
+        {
+            // FIXME
+            parse_expr(parser);
+            break;
+        }
         default:
         {
             report_error(parser, "Expected lhs expression, but got token \"%s\": \"%.*s\".",

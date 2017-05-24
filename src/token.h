@@ -21,6 +21,8 @@ enum TokenType : u32
     TOK_ASTERISK,
     TOK_SLASH,
 
+    TOK_AND,
+
     TOK_COLON_EQ,
     TOK_R_ARROW,
 

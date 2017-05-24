@@ -23,6 +23,9 @@ fn main()
 
     test := cast(i64) f;
 
+    ptr := &f;
+    ptri := cast(*i64) ptr;
+
     syscall5();
 //    syscall5(1, 1, 3, 8, 0, 0);
 }
