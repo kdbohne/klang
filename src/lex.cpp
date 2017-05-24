@@ -206,6 +206,8 @@ static Token get_token(Lexer *lexer)
                     tok.type = TOK_KEY_FN;
                 else if (token_matches(tok, "extern"))
                     tok.type = TOK_KEY_EXTERN;
+                else if (token_matches(tok, "cast"))
+                    tok.type = TOK_KEY_CAST;
             }
             else if (is_number(c))
             {

@@ -21,6 +21,8 @@ fn main()
     f := 3.14159;
     str := "test string";
 
+    test := cast(i64) f;
+
     syscall5();
 //    syscall5(1, 1, 3, 8, 0, 0);
 }

@@ -26,6 +26,7 @@ enum TokenType : u32
 
     TOK_KEY_FN,
     TOK_KEY_EXTERN,
+    TOK_KEY_CAST,
 
     TOK_EOF,
     TOK_UNKNOWN,

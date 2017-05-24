@@ -29,6 +29,7 @@ enum AstNodeType : u32
     AST_EXPR_CALL,
     AST_EXPR_TYPE,
     AST_EXPR_PARAM,
+    AST_EXPR_CAST,
 
     // Stmt
     AST_STMT_EXPR,
@@ -139,6 +140,14 @@ struct AstExprParam : AstExpr
 
     AstExprIdent *name = NULL;
     AstExprType *type = NULL;
+};
+
+struct AstExprCast : AstExpr
+{
+    AstExprCast() : AstExpr(AST_EXPR_CAST) {}
+
+    AstExprType *type = NULL;
+    AstExpr *expr = NULL;
 };
 
 struct AstStmt : AstNode

@@ -73,6 +73,22 @@ static BinOp get_bin_op(TokenType type)
     }
 }
 
+static AstExprType *parse_type(Parser *parser)
+{
+    bool is_pointer = false;
+    if (eat_optional(parser, TOK_ASTERISK))
+        is_pointer = true;
+
+    Token type_tok = expect(parser, TOK_IDENT);
+
+    AstExprType *type = ast_alloc(AstExprType);
+    type->name = make_ident(type_tok);
+    if (is_pointer)
+        type->flags |= TYPE_IS_POINTER;
+
+    return type;
+}
+
 static AstExpr *parse_expr(Parser *parser)
 {
     AstExpr *lhs = NULL;
@@ -104,6 +120,22 @@ static AstExpr *parse_expr(Parser *parser)
             eat(parser);
             lhs = parse_expr(parser);
             expect(parser, TOK_CLOSE_PAREN);
+
+            break;
+        }
+        case TOK_KEY_CAST:
+        {
+            expect(parser, TOK_OPEN_PAREN);
+            AstExprType *type = parse_type(parser);
+            expect(parser, TOK_CLOSE_PAREN);
+
+            AstExpr *expr = parse_expr(parser);
+
+            AstExprCast *cast = ast_alloc(AstExprCast);
+            cast->type = type;
+            cast->expr = expr;
+
+            lhs = cast;
 
             break;
         }
@@ -234,20 +266,9 @@ static AstExprParam *parse_param(Parser *parser)
 {
     Token name_tok = expect(parser, TOK_IDENT);
 
-    bool is_pointer = false;
-    if (eat_optional(parser, TOK_ASTERISK))
-        is_pointer = true;
-
-    Token type_tok = expect(parser, TOK_IDENT);
-
-    AstExprType *type = ast_alloc(AstExprType);
-    type->name = make_ident(type_tok);
-    if (is_pointer)
-        type->flags |= TYPE_IS_POINTER;
-
     AstExprParam *param = ast_alloc(AstExprParam);
     param->name = make_ident(name_tok);
-    param->type = type;
+    param->type = parse_type(parser);
 
     return param;
 }
