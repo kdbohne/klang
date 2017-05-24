@@ -161,6 +161,12 @@ static llvm::Value *gen_expr(AstExpr *expr)
 
 //            return builder.CreateCall(func, args, llvm::Twine(call->name->str));
         }
+        case AST_EXPR_CAST:
+        {
+            // FIXME: this ignores the cast completely
+            auto cast = static_cast<AstExprCast *>(expr);
+            return gen_expr(cast->expr);
+        }
         default:
         {
             assert(false);

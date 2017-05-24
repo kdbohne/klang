@@ -309,6 +309,13 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
             // TODO: static type defn for void instead of looking up every time
             return get_type_defn("void");
         }
+        case AST_EXPR_CAST:
+        {
+            auto cast = static_cast<AstExprCast *>(expr);
+            cast->type_defn = get_type_defn(cast->type);
+
+            break;
+        }
         default:
         {
             assert(false);
