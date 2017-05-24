@@ -25,6 +25,13 @@ const char *bin_op_strings[] =
     "?", // BIN_ERR
 };
 
+const char *un_op_strings[] =
+{
+    "&", // UN_ADD
+
+    "?", // UN_ERR
+};
+
 #if 0
 AstNode *ast_alloc(AstNodeType type)
 {
@@ -120,8 +127,17 @@ AstExprBin *make_bin(AstExpr *lhs, AstExpr *rhs, BinOp op)
     bin->lhs = lhs;
     bin->rhs = rhs;
     bin->op = op;
-    
+
     return bin;
+}
+
+AstExprUn *make_un(UnOp op, AstExpr *expr)
+{
+    AstExprUn *un = ast_alloc(AstExprUn);
+    un->op = op;
+    un->expr = expr;
+
+    return un;
 }
 
 #include <stdio.h>

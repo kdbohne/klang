@@ -26,6 +26,7 @@ enum AstNodeType : u32
     AST_EXPR_IDENT,
     AST_EXPR_LIT,
     AST_EXPR_BIN,
+    AST_EXPR_UN,
     AST_EXPR_CALL,
     AST_EXPR_TYPE,
     AST_EXPR_PARAM,
@@ -111,6 +112,22 @@ struct AstExprBin : AstExpr
     AstExpr *lhs = NULL;
     AstExpr *rhs = NULL;
     BinOp op = BIN_ERR;
+};
+
+enum UnOp : u32
+{
+    UN_ADDR,
+
+    UN_ERR,
+};
+extern const char *un_op_strings[];
+
+struct AstExprUn : AstExpr
+{
+    AstExprUn() : AstExpr(AST_EXPR_UN) {}
+
+    UnOp op = UN_ERR;
+    AstExpr *expr = NULL;
 };
 
 struct AstExprCall : AstExpr
@@ -211,5 +228,6 @@ AstExprLit *make_lit_int(Token tok);
 AstExprLit *make_lit_float(Token tok);
 AstExprLit *make_lit_str(Token tok);
 AstExprBin *make_bin(AstExpr *lhs, AstExpr *rhs, BinOp op);
+AstExprUn *make_un(UnOp op, AstExpr *expr);
 
 void debug_dump(AstRoot *root);

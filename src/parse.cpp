@@ -68,7 +68,20 @@ static BinOp get_bin_op(TokenType type)
         default:
         {
             assert(false);
-            return (BinOp)0;
+            return BIN_ERR;
+        }
+    }
+}
+
+static UnOp get_un_op(TokenType type)
+{
+    switch (type)
+    {
+        case TOK_AND: return UN_ADDR;
+        default:
+        {
+            assert(false);
+            return UN_ERR;
         }
     }
 }
@@ -139,12 +152,17 @@ static AstExpr *parse_expr(Parser *parser)
 
             break;
         }
+
+        // Unary operators.
+        // Add more here!
         case TOK_AND:
         {
-            // FIXME
-            parse_expr(parser);
-            break;
+            UnOp op = get_un_op(tok.type);
+            AstExpr *expr = parse_expr(parser);
+
+            return make_un(op, expr);
         }
+
         default:
         {
             report_error(parser, "Expected lhs expression, but got token \"%s\": \"%.*s\".",
