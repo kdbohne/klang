@@ -207,7 +207,7 @@ struct AstFunc : AstNode
 
     AstExprIdent *name = NULL;
     Array<AstExprParam *> params;
-    AstExprIdent *ret = NULL;
+    AstExprType *ret = NULL;
 
     AstBlock *block = NULL;
 };

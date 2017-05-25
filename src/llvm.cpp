@@ -303,7 +303,7 @@ static llvm::Function *gen_func(AstFunc *func)
 {
     llvm::Type *ret_type = NULL;
     if (func->ret)
-        ret_type = get_type_by_name(func->ret->str);
+        ret_type = get_type_by_expr(func->ret);
     else
         ret_type = llvm::Type::getVoidTy(context);
 

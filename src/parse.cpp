@@ -323,10 +323,7 @@ static AstFunc *parse_func(Parser *parser)
     expect(parser, TOK_CLOSE_PAREN);
 
     if (eat_optional(parser, TOK_R_ARROW))
-    {
-        Token ret = next(parser);
-        func->ret = make_ident(ret);
-    }
+        func->ret = parse_type(parser);
 
     // Extern functions are just a declaration; there is no body.
     if (func->flags & FUNC_EXTERN)
