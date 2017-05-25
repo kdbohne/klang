@@ -9,7 +9,6 @@
 #include "core/hash_map.h"
 
 llvm::LLVMContext context;
-//llvm::Module *module = new llvm::Module("Module", context);
 llvm::Module module("Module", context);
 llvm::IRBuilder<> builder(context);
 
@@ -83,7 +82,12 @@ static llvm::Value *gen_lit(AstExprLit *lit)
         }
         case LIT_STR:
         {
-            return llvm::ConstantDataArray::getString(context, lit->value_str);
+            auto str = llvm::ConstantDataArray::getString(context, lit->value_str);
+
+            auto alloca = builder.CreateAlloca(str->getType());
+            builder.CreateStore(str, alloca);
+
+            return builder.CreateGEP(alloca, llvm::ConstantInt::get(llvm::IntegerType::getInt64Ty(context), 0));
         }
         default:
         {
@@ -143,13 +147,25 @@ static llvm::Value *gen_un(AstExprUn *un)
     {
         case UN_ADDR:
         {
-//            auto type = llvm::PointerType::getUnqual(expr);
-//            return builder.CreateIntToPtr(expr, llvm::IntegerType::get(context, 64));
-//            return builder.CreateLoad(expr);
+            auto alloca = builder.CreateAlloca(expr->getType());
+            builder.CreateStore(expr, alloca);
 
+            return builder.CreateGEP(alloca, llvm::ConstantInt::get(llvm::IntegerType::getInt64Ty(context), 0));
+
+            /*
+            return builder.CreateIntToPtr(expr, llvm::PointerType::getUnqual(expr->getType()));
+            */
+
+            /*
+            auto type = llvm::PointerType::getUnqual(expr->getType());
+            return builder.CreateLoad(type, expr);
+            */
+
+            /*
             // NOTE: expr should be an ident, whose address is already computed with
             // a CreateLoad() in the AST_EXPR_IDENT branch of gen_expr().
             return expr;
+            */
         }
         default:
         {
@@ -229,8 +245,7 @@ static llvm::Value *gen_expr(AstExpr *expr)
             auto cast = static_cast<AstExprCast *>(expr);
 
             auto src = gen_expr(cast->expr);
-//            auto dest = get_type_by_expr(cast->type); // TODO: why does this return a double pointer?
-            auto dest = get_type_by_name(cast->type->name->str);
+            auto dest = get_type_by_expr(cast->type);
 
             // FIXME: signed vs unsigned?
             auto opcode = llvm::CastInst::getCastOpcode(src, true, dest, true);

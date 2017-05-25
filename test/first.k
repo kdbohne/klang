@@ -1,6 +1,4 @@
-//extern fn syscall5(num *i64, arg1 *i64, arg2 *i64, arg3 *i64, arg4 *i64, arg5 *i64) -> i64;
-//extern fn syscall5(num i64, arg1 i64, arg2 i64, arg3 i64, arg4 i64, arg5 i64) -> i64;
-extern fn syscall5();
+extern fn syscall5(num *i64, arg1 *i64, arg2 *i64, arg3 *i64, arg4 *i64, arg5 *i64) -> i64;
 
 fn inc(x i64) -> i64
 {
@@ -14,18 +12,24 @@ fn add(a i64, b i64) -> i64
 
 fn main()
 {
+    /*
     x := 3;
     y := inc(x);
     z := add(x, y);
+    */
 
     f := 3.14159;
-    str := "test string";
 
-    test := cast(i64) f;
+    x := 3;
+    xp := &x;
+    xpp := &xp;
+
+    str := "hello!\n";
+    stri := cast(*i64) str;
+    strp := &str;
 
     ptr := &f;
     ptri := cast(*i64) ptr;
 
-    syscall5();
-//    syscall5(1, 1, 3, 8, 0, 0);
+    syscall5(cast(*i64) 1, cast(*i64) 1, cast(*i64) str, cast(*i64) 7, cast(*i64) 0, cast(*i64) 0);
 }
