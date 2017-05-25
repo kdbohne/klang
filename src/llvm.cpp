@@ -312,7 +312,7 @@ static llvm::Function *gen_func(AstFunc *func)
     {
         Array<llvm::Type *> params_;
         foreach(func->params)
-            params_.add(get_type_by_name(it->type->name->str));
+            params_.add(get_type_by_expr(it->type));
 
         auto params = llvm::ArrayRef<llvm::Type *>(params_.data, params_.count);
         type = llvm::FunctionType::get(ret_type, params, false);
