@@ -181,14 +181,55 @@ static Token get_token(Lexer *lexer)
 
         case '"':
         {
-            while (*lexer->cursor != '"')
-                advance(lexer);
+            tok.type = TOK_STR;
 
+            int escape_count = 0;
+            while (*lexer->cursor != '"')
+            {
+                if (*lexer->cursor == '\\')
+                    ++escape_count;
+
+                advance(lexer);
+            }
             advance(lexer);
 
-            tok.type = TOK_STR;
-            tok.len = lexer->cursor - tok.str - 2;
-            ++tok.str;
+            int raw_len = lexer->cursor - tok.str - 2;
+            char *raw_str = tok.str + 1;
+
+            // TODO: leak, free after parsing
+            tok.len = raw_len - escape_count;
+            tok.str = (char *)malloc(tok.len + 1);
+
+            char *str = tok.str;
+            if (raw_len > 0)
+            {
+                for (int i = 0; i < raw_len - 1; ++i)
+                {
+                    if (raw_str[i] == '\\')
+                    {
+                        char e = raw_str[i + 1];
+                        switch (e)
+                        {
+                            case 'n': { *str++ = '\n'; break; }
+                            case 'r': { *str++ = '\r'; break; }
+                            case 't': { *str++ = '\t'; break; }
+                            default:
+                            {
+                                assert(false);
+                                break;
+                            }
+                        }
+
+                        ++i;
+                    }
+                    else
+                    {
+                        *str++ = raw_str[i];
+                    }
+                }
+            }
+
+            tok.str[tok.len] = '\0';
 
             break;
         }
