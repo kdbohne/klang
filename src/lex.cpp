@@ -187,7 +187,7 @@ static Token get_token(Lexer *lexer)
             advance(lexer);
 
             tok.type = TOK_STR;
-            tok.len = lexer->cursor - tok.str - 1;
+            tok.len = lexer->cursor - tok.str - 2;
             ++tok.str;
 
             break;
