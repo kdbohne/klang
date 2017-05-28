@@ -82,8 +82,10 @@ static llvm::Value *gen_lit(AstExprLit *lit)
         }
         case LIT_STR:
         {
-            auto str = llvm::ConstantDataArray::getString(context, lit->value_str);
+            auto ref = llvm::StringRef(lit->value_str);
+            auto str = llvm::ConstantDataArray::getString(context, ref);
 
+            // TODO: global instead of alloca?
             auto alloca = builder.CreateAlloca(str->getType());
             builder.CreateStore(str, alloca);
 
