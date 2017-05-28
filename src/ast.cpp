@@ -9,7 +9,6 @@ static i32 nodes_pool_capacity = 1024;
 extern "C"
 {
     void *calloc(u64 nmemb, u64 size);
-    char *strncpy(char *dest, const char *src, u64 n);
 
     i64 strtoll(const char *nptr, char **endptr, int base);
     float strtof(const char *nptr, char **endptr);
@@ -52,7 +51,7 @@ static char *make_str_from_token(Token tok)
     // TODO: better allocation strategy
     char *str = (char *)malloc(tok.len + 1);
 
-    strncpy(str, tok.str, tok.len);
+    string_copy(tok.str, str, tok.len);
     str[tok.len] = '\0';
 
     return str;
@@ -64,7 +63,7 @@ static u64 make_int_from_token(Token tok)
     static char buf[64];
 
     assert(tok.len < (i32)(sizeof(buf) / sizeof(buf[0])));
-    strncpy(buf, tok.str, tok.len);
+    string_copy(tok.str, buf, tok.len);
     buf[tok.len] = '\0';
 
     u64 num = (u64)strtoll(buf, NULL, 10);
@@ -78,7 +77,7 @@ static float make_float_from_token(Token tok)
     static char buf[64];
 
     assert(tok.len < (i32)(sizeof(buf) / sizeof(buf[0])));
-    strncpy(buf, tok.str, tok.len);
+    string_copy(tok.str, buf, tok.len);
     buf[tok.len] = '\0';
 
     float num = strtof(buf, NULL);

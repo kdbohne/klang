@@ -37,6 +37,15 @@ void string_copy(const char *src, char *dest)
     while ((*dest++ = *src++) != '\0');
 }
 
+void string_copy(const char *src, char *dest, int length)
+{
+    // TODO: bounds checking
+    for (int i = 0; i < length; ++i)
+        dest[i] = src[i];
+
+    dest[length] = '\0';
+}
+
 extern "C" { void *malloc(u64 size); }
 char *string_duplicate(const char *str)
 {
