@@ -260,12 +260,23 @@ static llvm::Value *gen_expr(AstExpr *expr)
             // TODO: multiple decls, patterns, etc.
             assert(assign->lhs->type == AST_EXPR_IDENT);
             auto ident = static_cast<AstExprIdent *>(assign->lhs);
-            auto var = vars.get(ident->str);
-            assert(var);
+
+            auto var_ptr = vars.get(ident->str);
+            assert(var_ptr);
+            auto var = *var_ptr;
 
             auto val = gen_expr(assign->rhs);
 
-            return builder.CreateStore(val, *var);
+            builder.CreateStore(val, var);
+
+            // TODO: does it matter whether the var or the val is returned?
+            // It seems like it shouldn't matter. Returning the value avoids
+            // a load instruction, so that seems to be the better option.
+#if 1
+            return val;
+#else
+            return builder.CreateLoad(var);
+#endif
         }
         default:
         {
