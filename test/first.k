@@ -26,6 +26,8 @@ fn main()
 
     x = 8;
 
+    y := (x = 4) + 3;
+
     str := "hello!\n";
     stri := cast(*i64) str;
     strp := &str;

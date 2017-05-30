@@ -130,7 +130,6 @@ static AstExpr *parse_expr(Parser *parser)
         }
         case TOK_OPEN_PAREN:
         {
-            eat(parser);
             lhs = parse_expr(parser);
             expect(parser, TOK_CLOSE_PAREN);
 
