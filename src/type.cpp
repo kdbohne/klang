@@ -5,10 +5,10 @@
 
 #include <stdio.h>
 #define report_error(str, ...) \
-{ \
+do { \
     fprintf(stderr, "Type error: " str, __VA_ARGS__); \
     ++global_error_count; \
-}
+} while (0)
 
 // TODO: size?
 TypeDefn global_type_defns[512];

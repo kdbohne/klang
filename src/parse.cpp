@@ -10,10 +10,10 @@ struct Parser
 
 #include <stdio.h>
 #define report_error(parser, str, ...) \
-{ \
+do { \
     fprintf(stderr, "Parse error: " str "\n", __VA_ARGS__); \
     fprintf(stderr, "(TODO: print tokens here)\n"); \
-}
+} while (0)
 
 static TokenType peek(Parser *parser)
 {
