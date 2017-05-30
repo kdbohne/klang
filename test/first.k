@@ -24,6 +24,8 @@ fn main()
     xp := &x;
     xpp := &xp;
 
+    x = 8;
+
     str := "hello!\n";
     stri := cast(*i64) str;
     strp := &str;

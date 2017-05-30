@@ -327,6 +327,35 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
 
             return cast->type_defn;
         }
+        case AST_EXPR_ASSIGN:
+        {
+            auto assign = static_cast<AstExprAssign *>(expr);
+
+            // TODO: multiple decls, patterns, etc.
+            assert(assign->lhs->type == AST_EXPR_IDENT);
+            auto lhs = static_cast<AstExprIdent *>(assign->lhs);
+            auto rhs = assign->rhs;
+
+            lhs->scope = assign->scope;
+            rhs->scope = assign->scope;
+
+            auto lhs_var = scope_get_var(lhs->scope, lhs->str);
+            if (!lhs_var)
+                report_error("Assigning value to undeclared identifier \"%s\".\n", lhs->str);
+            else
+                lhs->type_defn = lhs_var->type_defn;
+
+            rhs->type_defn = determine_expr_type(rhs);
+
+            if (lhs->type_defn != rhs->type_defn)
+            {
+                report_error("Assigning rvalue of type \"%s\" to lvalue of type \"%s\".\n",
+                             rhs->type_defn->name, lhs->type_defn->name);
+            }
+            assign->type_defn = lhs->type_defn;
+
+            return assign->type_defn;
+        }
         default:
         {
             assert(false);

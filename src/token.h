@@ -20,6 +20,7 @@ enum TokenType : u32
     TOK_MINUS,
     TOK_ASTERISK,
     TOK_SLASH,
+    TOK_EQ,
 
     TOK_AND,
 

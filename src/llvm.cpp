@@ -253,6 +253,20 @@ static llvm::Value *gen_expr(AstExpr *expr)
             auto opcode = llvm::CastInst::getCastOpcode(src, true, dest, true);
             return builder.CreateCast(opcode, src, dest);
         }
+        case AST_EXPR_ASSIGN:
+        {
+            auto assign = static_cast<AstExprAssign *>(expr);
+
+            // TODO: multiple decls, patterns, etc.
+            assert(assign->lhs->type == AST_EXPR_IDENT);
+            auto ident = static_cast<AstExprIdent *>(assign->lhs);
+            auto var = vars.get(ident->str);
+            assert(var);
+
+            auto val = gen_expr(assign->rhs);
+
+            return builder.CreateStore(val, *var);
+        }
         default:
         {
             assert(false);

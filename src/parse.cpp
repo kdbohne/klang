@@ -212,6 +212,16 @@ static AstExpr *parse_expr(Parser *parser)
 
             return call;
         }
+        case TOK_EQ:
+        {
+            eat(parser);
+
+            AstExprAssign *assign = ast_alloc(AstExprAssign);
+            assign->lhs = lhs;
+            assign->rhs = parse_expr(parser);
+
+            return assign;
+        }
         default:
         {
             break;
