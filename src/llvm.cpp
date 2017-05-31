@@ -355,6 +355,8 @@ static llvm::Value *gen_stmt(AstStmt *stmt)
             auto ident = static_cast<AstExprIdent *>(decl->lhs);
 
             auto rhs = gen_expr(decl->rhs);
+            assert(rhs);
+
 //            auto alloca = create_alloca(func, rhs->getType(), ident->str);
             auto alloca = create_alloca(rhs->getType(), ident->str);
 
