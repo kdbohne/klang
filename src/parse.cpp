@@ -151,6 +151,19 @@ static AstExpr *parse_expr(Parser *parser)
 
             break;
         }
+#if 0
+        case TOK_KEY_IF:
+        {
+            AstExpr *cond = parse_expr(parser);
+            AstBlock *if_block = parse_block(parser);
+
+            // TODO: else if
+            if (eat_optional(parser, TOK_ELSE))
+            {
+                parse_
+            }
+        }
+#endif
 
         // Unary operators.
         // Add more here!
@@ -265,9 +278,9 @@ static AstStmt *parse_stmt(Parser *parser)
     }
 }
 
-static AstBlock *parse_block(Parser *parser)
+static AstExprBlock *parse_block(Parser *parser)
 {
-    AstBlock *block = ast_alloc(AstBlock);
+    AstExprBlock *block = ast_alloc(AstExprBlock);
 
     expect(parser, TOK_OPEN_BRACE);
     while (true)

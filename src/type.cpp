@@ -423,7 +423,7 @@ static void determine_stmt_type(AstStmt *stmt)
     }
 }
 
-static void determine_block_type(AstBlock *blk)
+static void determine_block_type(AstExprBlock *blk)
 {
     foreach(blk->stmts)
     {

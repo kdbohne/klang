@@ -237,7 +237,7 @@ void debug_dump(AstRoot *root)
         fprintf(stderr, "%*s{\n", indent, "");
         indent += 4;
 
-        AstBlock *blk = it->block;
+        auto blk = it->block;
         for (int i = 0; i < blk->stmts.count; ++i)
         {
             fprintf(stderr, "%*s", indent, "");

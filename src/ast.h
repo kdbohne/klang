@@ -7,8 +7,9 @@
 #include "type.h"
 
 struct AstFunc;
-struct AstBlock;
+struct AstExprBlock;
 struct AstExprIdent;
+struct AstStmt;
 
 struct Scope
 {
@@ -32,6 +33,8 @@ enum AstNodeType : u32
     AST_EXPR_PARAM,
     AST_EXPR_CAST,
     AST_EXPR_ASSIGN,
+    AST_EXPR_IF,
+    AST_EXPR_BLOCK,
 
     // Stmt
     AST_STMT_EXPR,
@@ -39,7 +42,6 @@ enum AstNodeType : u32
     AST_STMT_DECL,
 
     AST_FUNC,
-    AST_BLOCK,
 
     AST_ERR,
 };
@@ -176,6 +178,25 @@ struct AstExprAssign : AstExpr
     AstExpr *rhs = NULL;
 };
 
+#if 0
+struct AstExprIf : AstExpr
+{
+    AstExprIf() : AstExpr(AST_EXPR_IF) {}
+
+    AstExpr *if_expr = NULL;
+    AstExprBlock *block = NULL;
+    AstExpr *else_expr = NULL;
+};
+#endif
+
+struct AstExprBlock : AstExpr
+{
+    AstExprBlock() : AstExpr(AST_EXPR_BLOCK) {}
+
+    Array<AstStmt *> stmts;
+    AstExpr *expr = NULL;
+};
+
 struct AstStmt : AstNode
 {
     AstStmt(AstNodeType type_) : AstNode(type_) {}
@@ -218,15 +239,7 @@ struct AstFunc : AstNode
     Array<AstExprParam *> params;
     AstExprType *ret = NULL;
 
-    AstBlock *block = NULL;
-};
-
-struct AstBlock : AstNode
-{
-    AstBlock() : AstNode(AST_BLOCK) {}
-
-    Array<AstStmt *> stmts;
-    AstExpr *expr = NULL;
+    AstExprBlock *block = NULL;
 };
 
 // TODO: this is really bad; use a pool allocator (one for each type?)

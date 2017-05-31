@@ -37,6 +37,7 @@ fn main()
 
     syscall5(cast(*i64) 1, cast(*i64) 1, cast(*i64) str, cast(*i64) 7, cast(*i64) 0, cast(*i64) 0);
 
+/*
     st := "true\n";
     sf := "false\n";
     if y == 7
@@ -47,4 +48,5 @@ fn main()
     {
         syscall5(cast(*i64) 1, cast(*i64) 1, cast(*i64) sf, cast(*i64) 6, cast(*i64) 0, cast(*i64) 0);
     }
+*/
 }
