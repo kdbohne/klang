@@ -349,6 +349,13 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
 
             rhs->type_defn = determine_expr_type(rhs);
 
+            // TODO: optimize, don't look up void each time
+            if (rhs->type_defn == get_type_defn("void"))
+            {
+                report_error("Assigning \"%s\" to a block with a void return value.\n",
+                             lhs->str);
+            }
+
             if (lhs->type_defn != rhs->type_defn)
             {
                 report_error("Assigning rvalue of type \"%s\" to lvalue of type \"%s\".\n",
@@ -425,6 +432,11 @@ static void determine_stmt_type(AstStmt *stmt)
             auto lhs = static_cast<AstExprIdent *>(decl->lhs);
 
             auto type = determine_expr_type(decl->rhs);
+            if (type == get_type_defn("void"))
+            {
+                report_error("Assigning \"%s\" to a block with a void return value.\n",
+                             lhs->str);
+            }
             lhs->type_defn = type;
 
             // If the RHS is a function call, make sure the function actually returns a value.
