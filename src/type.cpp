@@ -352,7 +352,8 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
             if (lhs->type_defn != rhs->type_defn)
             {
                 report_error("Assigning rvalue of type \"%s\" to lvalue of type \"%s\".\n",
-                             rhs->type_defn->name, lhs->type_defn->name);
+                             rhs->type_defn ? rhs->type_defn->name : "(null)",
+                             lhs->type_defn ? lhs->type_defn->name : "(null)");
             }
             assign->type_defn = lhs->type_defn;
 
