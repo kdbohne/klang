@@ -361,6 +361,8 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
         case AST_EXPR_BLOCK:
         {
             auto block = static_cast<AstExprBlock *>(expr);
+            block->scope = make_scope(block->scope);
+
             foreach(block->stmts)
             {
                 it->scope = block->scope;
