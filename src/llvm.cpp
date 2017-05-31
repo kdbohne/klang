@@ -15,6 +15,12 @@ llvm::IRBuilder<> builder(context);
 HashMap<llvm::Function *> funcs;
 HashMap<llvm::AllocaInst *> vars;
 
+// TODO: this is ugly; figure out how to generate decls without
+// making this global or passing it everywhere.
+llvm::Function *cur_func;
+
+static llvm::Value *gen_stmt(AstStmt *stmt);
+
 llvm::Type *get_type_by_name(const char *name)
 {
     // TODO: support arbitrary types
@@ -278,6 +284,25 @@ static llvm::Value *gen_expr(AstExpr *expr)
             return builder.CreateLoad(var);
 #endif
         }
+        case AST_EXPR_BLOCK:
+        {
+            auto block = static_cast<AstExprBlock *>(expr);
+
+            // Save current var table.
+            auto vars_old = vars;
+
+            foreach(block->stmts)
+                gen_stmt(it);
+
+            llvm::Value *block_expr = NULL;
+            if (block->expr)
+                block_expr = gen_expr(block->expr);
+
+            // Pop args from var table.
+            vars = vars_old;
+
+            return block_expr;
+        }
         default:
         {
             assert(false);
@@ -288,13 +313,20 @@ static llvm::Value *gen_expr(AstExpr *expr)
     return NULL;
 }
 
-static llvm::AllocaInst *create_alloca(llvm::Function *func, llvm::Type *type, const char *name)
+// NOTE: see comment on cur_func global.
+//static llvm::AllocaInst *create_alloca(llvm::Function *func, llvm::Type *type, const char *name)
+static llvm::AllocaInst *create_alloca(llvm::Type *type, const char *name)
 {
-    llvm::IRBuilder<> tmp(&func->getEntryBlock(), func->getEntryBlock().begin());
+    assert(cur_func != NULL);
+
+//    llvm::IRBuilder<> tmp(&func->getEntryBlock(), func->getEntryBlock().begin());
+    llvm::IRBuilder<> tmp(&cur_func->getEntryBlock(), cur_func->getEntryBlock().begin());
     return tmp.CreateAlloca(type, 0, llvm::Twine(name));
 }
 
-static llvm::Value *gen_stmt(AstStmt *stmt, llvm::Function *func)
+// NOTE: see comment on cur_func global.
+//static llvm::Value *gen_stmt(AstStmt *stmt, llvm::Function *func)
+static llvm::Value *gen_stmt(AstStmt *stmt)
 {
     switch (stmt->type)
     {
@@ -323,7 +355,8 @@ static llvm::Value *gen_stmt(AstStmt *stmt, llvm::Function *func)
             auto ident = static_cast<AstExprIdent *>(decl->lhs);
 
             auto rhs = gen_expr(decl->rhs);
-            auto alloca = create_alloca(func, rhs->getType(), ident->str);
+//            auto alloca = create_alloca(func, rhs->getType(), ident->str);
+            auto alloca = create_alloca(rhs->getType(), ident->str);
 
             builder.CreateStore(rhs, alloca);
 
@@ -367,6 +400,7 @@ static llvm::Function *gen_func(AstFunc *func)
     // TODO: which linkage?
     auto llvm_func = llvm::Function::Create(type, llvm::Function::ExternalLinkage, llvm::Twine(func->name->str), &module);
     funcs.insert(func->name->str, llvm_func);
+    cur_func = llvm_func;
 
     if (func->flags & FUNC_EXTERN)
         return llvm_func;
@@ -387,25 +421,20 @@ static llvm::Function *gen_func(AstFunc *func)
 
             arg.setName(param->name->str);
 
-            auto alloca = create_alloca(llvm_func, arg.getType(), param->name->str);
+            auto alloca = create_alloca(arg.getType(), param->name->str);
             builder.CreateStore(&arg, alloca);
 
             vars.set(param->name->str, alloca);
         }
     }
 
-    foreach(func->block->stmts)
-        gen_stmt(it, llvm_func);
-
+    auto block = gen_expr(func->block);
     if (func->block->expr)
-    {
-        auto ret = gen_expr(func->block->expr);
-        builder.CreateRet(ret);
-    }
+        builder.CreateRet(block);
     else
-    {
         builder.CreateRetVoid();
-    }
+
+    cur_func = NULL;
 
     llvm::verifyFunction(*llvm_func);
 

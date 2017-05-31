@@ -15,6 +15,8 @@ do { \
     fprintf(stderr, "(TODO: print tokens here)\n"); \
 } while (0)
 
+static AstExprBlock *parse_block(Parser *parser);
+
 static TokenType peek(Parser *parser)
 {
     assert(parser->index < parser->tokens->count);
@@ -133,6 +135,11 @@ static AstExpr *parse_expr(Parser *parser)
             lhs = parse_expr(parser);
             expect(parser, TOK_CLOSE_PAREN);
 
+            break;
+        }
+        case TOK_OPEN_BRACE:
+        {
+            lhs = parse_block(parser);
             break;
         }
         case TOK_KEY_CAST:
@@ -282,7 +289,6 @@ static AstExprBlock *parse_block(Parser *parser)
 {
     AstExprBlock *block = ast_alloc(AstExprBlock);
 
-    expect(parser, TOK_OPEN_BRACE);
     while (true)
     {
         if (peek(parser) == TOK_CLOSE_BRACE)
@@ -354,6 +360,7 @@ static AstFunc *parse_func(Parser *parser)
         return func;
     }
 
+    expect(parser, TOK_OPEN_BRACE);
     func->block = parse_block(parser);
 
     return func;

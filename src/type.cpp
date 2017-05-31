@@ -16,6 +16,12 @@ static i32 global_type_defns_count;
 
 static i32 global_error_count;
 
+// TODO: size?
+static Scope scope_pool[512];
+static i32 scope_pool_count;
+
+static void determine_stmt_type(AstStmt *stmt);
+
 static void dump_type_defns()
 {
     for (int i = 0; i < global_type_defns_count; ++i)
@@ -24,10 +30,6 @@ static void dump_type_defns()
         fprintf(stderr, "%s\n", defn->name);
     }
 }
-
-// TODO: size?
-static Scope scope_pool[512];
-static i32 scope_pool_count;
 
 static Scope *make_scope(Scope *parent)
 {
@@ -356,6 +358,27 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
 
             return assign->type_defn;
         }
+        case AST_EXPR_BLOCK:
+        {
+            auto block = static_cast<AstExprBlock *>(expr);
+            foreach(block->stmts)
+            {
+                it->scope = block->scope;
+                determine_stmt_type(it);
+            }
+
+            if (block->expr)
+            {
+                block->expr->scope = block->scope;
+                block->type_defn = determine_expr_type(block->expr);
+            }
+            else
+            {
+                block->type_defn = get_type_defn("void");
+            }
+
+            return block->type_defn;
+        }
         default:
         {
             assert(false);
@@ -423,21 +446,6 @@ static void determine_stmt_type(AstStmt *stmt)
     }
 }
 
-static void determine_block_type(AstExprBlock *blk)
-{
-    foreach(blk->stmts)
-    {
-        it->scope = blk->scope;
-        determine_stmt_type(it);
-    }
-
-    if (blk->expr)
-    {
-        blk->expr->scope = blk->scope;
-        determine_expr_type(blk->expr);
-    }
-}
-
 static void determine_node_types(AstRoot *root)
 {
     root->scope = make_scope(NULL);
@@ -461,7 +469,7 @@ static void determine_node_types(AstRoot *root)
         if (it->block)
         {
             it->block->scope = it->scope;
-            determine_block_type(it->block);
+            it->block->type_defn = determine_expr_type(it->block);
         }
     }
 }

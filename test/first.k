@@ -37,6 +37,14 @@ fn main()
 
     syscall5(cast(*i64) 1, cast(*i64) 1, cast(*i64) str, cast(*i64) 7, cast(*i64) 0, cast(*i64) 0);
 
+    a :=
+    {
+        b := 3;
+        b2 := b * b;
+
+        b2 * b2
+    };
+
 /*
     st := "true\n";
     sf := "false\n";
