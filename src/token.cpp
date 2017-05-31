@@ -21,6 +21,7 @@ const char *token_type_strings[]
     "eq",
 
     "and",
+    "eq eq",
 
     "colon eq",
     "r arrow",
