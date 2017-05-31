@@ -15,10 +15,6 @@ llvm::IRBuilder<> builder(context);
 HashMap<llvm::Function *> funcs;
 HashMap<llvm::AllocaInst *> vars;
 
-// TODO: this is ugly; figure out how to generate decls without
-// making this global or passing it everywhere.
-llvm::Function *cur_func;
-
 static llvm::Value *gen_stmt(AstStmt *stmt);
 
 llvm::Type *get_type_by_name(const char *name)
@@ -313,19 +309,15 @@ static llvm::Value *gen_expr(AstExpr *expr)
     return NULL;
 }
 
-// NOTE: see comment on cur_func global.
-//static llvm::AllocaInst *create_alloca(llvm::Function *func, llvm::Type *type, const char *name)
 static llvm::AllocaInst *create_alloca(llvm::Type *type, const char *name)
 {
-    assert(cur_func != NULL);
+    auto func = builder.GetInsertBlock()->getParent();
 
 //    llvm::IRBuilder<> tmp(&func->getEntryBlock(), func->getEntryBlock().begin());
-    llvm::IRBuilder<> tmp(&cur_func->getEntryBlock(), cur_func->getEntryBlock().begin());
+    llvm::IRBuilder<> tmp(&func->getEntryBlock(), func->getEntryBlock().begin());
     return tmp.CreateAlloca(type, 0, llvm::Twine(name));
 }
 
-// NOTE: see comment on cur_func global.
-//static llvm::Value *gen_stmt(AstStmt *stmt, llvm::Function *func)
 static llvm::Value *gen_stmt(AstStmt *stmt)
 {
     switch (stmt->type)
@@ -402,7 +394,6 @@ static llvm::Function *gen_func(AstFunc *func)
     // TODO: which linkage?
     auto llvm_func = llvm::Function::Create(type, llvm::Function::ExternalLinkage, llvm::Twine(func->name->str), &module);
     funcs.insert(func->name->str, llvm_func);
-    cur_func = llvm_func;
 
     if (func->flags & FUNC_EXTERN)
         return llvm_func;
@@ -435,8 +426,6 @@ static llvm::Function *gen_func(AstFunc *func)
         builder.CreateRet(block);
     else
         builder.CreateRetVoid();
-
-    cur_func = NULL;
 
     llvm::verifyFunction(*llvm_func);
 
