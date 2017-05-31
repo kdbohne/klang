@@ -29,6 +29,8 @@ const char *token_type_strings[]
     "key fn",
     "key extern",
     "key cast",
+    "key if",
+    "key else",
 
     "eof",
     "unknown",

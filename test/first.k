@@ -36,4 +36,15 @@ fn main()
     ptri := cast(*i64) ptr;
 
     syscall5(cast(*i64) 1, cast(*i64) 1, cast(*i64) str, cast(*i64) 7, cast(*i64) 0, cast(*i64) 0);
+
+    st := "true\n";
+    sf := "false\n";
+    if y == 7
+    {
+        syscall5(cast(*i64) 1, cast(*i64) 1, cast(*i64) st, cast(*i64) 5, cast(*i64) 0, cast(*i64) 0);
+    }
+    else
+    {
+        syscall5(cast(*i64) 1, cast(*i64) 1, cast(*i64) sf, cast(*i64) 6, cast(*i64) 0, cast(*i64) 0);
+    }
 }
