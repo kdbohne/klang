@@ -218,31 +218,28 @@ static Token get_token(Lexer *lexer)
             tok.str = (char *)malloc(tok.len + 1);
 
             char *str = tok.str;
-            if (raw_len > 0)
+            for (int i = 0; i < raw_len; ++i)
             {
-                for (int i = 0; i < raw_len - 1; ++i)
+                if ((i < raw_len - 1) && (raw_str[i] == '\\'))
                 {
-                    if (raw_str[i] == '\\')
+                    char e = raw_str[i + 1];
+                    switch (e)
                     {
-                        char e = raw_str[i + 1];
-                        switch (e)
+                        case 'n': { *str++ = '\n'; break; }
+                        case 'r': { *str++ = '\r'; break; }
+                        case 't': { *str++ = '\t'; break; }
+                        default:
                         {
-                            case 'n': { *str++ = '\n'; break; }
-                            case 'r': { *str++ = '\r'; break; }
-                            case 't': { *str++ = '\t'; break; }
-                            default:
-                            {
-                                assert(false);
-                                break;
-                            }
+                            assert(false);
+                            break;
                         }
+                    }
 
-                        ++i;
-                    }
-                    else
-                    {
-                        *str++ = raw_str[i];
-                    }
+                    ++i;
+                }
+                else
+                {
+                    *str++ = raw_str[i];
                 }
             }
 
