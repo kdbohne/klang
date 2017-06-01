@@ -104,6 +104,8 @@ enum BinOp : u32
     BIN_MUL,
     BIN_DIV,
 
+    BIN_EQ,
+
     BIN_ERR,
 };
 extern const char *bin_op_strings[];

@@ -16,10 +16,12 @@ extern "C"
 
 const char *bin_op_strings[] =
 {
-    "+", // BIN_ADD
-    "-", // BIN_SUB
-    "*", // BIN_MUL
-    "/", // BIN_DIV
+    "+",  // BIN_ADD
+    "-",  // BIN_SUB
+    "*",  // BIN_MUL
+    "/",  // BIN_DIV
+
+    "==", // BIN_EQ
 
     "?", // BIN_ERR
 };

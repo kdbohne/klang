@@ -67,6 +67,7 @@ static BinOp get_bin_op(TokenType type)
         case TOK_MINUS:    return BIN_SUB;
         case TOK_ASTERISK: return BIN_MUL;
         case TOK_SLASH:    return BIN_DIV;
+        case TOK_EQ_EQ:    return BIN_EQ;
         default:
         {
             assert(false);
@@ -194,10 +195,12 @@ static AstExpr *parse_expr(Parser *parser)
     TokenType next = peek(parser);
     switch (next)
     {
+        // Binary operators.
         case TOK_PLUS:
         case TOK_MINUS:
         case TOK_ASTERISK:
         case TOK_SLASH:
+        case TOK_EQ_EQ:
         {
             eat(parser);
 
