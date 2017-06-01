@@ -221,6 +221,15 @@ static llvm::Value *gen_un(AstExprUn *un)
     return NULL;
 }
 
+static llvm::AllocaInst *create_alloca(llvm::Type *type, const char *name)
+{
+    auto func = builder.GetInsertBlock()->getParent();
+
+//    llvm::IRBuilder<> tmp(&func->getEntryBlock(), func->getEntryBlock().begin());
+    llvm::IRBuilder<> tmp(&func->getEntryBlock(), func->getEntryBlock().begin());
+    return tmp.CreateAlloca(type, 0, llvm::Twine(name));
+}
+
 static llvm::Value *gen_expr(AstExpr *expr)
 {
     switch (expr->type)
@@ -345,45 +354,70 @@ static llvm::Value *gen_expr(AstExpr *expr)
 
             auto cond = gen_expr(if_expr->cond);
 
+#if 0
+            // TODO: optimize, don't look up void each time
+            if (!if_expr->block->expr || (if_expr->block->expr->type_defn == get_type_defn("void")))
+            {
+            }
+#endif
+
+            // The result of the if-expression. alloca is called with the type
+            // of the if-block after the block is generated. At the end of each
+            // branch, the branch's value is stored here.
+            llvm::AllocaInst *result = NULL;
+
             // TODO: are else-if chains generating too many merge blocks?
             auto func = builder.GetInsertBlock()->getParent();
-            auto then_bb = llvm::BasicBlock::Create(context, "if", func);
+            auto if_bb = llvm::BasicBlock::Create(context, "if", func);
             auto merge_bb = llvm::BasicBlock::Create(context, "merge");
             llvm::BasicBlock *else_bb = NULL;
 
             if (if_expr->else_expr)
             {
                 else_bb = llvm::BasicBlock::Create(context, "else");
-                builder.CreateCondBr(cond, then_bb, else_bb);
+                builder.CreateCondBr(cond, if_bb, else_bb);
             }
             else
             {
-                builder.CreateCondBr(cond, then_bb, merge_bb);
+                builder.CreateCondBr(cond, if_bb, merge_bb);
             }
 
-            // Emit then block.
-            builder.SetInsertPoint(then_bb);
+            // Emit if-block.
+            builder.SetInsertPoint(if_bb);
 
-            auto then_val = gen_expr(if_expr->block);
+            auto if_val = gen_expr(if_expr->block);
+            if (if_val)
+            {
+                // The type of the if-expression is now known, so the result
+                // can be allocated.
+                result = create_alloca(if_val->getType(), "iftmp");
+                builder.CreateStore(if_val, result);
+
+                // NOTE: this isn't needed if a phi node isn't used.
+//                if_bb = builder.GetInsertBlock();
+            }
             builder.CreateBr(merge_bb);
 
-            then_bb = builder.GetInsertBlock();
-
-            // Emit else block.
+            // Emit else-block.
             if (if_expr->else_expr)
             {
                 func->getBasicBlockList().push_back(else_bb);
                 builder.SetInsertPoint(else_bb);
 
                 auto else_val = gen_expr(if_expr->else_expr);
+                if (else_val)
+                    builder.CreateStore(else_val, result);
+
                 builder.CreateBr(merge_bb);
             }
 
             func->getBasicBlockList().push_back(merge_bb);
             builder.SetInsertPoint(merge_bb);
 
-            // TODO: is this the right value to return?
-            return cond;
+            if (result)
+                return builder.CreateLoad(result);
+
+            return NULL;
         }
         default:
         {
@@ -393,15 +427,6 @@ static llvm::Value *gen_expr(AstExpr *expr)
     }
 
     return NULL;
-}
-
-static llvm::AllocaInst *create_alloca(llvm::Type *type, const char *name)
-{
-    auto func = builder.GetInsertBlock()->getParent();
-
-//    llvm::IRBuilder<> tmp(&func->getEntryBlock(), func->getEntryBlock().begin());
-    llvm::IRBuilder<> tmp(&func->getEntryBlock(), func->getEntryBlock().begin());
-    return tmp.CreateAlloca(type, 0, llvm::Twine(name));
 }
 
 static llvm::Value *gen_stmt(AstStmt *stmt)
