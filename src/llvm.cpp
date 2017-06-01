@@ -103,6 +103,42 @@ static llvm::Value *gen_lit(AstExprLit *lit)
     return NULL;
 }
 
+static llvm::CmpInst::Predicate get_icmp_predicate(BinOp op)
+{
+    switch (op)
+    {
+        case BIN_EQ: return llvm::CmpInst::ICMP_EQ;
+        default:
+        {
+            assert(false);
+            break;
+        }
+    }
+
+    return llvm::CmpInst::BAD_ICMP_PREDICATE;
+}
+
+static llvm::Value *gen_cmp(llvm::Value *lhs, llvm::Value *rhs, BinOp op)
+{
+    auto type = lhs->getType();
+    if (type->isIntegerTy())
+    {
+        auto pred = get_icmp_predicate(op);
+        return builder.CreateICmp(pred, lhs, rhs);
+    }
+    else if (type->isFloatTy())
+    {
+        // FIXME
+        assert(false);
+    }
+    else
+    {
+        assert(false);
+    }
+
+    return NULL;
+}
+
 static llvm::Value *gen_bin(AstExprBin *bin)
 {
     auto lhs = gen_expr(bin->lhs);
@@ -132,6 +168,10 @@ static llvm::Value *gen_bin(AstExprBin *bin)
             // TODO: CreateUDiv
             // TODO: CreateFDiv
             return builder.CreateSDiv(lhs, rhs); // TODO: more args?
+        }
+        case BIN_EQ:
+        {
+            return gen_cmp(lhs, rhs, bin->op);
         }
         default:
         {
@@ -298,6 +338,47 @@ static llvm::Value *gen_expr(AstExpr *expr)
             vars = vars_old;
 
             return block_expr;
+        }
+        case AST_EXPR_IF:
+        {
+            auto if_expr = static_cast<AstExprIf *>(expr);
+
+            auto cond = gen_expr(if_expr->cond);
+
+            auto func = builder.GetInsertBlock()->getParent();
+            auto then_bb = llvm::BasicBlock::Create(context, "if", func);
+            auto else_bb = llvm::BasicBlock::Create(context, "else");
+            auto merge_bb = llvm::BasicBlock::Create(context, "merge");
+
+            builder.CreateCondBr(cond, then_bb, else_bb);
+
+            // Emit then block.
+            builder.SetInsertPoint(then_bb);
+
+            auto then_val = gen_expr(if_expr->block);
+            builder.CreateBr(merge_bb);
+
+            then_bb = builder.GetInsertBlock();
+
+            // Emit else block.
+            func->getBasicBlockList().push_back(else_bb);
+            builder.SetInsertPoint(else_bb);
+
+            auto else_val = gen_expr(if_expr->else_expr);
+            builder.CreateBr(merge_bb);
+
+            func->getBasicBlockList().push_back(merge_bb);
+            builder.SetInsertPoint(merge_bb);
+
+            return cond;
+#if 0
+            auto phi = builder.CreatePHI(, , );
+
+            phi->addIncoming(then_val, then_bb);
+            phi->addIncoming(else_val, else_bb);
+
+            return phi;
+#endif
         }
         default:
         {

@@ -389,6 +389,36 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
 
             return block->type_defn;
         }
+        case AST_EXPR_IF:
+        {
+            auto if_expr = static_cast<AstExprIf *>(expr);
+            if_expr->cond->scope = if_expr->scope;
+            if_expr->block->scope = if_expr->scope;
+
+            // TODO: are these assignments necessary? just do determine_expr_type()
+            // and it should already set the node's type_defn
+            if_expr->cond->type_defn = determine_expr_type(if_expr->cond);
+
+            if_expr->block->scope = make_scope(if_expr->block->scope);
+            if_expr->block->type_defn = determine_expr_type(if_expr->block);
+            if_expr->type_defn = if_expr->block->type_defn;
+
+            auto else_expr = if_expr->else_expr;
+            if (else_expr)
+            {
+                else_expr->scope = if_expr->scope;
+                else_expr->type_defn = determine_expr_type(else_expr);
+
+                if (if_expr->type_defn != else_expr->type_defn)
+                {
+                    report_error("Type mismatch between if-block and else-block: \"%s\" vs \"%s\".\n",
+                                 if_expr->type_defn ? if_expr->type_defn->name : "null",
+                                 else_expr->type_defn ? else_expr->type_defn->name : "null");
+                }
+            }
+
+            return if_expr->type_defn;
+        }
         default:
         {
             assert(false);

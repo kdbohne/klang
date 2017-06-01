@@ -180,16 +180,14 @@ struct AstExprAssign : AstExpr
     AstExpr *rhs = NULL;
 };
 
-#if 0
 struct AstExprIf : AstExpr
 {
     AstExprIf() : AstExpr(AST_EXPR_IF) {}
 
-    AstExpr *if_expr = NULL;
+    AstExpr *cond = NULL;
     AstExprBlock *block = NULL;
     AstExpr *else_expr = NULL;
 };
-#endif
 
 struct AstExprBlock : AstExpr
 {

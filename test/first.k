@@ -35,7 +35,7 @@ fn main()
     ptr := &f;
     ptri := cast(*i64) ptr;
 
-    syscall5(cast(*i64) 1, cast(*i64) 1, cast(*i64) str, cast(*i64) 7, cast(*i64) 0, cast(*i64) 0);
+    syscall5(cast(*i64) 1, cast(*i64) 1, cast(*i64) "test\n", cast(*i64) 5, cast(*i64) 0, cast(*i64) 0);
 
     a :=
     {
@@ -45,16 +45,18 @@ fn main()
         b2 * b2
     };
 
-/*
-    st := "true\n";
-    sf := "false\n";
-    if y == 7
+    if a == 81 {
+        syscall5(cast(*i64) 1, cast(*i64) 1, cast(*i64) "true", cast(*i64) 4, cast(*i64) 0, cast(*i64) 0);
+    } else {
+        syscall5(cast(*i64) 1, cast(*i64) 1, cast(*i64) "false", cast(*i64) 5, cast(*i64) 0, cast(*i64) 0);
+    };
+    syscall5(cast(*i64) 1, cast(*i64) 1, cast(*i64) "\n", cast(*i64) 1, cast(*i64) 0, cast(*i64) 0);
+
+    a =
     {
-        syscall5(cast(*i64) 1, cast(*i64) 1, cast(*i64) st, cast(*i64) 5, cast(*i64) 0, cast(*i64) 0);
-    }
-    else
-    {
-        syscall5(cast(*i64) 1, cast(*i64) 1, cast(*i64) sf, cast(*i64) 6, cast(*i64) 0, cast(*i64) 0);
-    }
-*/
+        b := 4;
+        b2 := b * b;
+
+        b2 + b2
+    };
 }
