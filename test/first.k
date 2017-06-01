@@ -45,8 +45,10 @@ fn main()
         b2 * b2
     };
 
-    if a == 81 {
+    if a == 80 {
         syscall5(cast(*i64) 1, cast(*i64) 1, cast(*i64) "true", cast(*i64) 4, cast(*i64) 0, cast(*i64) 0);
+    } else if a == 81 {
+        syscall5(cast(*i64) 1, cast(*i64) 1, cast(*i64) "true2", cast(*i64) 5, cast(*i64) 0, cast(*i64) 0);
     } else {
         syscall5(cast(*i64) 1, cast(*i64) 1, cast(*i64) "false", cast(*i64) 5, cast(*i64) 0, cast(*i64) 0);
     };

@@ -345,6 +345,7 @@ static llvm::Value *gen_expr(AstExpr *expr)
 
             auto cond = gen_expr(if_expr->cond);
 
+            // TODO: are else-if chains generating too many merge blocks?
             auto func = builder.GetInsertBlock()->getParent();
             auto then_bb = llvm::BasicBlock::Create(context, "if", func);
             auto else_bb = llvm::BasicBlock::Create(context, "else");
