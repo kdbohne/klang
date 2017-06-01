@@ -115,6 +115,34 @@ static AstExpr *parse_expr(Parser *parser)
         case TOK_IDENT:
         {
             lhs = make_ident(tok);
+
+            // Function call.
+            if (peek(parser) == TOK_OPEN_PAREN)
+            {
+                eat(parser);
+
+                AstExprCall *call = ast_alloc(AstExprCall);
+                call->name = static_cast<AstExprIdent *>(lhs);
+                assert(call->name);
+
+                if (peek(parser) != TOK_CLOSE_PAREN)
+                {
+                    while (true)
+                    {
+                        if (peek(parser) == TOK_CLOSE_PAREN)
+                            break;
+
+                        eat_optional(parser, TOK_COMMA);
+
+                        AstExpr *arg = parse_expr(parser);
+                        call->args.add(arg);
+                    }
+                }
+                expect(parser, TOK_CLOSE_PAREN);
+
+                lhs = call;
+            }
+
             break;
         }
         case TOK_NUM:
@@ -210,31 +238,6 @@ static AstExpr *parse_expr(Parser *parser)
             BinOp op = get_bin_op(next);
 
             return make_bin(lhs, rhs, op);
-        }
-        case TOK_OPEN_PAREN:
-        {
-            eat(parser);
-
-            AstExprCall *call = ast_alloc(AstExprCall);
-            call->name = static_cast<AstExprIdent *>(lhs);
-            assert(call->name);
-
-            if (peek(parser) != TOK_CLOSE_PAREN)
-            {
-                while (true)
-                {
-                    if (peek(parser) == TOK_CLOSE_PAREN)
-                        break;
-
-                    eat_optional(parser, TOK_COMMA);
-
-                    AstExpr *arg = parse_expr(parser);
-                    call->args.add(arg);
-                }
-            }
-            expect(parser, TOK_CLOSE_PAREN);
-
-            return call;
         }
         case TOK_EQ:
         {

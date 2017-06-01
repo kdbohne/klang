@@ -16,7 +16,6 @@ fn main()
     x := 3;
     y := inc(x);
     z := add(x, y);
-    */
 
     f := 3.14159;
 
@@ -25,8 +24,6 @@ fn main()
     xpp := &xp;
 
     x = 8;
-
-    y := (x = 4) + 3;
 
     str := "hello!\n";
     stri := cast(*i64) str;
@@ -44,7 +41,17 @@ fn main()
 
         b2 * b2
     };
+    */
 
+    x := 3;
+    y := (x = 4) + 3;
+
+    if add(81, 256) == inc(add(inc(299), 36)) {
+        syscall5(cast(*i64) 1, cast(*i64) 1, cast(*i64) "asdf", cast(*i64) 4, cast(*i64) 0, cast(*i64) 0);
+    };
+    syscall5(cast(*i64) 1, cast(*i64) 1, cast(*i64) "\n", cast(*i64) 1, cast(*i64) 0, cast(*i64) 0);
+
+/*
     if a == 80 {
         syscall5(cast(*i64) 1, cast(*i64) 1, cast(*i64) "true", cast(*i64) 4, cast(*i64) 0, cast(*i64) 0);
     } else if a == 81 {
@@ -61,4 +68,5 @@ fn main()
 
         b2 + b2
     };
+    */
 }
