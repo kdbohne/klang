@@ -348,10 +348,18 @@ static llvm::Value *gen_expr(AstExpr *expr)
             // TODO: are else-if chains generating too many merge blocks?
             auto func = builder.GetInsertBlock()->getParent();
             auto then_bb = llvm::BasicBlock::Create(context, "if", func);
-            auto else_bb = llvm::BasicBlock::Create(context, "else");
             auto merge_bb = llvm::BasicBlock::Create(context, "merge");
+            llvm::BasicBlock *else_bb = NULL;
 
-            builder.CreateCondBr(cond, then_bb, else_bb);
+            if (if_expr->else_expr)
+            {
+                else_bb = llvm::BasicBlock::Create(context, "else");
+                builder.CreateCondBr(cond, then_bb, else_bb);
+            }
+            else
+            {
+                builder.CreateCondBr(cond, then_bb, merge_bb);
+            }
 
             // Emit then block.
             builder.SetInsertPoint(then_bb);
@@ -362,24 +370,20 @@ static llvm::Value *gen_expr(AstExpr *expr)
             then_bb = builder.GetInsertBlock();
 
             // Emit else block.
-            func->getBasicBlockList().push_back(else_bb);
-            builder.SetInsertPoint(else_bb);
+            if (if_expr->else_expr)
+            {
+                func->getBasicBlockList().push_back(else_bb);
+                builder.SetInsertPoint(else_bb);
 
-            auto else_val = gen_expr(if_expr->else_expr);
-            builder.CreateBr(merge_bb);
+                auto else_val = gen_expr(if_expr->else_expr);
+                builder.CreateBr(merge_bb);
+            }
 
             func->getBasicBlockList().push_back(merge_bb);
             builder.SetInsertPoint(merge_bb);
 
+            // TODO: is this the right value to return?
             return cond;
-#if 0
-            auto phi = builder.CreatePHI(, , );
-
-            phi->addIncoming(then_val, then_bb);
-            phi->addIncoming(else_val, else_bb);
-
-            return phi;
-#endif
         }
         default:
         {
