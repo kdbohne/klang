@@ -190,11 +190,6 @@ static void type_check_func(AstFunc *func)
     }
 }
 
-static void register_user_types(AstRoot *root)
-{
-    // FIXME
-}
-
 static TypeDefn *determine_expr_type(AstExpr *expr)
 {
     switch (expr->type)
@@ -553,7 +548,8 @@ bool type_check(AstRoot *root)
     register_type_defn("f64");
     register_type_defn("string");
 
-    register_user_types(root);
+    foreach(root->structs)
+        register_type_defn(it->name->str);
 
     determine_node_types(root);
 
