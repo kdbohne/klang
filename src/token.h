@@ -26,7 +26,7 @@ enum TokenType : u32
     TOK_AND,
 
     TOK_EQ_EQ,
-    TOK_COLON_EQ,
+//    TOK_COLON_EQ,
     TOK_R_ARROW,
 
     TOK_KEY_FN,
@@ -35,6 +35,7 @@ enum TokenType : u32
     TOK_KEY_IF,
     TOK_KEY_ELSE,
     TOK_KEY_STRUCT,
+    TOK_KEY_LET,
 
     TOK_EOF,
     TOK_UNKNOWN,

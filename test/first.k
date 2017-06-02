@@ -28,10 +28,23 @@ struct Vec3
 
 fn main()
 {
+    let x i32;
+    let y i64 = 42;
+    let z = 17;
+
+//    x = 43;
+
+    /*
+    v Vec3;
+    v.x = 3.14159;
+    */
+
+    /*
     x := factorial(5);
     if x == 120 {
         syscall5(cast(*i64) 1, cast(*i64) 1, cast(*i64) "120\n", cast(*i64) 4, cast(*i64) 0, cast(*i64) 0);
     };
+    */
 
     /*
     x := 3;

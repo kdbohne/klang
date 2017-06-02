@@ -180,6 +180,7 @@ static Token get_token(Lexer *lexer)
             break;
         }
 
+#if 0
         case ':':
         {
             if (*lexer->cursor == '=')
@@ -196,6 +197,7 @@ static Token get_token(Lexer *lexer)
 
             break;
         }
+#endif
 
         case '"':
         {
@@ -272,6 +274,8 @@ static Token get_token(Lexer *lexer)
                     tok.type = TOK_KEY_ELSE;
                 else if (token_matches(tok, "struct"))
                     tok.type = TOK_KEY_STRUCT;
+                else if (token_matches(tok, "let"))
+                    tok.type = TOK_KEY_LET;
             }
             else if (is_number(c))
             {

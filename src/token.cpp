@@ -24,7 +24,7 @@ const char *token_type_strings[]
     "and",
 
     "eq eq",
-    "colon eq",
+//    "colon eq",
     "r arrow",
 
     "key fn",
@@ -33,6 +33,7 @@ const char *token_type_strings[]
     "key if",
     "key else",
     "key struct",
+    "key let",
 
     "eof",
     "unknown",
