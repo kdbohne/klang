@@ -28,7 +28,10 @@ llvm::Type *get_type_by_name(const char *name)
         return llvm::Type::getFloatTy(context);
     if (strings_match(name, "f64"))
         return llvm::Type::getDoubleTy(context);
+    if (strings_match(name, "void"))
+        return llvm::Type::getVoidTy(context);
 
+    fprintf(stderr, "get_type_by_name() failed for \"%s\"\n", name);
     assert(false);
     return NULL;
 }
