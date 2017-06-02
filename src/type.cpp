@@ -548,6 +548,8 @@ bool type_check(AstRoot *root)
     register_type_defn("f64");
     register_type_defn("string");
 
+    // TODO: register these to scoped type tables instead of dumping
+    // all of them into the global type table?
     foreach(root->structs)
         register_type_defn(it->name->str);
 
