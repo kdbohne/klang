@@ -251,7 +251,7 @@ struct AstStruct : AstNode
 {
     AstStruct() : AstNode(AST_STRUCT) {}
 
-    AstExprIdent *name;
+    AstExprIdent *name = NULL;
     Array<AstStructField *> fields;
 };
 
