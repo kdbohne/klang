@@ -138,6 +138,7 @@ static Token get_token(Lexer *lexer)
         case '}':  { tok.type = TOK_CLOSE_BRACE; break; }
         case ';':  { tok.type = TOK_SEMI;        break; }
         case ',':  { tok.type = TOK_COMMA;       break; }
+        case '.':  { tok.type = TOK_DOT;         break; }
 
         case '&':  { tok.type = TOK_AND;         break; }
 

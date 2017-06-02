@@ -13,6 +13,7 @@ const char *token_type_strings[]
 
     "semi",
     "comma",
+    "dot",
 
     "plus",
     "minus",

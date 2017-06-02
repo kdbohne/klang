@@ -15,6 +15,7 @@ enum TokenType : u32
 
     TOK_SEMI,
     TOK_COMMA,
+    TOK_DOT,
 
     TOK_PLUS,
     TOK_MINUS,
