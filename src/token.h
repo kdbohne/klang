@@ -33,6 +33,7 @@ enum TokenType : u32
     TOK_KEY_CAST,
     TOK_KEY_IF,
     TOK_KEY_ELSE,
+    TOK_KEY_STRUCT,
 
     TOK_EOF,
     TOK_UNKNOWN,

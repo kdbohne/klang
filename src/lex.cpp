@@ -269,6 +269,8 @@ static Token get_token(Lexer *lexer)
                     tok.type = TOK_KEY_IF;
                 else if (token_matches(tok, "else"))
                     tok.type = TOK_KEY_ELSE;
+                else if (token_matches(tok, "struct"))
+                    tok.type = TOK_KEY_STRUCT;
             }
             else if (is_number(c))
             {

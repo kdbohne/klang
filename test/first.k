@@ -19,6 +19,13 @@ fn factorial(n i64) -> i64
     }
 }
 
+struct Vec3
+{
+    x f32;
+    y f32;
+    z f32;
+};
+
 fn main()
 {
     x := factorial(5);

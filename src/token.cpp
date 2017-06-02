@@ -21,8 +21,8 @@ const char *token_type_strings[]
     "eq",
 
     "and",
-    "eq eq",
 
+    "eq eq",
     "colon eq",
     "r arrow",
 
@@ -31,6 +31,7 @@ const char *token_type_strings[]
     "key cast",
     "key if",
     "key else",
+    "key struct",
 
     "eof",
     "unknown",
