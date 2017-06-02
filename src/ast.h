@@ -6,10 +6,12 @@
 #include "token.h"
 #include "type.h"
 
-struct AstFunc;
 struct AstExprBlock;
 struct AstExprIdent;
 struct AstStmt;
+struct AstFunc;
+struct AstStruct;
+struct AstStructField;
 
 struct Scope
 {
@@ -42,6 +44,8 @@ enum AstNodeType : u32
     AST_STMT_DECL,
 
     AST_FUNC,
+    AST_STRUCT,
+    AST_STRUCT_FIELD,
 
     AST_ERR,
 };
@@ -61,6 +65,7 @@ struct AstRoot : AstNode
     AstRoot() : AstNode(AST_ROOT) {}
 
     Array<AstFunc *> funcs;
+    Array<AstStruct *> structs;
 };
 
 struct AstExpr : AstNode
@@ -240,6 +245,22 @@ struct AstFunc : AstNode
     AstExprType *ret = NULL;
 
     AstExprBlock *block = NULL;
+};
+
+struct AstStruct : AstNode
+{
+    AstStruct() : AstNode(AST_STRUCT) {}
+
+    AstExprIdent *name;
+    Array<AstStructField *> fields;
+};
+
+struct AstStructField : AstNode
+{
+    AstStructField() : AstNode(AST_STRUCT_FIELD) {}
+
+    AstExprIdent *name = NULL;
+    AstExprType *type = NULL;
 };
 
 // TODO: this is really bad; use a pool allocator (one for each type?)

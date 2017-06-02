@@ -374,6 +374,42 @@ static AstFunc *parse_func(Parser *parser)
     return func;
 }
 
+static AstStructField *parse_field(Parser *parser)
+{
+    Token name_tok = expect(parser, TOK_IDENT);
+
+    AstStructField *field = ast_alloc(AstStructField);
+    field->name = make_ident(name_tok);
+    field->type = parse_type(parser);
+
+    return field;
+}
+
+AstStruct *parse_struct(Parser *parser)
+{
+    AstStruct *struct_ = ast_alloc(AstStruct);
+
+    expect(parser, TOK_KEY_STRUCT);
+    Token ident = expect(parser, TOK_IDENT);
+    struct_->name = make_ident(ident);
+
+    expect(parser, TOK_OPEN_BRACE);
+    while (true)
+    {
+        if (peek(parser) == TOK_CLOSE_BRACE)
+            break;
+
+        AstStructField *field = parse_field(parser);
+        struct_->fields.add(field);
+
+        expect(parser, TOK_SEMI);
+    }
+    expect(parser, TOK_CLOSE_BRACE);
+    expect(parser, TOK_SEMI);
+
+    return struct_;
+}
+
 void parse_file(AstRoot *root, Array<Token> *tokens)
 {
     Parser parser;
@@ -382,10 +418,24 @@ void parse_file(AstRoot *root, Array<Token> *tokens)
 
     while (true)
     {
-        if (peek(&parser) == TOK_EOF)
+        TokenType tok = peek(&parser);
+        if (tok == TOK_EOF)
             break;
 
-        AstFunc *func = parse_func(&parser);
-        root->funcs.add(func);
+        if ((tok == TOK_KEY_FN) || (tok == TOK_KEY_EXTERN))
+        {
+            AstFunc *func = parse_func(&parser);
+            root->funcs.add(func);
+        }
+        else if (tok == TOK_KEY_STRUCT)
+        {
+            AstStruct *struct_ = parse_struct(&parser);
+            root->structs.add(struct_);
+        }
+        else
+        {
+            // TODO: error message
+            assert(false);
+        }
     }
 }
