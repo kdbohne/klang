@@ -457,18 +457,32 @@ static llvm::Value *gen_stmt(AstStmt *stmt)
             auto decl = static_cast<AstStmtDecl *>(stmt);
 
             // TODO: multiple decls, patterns, etc.
-            assert(decl->lhs->type == AST_EXPR_IDENT);
-            auto ident = static_cast<AstExprIdent *>(decl->lhs);
+            assert(decl->bind->type == AST_EXPR_IDENT);
+            auto ident = static_cast<AstExprIdent *>(decl->bind);
 
-            auto rhs = gen_expr(decl->rhs);
-            assert(rhs);
+            if (decl->rhs)
+            {
+                auto rhs = gen_expr(decl->rhs);
+                assert(rhs);
 
-//            auto alloca = create_alloca(func, rhs->getType(), ident->str);
-            auto alloca = create_alloca(rhs->getType(), ident->str);
+                auto alloca = create_alloca(rhs->getType(), ident->str);
+                builder.CreateStore(rhs, alloca);
 
-            builder.CreateStore(rhs, alloca);
+                vars.insert(ident->str, alloca);
+            }
+            else
+            {
+                // TODO: both methods work, which one is better?
+                auto type = get_type_by_name(decl->bind->type_defn->name);
+//                auto type = get_type_by_name(decl->type->name->str);
 
-            vars.insert(ident->str, alloca);
+                auto alloca = create_alloca(type, ident->str);
+
+                // TODO: default value
+//                builder.CreateStore(???, alloca);
+
+                vars.insert(ident->str, alloca);
+            }
 
             break;
         }

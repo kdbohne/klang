@@ -260,28 +260,43 @@ static AstExpr *parse_expr(Parser *parser)
 
 static AstStmt *parse_stmt(Parser *parser)
 {
-    AstExpr *expr = parse_expr(parser);
-
-    if (peek(parser) == TOK_COLON_EQ)
+    if (eat_optional(parser, TOK_KEY_LET))
     {
-        eat(parser);
+        // TODO: multiple decls, patterns, etc.
+        // NOTE: can't use parse_expr() here, because this case:
+        //            let x = 3;
+        //       would parse the whole assignment instead of just
+        //       the ident (pattern in the future?).
+        //
+        //       TODO: use parse_expr() anyway, extract the data
+        //       from the assignment node?
+        Token ident = expect(parser, TOK_IDENT);
+        AstExpr *bind = make_ident(ident);
+
+        AstExprType *type = NULL;
+        if (peek(parser) == TOK_IDENT)
+            type = parse_type(parser);
+
+        AstExpr *rhs = NULL;
+        if (eat_optional(parser, TOK_EQ))
+            rhs = parse_expr(parser);
 
         AstStmtDecl *decl = ast_alloc(AstStmtDecl);
-        decl->lhs = expr;
-        decl->rhs = parse_expr(parser);
+        decl->bind = bind;
+        decl->type = type;
+        decl->rhs = rhs;
 
         expect(parser, TOK_SEMI);
 
         return decl;
     }
 
-    if (peek(parser) == TOK_SEMI)
+    AstExpr *expr = parse_expr(parser);
+    if (eat_optional(parser, TOK_SEMI))
     {
-        eat(parser);
-
         AstStmtSemi *stmt = ast_alloc(AstStmtSemi);
         stmt->expr = expr;
-        
+
         return stmt;
     }
     else

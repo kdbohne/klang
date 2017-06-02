@@ -225,7 +225,8 @@ struct AstStmtDecl : AstStmt
 {
     AstStmtDecl() : AstStmt(AST_STMT_DECL) {}
 
-    AstExpr *lhs = NULL;
+    AstExpr *bind = NULL;
+    AstExprType *type = NULL;
     AstExpr *rhs = NULL;
 };
 

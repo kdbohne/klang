@@ -268,9 +268,17 @@ void debug_dump(AstRoot *root)
                 {
                     auto stmt = static_cast<AstStmtDecl *>(blk->stmts[i]);
 
-                    debug_dump_expr(stmt->lhs);
-                    fprintf(stderr, " := ");
-                    debug_dump_expr(stmt->rhs);
+                    fprintf(stderr, "let ");
+                    debug_dump_expr(stmt->bind);
+
+                    if (stmt->type)
+                        debug_dump_expr(stmt->type);
+
+                    if (stmt->rhs)
+                    {
+                        fprintf(stderr, " = ");
+                        debug_dump_expr(stmt->rhs);
+                    }
                     fprintf(stderr, ";\n");
 
                     break;

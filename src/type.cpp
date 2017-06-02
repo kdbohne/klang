@@ -454,29 +454,54 @@ static void determine_stmt_type(AstStmt *stmt)
         case AST_STMT_DECL:
         {
             auto decl = static_cast<AstStmtDecl *>(stmt);
-            decl->lhs->scope = decl->scope;
-            decl->rhs->scope = decl->scope;
+            decl->bind->scope = decl->scope;
 
             // TODO: multiple decls, patterns, etc.
-            assert(decl->lhs->type == AST_EXPR_IDENT);
-            auto lhs = static_cast<AstExprIdent *>(decl->lhs);
+            assert(decl->bind->type == AST_EXPR_IDENT);
+            auto lhs = static_cast<AstExprIdent *>(decl->bind);
 
-            auto type = determine_expr_type(decl->rhs);
-            if (type == get_type_defn("void"))
+            // TODO: avoid looking up void each time
+            lhs->type_defn = get_type_defn("void");
+
+            if (decl->type)
             {
-                report_error("Assigning \"%s\" to a block with a void return value.\n",
-                             lhs->str);
+                decl->type->type_defn = get_type_defn(decl->type);
+                lhs->type_defn = decl->type->type_defn;
             }
-            lhs->type_defn = type;
 
-            // If the RHS is a function call, make sure the function actually returns a value.
-            if (decl->rhs->type == AST_EXPR_CALL)
+            if (decl->rhs)
             {
-                auto call = static_cast<AstExprCall *>(decl->rhs);
-                auto func = scope_get_func(call->scope, call->name->str);
+                decl->rhs->scope = decl->scope;
 
-                if (!func->ret || !func->ret->type_defn)
-                    report_error("Attempting to assign void return value from function \"%s\".\n", func->name->str);
+                auto type = determine_expr_type(decl->rhs);
+                if (type == get_type_defn("void"))
+                {
+                    report_error("Assigning \"%s\" to a block with a void return value.\n",
+                                 lhs->str);
+                }
+
+                // If the declaration was given an explicit type, check to make sure
+                // the rvalue expression being assigned has the same type.
+                if (decl->type)
+                {
+                    if (type != get_type_defn(decl->type->name->str))
+                    {
+                        report_error("Assigning rvalue of type \"%s\" to a declaration with type \"%s\".\n",
+                                    type->name, decl->type->name->str);
+                    }
+                }
+
+                lhs->type_defn = type;
+
+                // If the RHS is a function call, make sure the function actually returns a value.
+                if (decl->rhs->type == AST_EXPR_CALL)
+                {
+                    auto call = static_cast<AstExprCall *>(decl->rhs);
+                    auto func = scope_get_func(call->scope, call->name->str);
+
+                    if (!func->ret || !func->ret->type_defn)
+                        report_error("Attempting to assign void return value from function \"%s\".\n", func->name->str);
+                }
             }
 
             scope_add_var(lhs->scope, lhs->str, lhs);
