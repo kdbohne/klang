@@ -98,7 +98,7 @@ static void scope_add_var(Scope *scope, const char *name, AstExprIdent *var)
     scope->vars.insert(name, var);
 }
 
-void register_type_defn(const char *name)
+void register_type_defn(const char *name, AstStruct *struct_)
 {
     assert(global_type_defns_count < (i32)(sizeof(global_type_defns) / sizeof(global_type_defns[0])));
 
@@ -122,6 +122,15 @@ void register_type_defn(const char *name)
 //    defn_ptr->name = string_concatenate("*", name);
     defn_ptr->name = defn->name;
     defn_ptr->flags |= TYPE_DEFN_IS_POINTER;
+
+    if (struct_)
+    {
+        defn->struct_ = struct_;
+        defn->flags |= TYPE_DEFN_IS_STRUCT;
+
+        defn_ptr->struct_ = struct_;
+        defn_ptr->flags |= TYPE_DEFN_IS_STRUCT;
+    }
 }
 
 TypeDefn *get_type_defn(const char *name)
@@ -199,7 +208,11 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
             auto ident = static_cast<AstExprIdent *>(expr);
 
             auto var = scope_get_var(expr->scope, ident->str);
-            assert(var);
+            if (!var)
+            {
+                report_error("Undeclared identifier \"%s\".\n", ident->str);
+                return NULL;
+            }
 
             return var->type_defn;
         }
@@ -327,28 +340,20 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
         case AST_EXPR_ASSIGN:
         {
             auto assign = static_cast<AstExprAssign *>(expr);
-
-            // TODO: multiple decls, patterns, etc.
-            assert(assign->lhs->type == AST_EXPR_IDENT);
-            auto lhs = static_cast<AstExprIdent *>(assign->lhs);
+            auto lhs = assign->lhs;
             auto rhs = assign->rhs;
 
             lhs->scope = assign->scope;
             rhs->scope = assign->scope;
 
-            auto lhs_var = scope_get_var(lhs->scope, lhs->str);
-            if (!lhs_var)
-                report_error("Assigning value to undeclared identifier \"%s\".\n", lhs->str);
-            else
-                lhs->type_defn = lhs_var->type_defn;
-
+            lhs->type_defn = determine_expr_type(lhs);
             rhs->type_defn = determine_expr_type(rhs);
 
             // TODO: optimize, don't look up void each time
             if (rhs->type_defn == get_type_defn("void"))
             {
-                report_error("Assigning \"%s\" to a block with a void return value.\n",
-                             lhs->str);
+                // TODO: output lhs expr
+                report_error("Assigning \"%s\" to a block with a void return value.\n", "(expr)");
             }
 
             if (lhs->type_defn != rhs->type_defn)
@@ -414,8 +419,33 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
 
             return if_expr->type_defn;
         }
+        case AST_EXPR_FIELD:
+        {
+            auto field = static_cast<AstExprField *>(expr);
+            assert(field->scope != NULL);
+            field->expr->scope = field->scope;
+            field->name->scope = field->scope;
+
+            auto lhs_type = determine_expr_type(field->expr);
+            assert(lhs_type->flags & TYPE_DEFN_IS_STRUCT);
+
+            AstExprType *type = NULL;
+            foreach(lhs_type->struct_->fields)
+            {
+                if (strings_match(it->name->str, field->name->str))
+                {
+                    type = it->type;
+                    break;
+                }
+            }
+
+            field->type_defn = get_type_defn(type);
+
+            return field->type_defn;
+        }
         default:
         {
+            fprintf(stderr, "Internal error: unhandled expression type %d\n", expr->type);
             assert(false);
             break;
         }
@@ -551,7 +581,7 @@ bool type_check(AstRoot *root)
     // TODO: register these to scoped type tables instead of dumping
     // all of them into the global type table?
     foreach(root->structs)
-        register_type_defn(it->name->str);
+        register_type_defn(it->name->str, it);
 
     determine_node_types(root);
 

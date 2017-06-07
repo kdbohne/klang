@@ -34,10 +34,8 @@ fn main()
 
 //    x = 43;
 
-    /*
-    v Vec3;
+    let v Vec3;
     v.x = 3.14159;
-    */
 
     /*
     x := factorial(5);

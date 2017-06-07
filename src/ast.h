@@ -37,6 +37,7 @@ enum AstNodeType : u32
     AST_EXPR_ASSIGN,
     AST_EXPR_IF,
     AST_EXPR_BLOCK,
+    AST_EXPR_FIELD,
 
     // Stmt
     AST_STMT_EXPR,
@@ -200,6 +201,14 @@ struct AstExprBlock : AstExpr
 
     Array<AstStmt *> stmts;
     AstExpr *expr = NULL;
+};
+
+struct AstExprField : AstExpr
+{
+    AstExprField() : AstExpr(AST_EXPR_FIELD) {}
+
+    AstExpr *expr = NULL;
+    AstExprIdent *name = NULL;
 };
 
 struct AstStmt : AstNode

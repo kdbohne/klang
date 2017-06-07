@@ -222,6 +222,22 @@ static AstExpr *parse_expr(Parser *parser)
         }
     }
 
+    while (true)
+    {
+        if (peek(parser) != TOK_DOT)
+            break;
+
+        eat(parser);
+
+        Token ident = expect(parser, TOK_IDENT);
+
+        AstExprField *field = ast_alloc(AstExprField);
+        field->expr = lhs;
+        field->name = make_ident(ident);
+
+        lhs = field;
+    }
+
     TokenType next = peek(parser);
     switch (next)
     {
