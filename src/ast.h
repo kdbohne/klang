@@ -209,6 +209,9 @@ struct AstExprField : AstExpr
 
     AstExpr *expr = NULL;
     AstExprIdent *name = NULL;
+
+    // TODO: storing this feels wrong. Use LLVM API to look it up somehow?
+    i32 index = -1;
 };
 
 struct AstStmt : AstNode
@@ -271,6 +274,9 @@ struct AstStructField : AstNode
 
     AstExprIdent *name = NULL;
     AstExprType *type = NULL;
+
+    // TODO: storing this feels wrong. Use LLVM API to look it up somehow?
+    i32 index = -1;
 };
 
 // TODO: this is really bad; use a pool allocator (one for each type?)

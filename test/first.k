@@ -1,5 +1,6 @@
 extern fn syscall5(num *i64, arg1 *i64, arg2 *i64, arg3 *i64, arg4 *i64, arg5 *i64) -> i64;
 
+/*
 fn inc(x i64) -> i64
 {
     x + 1
@@ -18,6 +19,7 @@ fn factorial(n i64) -> i64
         n * factorial(n - 1)
     }
 }
+*/
 
 struct Vec3
 {

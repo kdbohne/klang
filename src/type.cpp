@@ -422,7 +422,6 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
         case AST_EXPR_FIELD:
         {
             auto field = static_cast<AstExprField *>(expr);
-            assert(field->scope != NULL);
             field->expr->scope = field->scope;
             field->name->scope = field->scope;
 
@@ -435,6 +434,8 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
                 if (strings_match(it->name->str, field->name->str))
                 {
                     type = it->type;
+                    field->index = it->index;
+
                     break;
                 }
             }

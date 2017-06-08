@@ -14,6 +14,7 @@ llvm::IRBuilder<> builder(context);
 
 HashMap<llvm::Function *> funcs;
 HashMap<llvm::AllocaInst *> vars;
+Array<llvm::StructType *> structs; // TODO: hash map?
 
 static llvm::Value *gen_stmt(AstStmt *stmt);
 
@@ -30,6 +31,13 @@ llvm::Type *get_type_by_name(const char *name)
         return llvm::Type::getDoubleTy(context);
     if (strings_match(name, "void"))
         return llvm::Type::getVoidTy(context);
+
+    foreach(structs)
+    {
+        // TODO: optimize?
+        if (it->getName().equals(name))
+            return it;
+    }
 
     fprintf(stderr, "get_type_by_name() failed for \"%s\"\n", name);
     assert(false);
@@ -66,6 +74,25 @@ llvm::Type *get_type_by_expr(AstExprType *expr)
 
     assert(false);
     return NULL;
+}
+
+static llvm::StructType *gen_struct(AstStruct *s)
+{
+    Array<llvm::Type *> fields;
+    foreach(s->fields)
+    {
+        auto type = get_type_by_expr(it->type);
+        fields.add(type);
+    }
+
+    auto llvm_fields = llvm::ArrayRef<llvm::Type *>(fields.data, fields.count);
+
+    // TODO: which way is better? use get() and store with name in hash map instead?
+//    auto struct_ = llvm::StructType::get(context, llvm_fields);
+    auto struct_ = llvm::StructType::create(context, llvm_fields, llvm::StringRef(s->name->str));
+    structs.add(struct_);
+
+    return struct_;
 }
 
 static llvm::Value *gen_expr(AstExpr *expr);
@@ -194,9 +221,14 @@ static llvm::Value *gen_un(AstExprUn *un)
     {
         case UN_ADDR:
         {
+            // TODO: use dyn_cast LoadInst -> AllocaInst like in AST_EXPR_FIELD?
+
+            // TODO: should this use create_alloca or IRBuilder::CreateAlloca()?
+//            auto alloca = create_alloca(expr->getType(), NULL);
             auto alloca = builder.CreateAlloca(expr->getType());
             builder.CreateStore(expr, alloca);
 
+            // TODO: CreateInBoundsGEP()?
             return builder.CreateGEP(alloca, llvm::ConstantInt::get(llvm::IntegerType::getInt64Ty(context), 0));
 
             /*
@@ -243,6 +275,20 @@ static llvm::Value *gen_expr(AstExpr *expr)
             auto var = vars.get(ident->str);
             assert(var);
 
+            // FIXME: 'return *var' works for field idents, but not for any other
+            // idents, e.g. params and locals.
+            return *var;
+
+#if 0
+            // TODO: does this even do anything?
+            if (llvm::LoadInst *i = llvm::dyn_cast<llvm::LoadInst>(*var))
+            {
+                if (llvm::AllocaInst *j = llvm::dyn_cast<llvm::AllocaInst>(i->getPointerOperand()))
+                    return j;
+            }
+#endif
+
+            // FIXME: do this for non-fields?
             return builder.CreateLoad(*var, ident->str);
         }
         case AST_EXPR_LIT:
@@ -311,25 +357,20 @@ static llvm::Value *gen_expr(AstExpr *expr)
         {
             auto assign = static_cast<AstExprAssign *>(expr);
 
-            // TODO: multiple decls, patterns, etc.
-            assert(assign->lhs->type == AST_EXPR_IDENT);
-            auto ident = static_cast<AstExprIdent *>(assign->lhs);
+            auto lhs = gen_expr(assign->lhs);
+            auto rhs = gen_expr(assign->rhs);
 
-            auto var_ptr = vars.get(ident->str);
-            assert(var_ptr);
-            auto var = *var_ptr;
+//            assert(lhs->getType() == rhs->getType()->getPointerTo());
 
-            auto val = gen_expr(assign->rhs);
+            builder.CreateStore(rhs, lhs);
 
-            builder.CreateStore(val, var);
-
-            // TODO: does it matter whether the var or the val is returned?
-            // It seems like it shouldn't matter. Returning the value avoids
+            // TODO: does it matter whether the lhs or the rhs is returned?
+            // It seems like it shouldn't matter. Returning the rhs avoids
             // a load instruction, so that seems to be the better option.
 #if 1
-            return val;
+            return rhs;
 #else
-            return builder.CreateLoad(var);
+            return builder.CreateLoad(lhs);
 #endif
         }
         case AST_EXPR_BLOCK:
@@ -421,6 +462,26 @@ static llvm::Value *gen_expr(AstExpr *expr)
                 return builder.CreateLoad(result);
 
             return NULL;
+        }
+        case AST_EXPR_FIELD:
+        {
+            auto field = static_cast<AstExprField *>(expr);
+
+            auto lhs = gen_expr(field->expr);
+
+            llvm::Type *type = lhs->getType();
+            if (auto pt = llvm::dyn_cast<llvm::PointerType>(type))
+                type = pt->getElementType();
+
+            // TODO: optimize, cache getInt32Ty() globally
+            auto zero = llvm::ConstantInt::get(llvm::IntegerType::getInt32Ty(context), 0);
+            auto index = llvm::ConstantInt::get(llvm::IntegerType::getInt32Ty(context), field->index);
+
+            llvm::SmallVector<llvm::Value *, 2> indices;
+            indices.push_back(zero);
+            indices.push_back(index);
+
+            return builder.CreateInBoundsGEP(type, lhs, indices, llvm::StringRef(field->name->str));
         }
         default:
         {
@@ -599,6 +660,9 @@ static void make_builtin_funcs()
 void llvm_gen_ir(AstRoot *ast)
 {
 //    make_builtin_funcs();
+
+    foreach(ast->structs)
+        gen_struct(it);
 
     foreach(ast->funcs)
         gen_func(it);
