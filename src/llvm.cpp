@@ -639,43 +639,8 @@ static llvm::Function *gen_func(AstFunc *func)
     return llvm_func;
 }
 
-static void make_builtin_funcs()
-{
-    auto ret_void = llvm::Type::getVoidTy(context);
-
-    {
-        Array<llvm::Type *> params_;
-        params_.add(llvm::Type::getInt8PtrTy(context));
-        params_.add(llvm::Type::getInt64Ty(context));
-        auto params = llvm::ArrayRef<llvm::Type *>(params_.data, params_.count);
-
-        auto type = llvm::FunctionType::get(ret_void, params, false);
-        auto func = llvm::Function::Create(type, llvm::Function::ExternalLinkage, llvm::Twine("printf"), &module);
-
-        funcs.set("print", func);
-    }
-
-    {
-        Array<llvm::Type *> params_;
-        params_.add(llvm::Type::getInt64PtrTy(context));
-        params_.add(llvm::Type::getInt64PtrTy(context));
-        params_.add(llvm::Type::getInt64PtrTy(context));
-        params_.add(llvm::Type::getInt64PtrTy(context));
-        params_.add(llvm::Type::getInt64PtrTy(context));
-        params_.add(llvm::Type::getInt64PtrTy(context));
-        auto params = llvm::ArrayRef<llvm::Type *>(params_.data, params_.count);
-
-        auto type = llvm::FunctionType::get(llvm::Type::getInt64PtrTy(context), params, false);
-        auto func = llvm::Function::Create(type, llvm::Function::ExternalLinkage, llvm::Twine("syscall"), &module);
-
-        funcs.set("syscall", func);
-    }
-}
-
 void llvm_gen_ir(AstRoot *ast)
 {
-//    make_builtin_funcs();
-
     foreach(ast->structs)
         gen_struct(it);
 
