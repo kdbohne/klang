@@ -572,12 +572,23 @@ static void determine_node_types(AstRoot *root)
 
 bool type_check(AstRoot *root)
 {
-    register_type_defn("void");
+    // TODO: optimize by reordering based on most common cases?
+    register_type_defn("i8");
+    register_type_defn("i16");
     register_type_defn("i32");
     register_type_defn("i64");
+
+    register_type_defn("u8");
+    register_type_defn("u16");
+    register_type_defn("u32");
+    register_type_defn("u64");
+
     register_type_defn("f32");
     register_type_defn("f64");
+
     register_type_defn("string");
+
+    register_type_defn("void");
 
     // TODO: register these to scoped type tables instead of dumping
     // all of them into the global type table?
