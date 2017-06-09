@@ -18,7 +18,7 @@ Array<llvm::StructType *> structs; // TODO: hash map?
 
 static llvm::Value *gen_stmt(AstStmt *stmt);
 
-llvm::Type *get_type_by_name(const char *name)
+llvm::Type *get_type_by_name(const char *name, bool is_pointer)
 {
     // TODO: support arbitrary types
     if (strings_match(name, "i32"))
@@ -46,34 +46,9 @@ llvm::Type *get_type_by_name(const char *name)
 
 llvm::Type *get_type_by_expr(AstExprType *expr)
 {
-    auto name = expr->name->str;
-
     // TODO: support arbitrary types
-    if (expr->flags & TYPE_IS_POINTER)
-    {
-        if (strings_match(name, "i32"))
-            return llvm::Type::getInt32PtrTy(context);
-        if (strings_match(name, "i64"))
-            return llvm::Type::getInt64PtrTy(context);
-        if (strings_match(name, "f32"))
-            return llvm::Type::getFloatPtrTy(context);
-        if (strings_match(name, "f64"))
-            return llvm::Type::getDoublePtrTy(context);
-    }
-    else
-    {
-        if (strings_match(name, "i32"))
-            return llvm::Type::getInt32Ty(context);
-        if (strings_match(name, "i64"))
-            return llvm::Type::getInt64Ty(context);
-        if (strings_match(name, "f32"))
-            return llvm::Type::getFloatTy(context);
-        if (strings_match(name, "f64"))
-            return llvm::Type::getDoubleTy(context);
-    }
-
-    assert(false);
-    return NULL;
+    auto name = expr->name->str;
+    return get_type_by_name(name, expr->flags & TYPE_IS_POINTER);
 }
 
 static llvm::StructType *gen_struct(AstStruct *s)
@@ -555,8 +530,9 @@ static llvm::Value *gen_stmt(AstStmt *stmt)
             else
             {
                 // TODO: both methods work, which one is better?
-                auto type = get_type_by_name(decl->bind->type_defn->name);
-//                auto type = get_type_by_name(decl->type->name->str);
+                auto defn = decl->bind->type_defn;
+                auto type = get_type_by_name(defn->name, defn->flags & TYPE_DEFN_IS_POINTER);
+//                auto type = get_type_by_name(decl->type->name->str, defn->flags & TYPE_DEFN_IS_POINTER);
 
                 auto alloca = create_alloca(type, ident->str);
 
