@@ -95,7 +95,7 @@ static llvm::StructType *gen_struct(AstStruct *s)
     return struct_;
 }
 
-static llvm::Value *gen_expr(AstExpr *expr);
+static llvm::Value *gen_expr(AstExpr *expr, bool is_field = false);
 
 static llvm::Value *gen_lit(AstExprLit *lit)
 {
@@ -265,7 +265,8 @@ static llvm::AllocaInst *create_alloca(llvm::Type *type, const char *name)
     return tmp.CreateAlloca(type, 0, llvm::Twine(name));
 }
 
-static llvm::Value *gen_expr(AstExpr *expr)
+// TODO: better way of doing is_field hack?
+static llvm::Value *gen_expr(AstExpr *expr, bool is_field)
 {
     switch (expr->type)
     {
@@ -277,7 +278,8 @@ static llvm::Value *gen_expr(AstExpr *expr)
 
             // FIXME: 'return *var' works for field idents, but not for any other
             // idents, e.g. params and locals.
-            return *var;
+            if (is_field)
+                return *var;
 
 #if 0
             // TODO: does this even do anything?
@@ -325,7 +327,7 @@ static llvm::Value *gen_expr(AstExpr *expr)
 #endif
 
                 foreach(call->args)
-                    args_.add(gen_expr(it));
+                    args_.add(gen_expr(it, is_field));
 
                 args = llvm::ArrayRef<llvm::Value *>(args_.data, args_.count);
             }
@@ -346,7 +348,7 @@ static llvm::Value *gen_expr(AstExpr *expr)
         {
             auto cast = static_cast<AstExprCast *>(expr);
 
-            auto src = gen_expr(cast->expr);
+            auto src = gen_expr(cast->expr, is_field);
             auto dest = get_type_by_expr(cast->type);
 
             // FIXME: signed vs unsigned?
@@ -357,8 +359,8 @@ static llvm::Value *gen_expr(AstExpr *expr)
         {
             auto assign = static_cast<AstExprAssign *>(expr);
 
-            auto lhs = gen_expr(assign->lhs);
-            auto rhs = gen_expr(assign->rhs);
+            auto lhs = gen_expr(assign->lhs, is_field);
+            auto rhs = gen_expr(assign->rhs, is_field);
 
 //            assert(lhs->getType() == rhs->getType()->getPointerTo());
 
@@ -385,7 +387,7 @@ static llvm::Value *gen_expr(AstExpr *expr)
 
             llvm::Value *block_expr = NULL;
             if (block->expr)
-                block_expr = gen_expr(block->expr);
+                block_expr = gen_expr(block->expr, is_field);
 
             // Pop args from var table.
             vars = vars_old;
@@ -396,7 +398,7 @@ static llvm::Value *gen_expr(AstExpr *expr)
         {
             auto if_expr = static_cast<AstExprIf *>(expr);
 
-            auto cond = gen_expr(if_expr->cond);
+            auto cond = gen_expr(if_expr->cond, is_field);
 
 #if 0
             // TODO: optimize, don't look up void each time
@@ -429,7 +431,7 @@ static llvm::Value *gen_expr(AstExpr *expr)
             // Emit if-block.
             builder.SetInsertPoint(if_bb);
 
-            auto if_val = gen_expr(if_expr->block);
+            auto if_val = gen_expr(if_expr->block, is_field);
             if (if_val)
             {
                 // The type of the if-expression is now known, so the result
@@ -448,7 +450,7 @@ static llvm::Value *gen_expr(AstExpr *expr)
                 func->getBasicBlockList().push_back(else_bb);
                 builder.SetInsertPoint(else_bb);
 
-                auto else_val = gen_expr(if_expr->else_expr);
+                auto else_val = gen_expr(if_expr->else_expr, is_field);
                 if (else_val)
                     builder.CreateStore(else_val, result);
 
@@ -467,7 +469,7 @@ static llvm::Value *gen_expr(AstExpr *expr)
         {
             auto field = static_cast<AstExprField *>(expr);
 
-            auto lhs = gen_expr(field->expr);
+            auto lhs = gen_expr(field->expr, true);
 
             llvm::Type *type = lhs->getType();
             if (auto pt = llvm::dyn_cast<llvm::PointerType>(type))
