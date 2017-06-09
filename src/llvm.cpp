@@ -23,43 +23,53 @@ llvm::Type *get_type_by_name(const char *name, bool is_pointer)
     // TODO: support arbitrary types
     // TODO: optimize by reordering based on most common cases?
 
+    llvm::Type *type = NULL;
+
     if (strings_match(name, "i8"))
-        return llvm::Type::getInt8Ty(context);
+        type = llvm::Type::getInt8Ty(context);
     if (strings_match(name, "i16"))
-        return llvm::Type::getInt16Ty(context);
+        type = llvm::Type::getInt16Ty(context);
     if (strings_match(name, "i32"))
-        return llvm::Type::getInt32Ty(context);
+        type = llvm::Type::getInt32Ty(context);
     if (strings_match(name, "i64"))
-        return llvm::Type::getInt64Ty(context);
+        type = llvm::Type::getInt64Ty(context);
 
     // NOTE: LLVM does not distinguish between signed/unsigned integers.
     if (strings_match(name, "u8"))
-        return llvm::Type::getInt8Ty(context);
+        type = llvm::Type::getInt8Ty(context);
     if (strings_match(name, "u16"))
-        return llvm::Type::getInt16Ty(context);
+        type = llvm::Type::getInt16Ty(context);
     if (strings_match(name, "u32"))
-        return llvm::Type::getInt32Ty(context);
+        type = llvm::Type::getInt32Ty(context);
     if (strings_match(name, "u64"))
-        return llvm::Type::getInt64Ty(context);
+        type = llvm::Type::getInt64Ty(context);
 
     if (strings_match(name, "f32"))
-        return llvm::Type::getFloatTy(context);
+        type = llvm::Type::getFloatTy(context);
     if (strings_match(name, "f64"))
-        return llvm::Type::getDoubleTy(context);
+        type = llvm::Type::getDoubleTy(context);
 
     if (strings_match(name, "void"))
-        return llvm::Type::getVoidTy(context);
+        type = llvm::Type::getVoidTy(context);
 
     foreach(structs)
     {
         // TODO: optimize?
         if (it->getName().equals(name))
-            return it;
+            type = it;
     }
 
-    fprintf(stderr, "get_type_by_name() failed for \"%s\"\n", name);
-    assert(false);
-    return NULL;
+    if (!type)
+    {
+        fprintf(stderr, "get_type_by_name() failed for \"%s\"\n", name);
+        assert(false);
+        return NULL;
+    }
+
+    if (is_pointer)
+        type = type->getPointerTo();
+
+    return type;
 }
 
 llvm::Type *get_type_by_expr(AstExprType *expr)
