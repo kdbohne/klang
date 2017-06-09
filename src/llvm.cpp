@@ -174,30 +174,60 @@ static llvm::Value *gen_bin(AstExprBin *bin)
     auto lhs = gen_expr(bin->lhs);
     auto rhs = gen_expr(bin->rhs);
 
+    // TODO: pointer arithmetic?
+    // TODO: why are pointers being passed here at all?
+    //       assuming it's a bug in the AST_EXPR_FIELD expr handling
+    if (lhs->getType()->isPointerTy())
+        lhs = builder.CreateLoad(lhs);
+    if (rhs->getType()->isPointerTy())
+        rhs = builder.CreateLoad(rhs);
+
+    auto lt = lhs->getType();
+    auto rt = rhs->getType();
+
+    // Check if the types are floats or not. This is needed in order to decide
+    // whether an Add or FAdd should be generated, for example.
+    bool is_float = false;
+    if (lt->isFloatTy() || rt->isFloatTy())
+    {
+        assert(lt->isFloatTy());
+        assert(rt->isFloatTy());
+
+        is_float = true;
+    }
+
     switch (bin->op)
     {
         case BIN_ADD:
         {
-            // TODO: CreateFAdd
-            return builder.CreateAdd(lhs, rhs); // TODO: more args?
+            if (is_float)
+                return builder.CreateFAdd(lhs, rhs);
+            else
+                return builder.CreateAdd(lhs, rhs); // TODO: more args?
         }
         case BIN_SUB:
         {
-            // TODO: CreateFSub
-            return builder.CreateSub(lhs, rhs); // TODO: more args?
+            if (is_float)
+                return builder.CreateFSub(lhs, rhs);
+            else
+                return builder.CreateSub(lhs, rhs); // TODO: more args?
         }
         case BIN_MUL:
         {
-            // TODO: CreateFMul
-            // TODO: CreateNSWMul
-            // TODO: CreateNUWMul
-            return builder.CreateMul(lhs, rhs); // TODO: more args?
+            // TODO: CreateNSWMul?
+            // TODO: CreateNUWMul?
+            if (is_float)
+                return builder.CreateFMul(lhs, rhs);
+            else
+                return builder.CreateMul(lhs, rhs); // TODO: more args?
         }
         case BIN_DIV:
         {
             // TODO: CreateUDiv
-            // TODO: CreateFDiv
-            return builder.CreateSDiv(lhs, rhs); // TODO: more args?
+            if (is_float)
+                return builder.CreateFDiv(lhs, rhs);
+            else
+                return builder.CreateSDiv(lhs, rhs); // TODO: more args?
         }
         case BIN_EQ:
         {
@@ -276,21 +306,10 @@ static llvm::Value *gen_expr(AstExpr *expr, bool is_field)
             auto var = vars.get(ident->str);
             assert(var);
 
-            // FIXME: 'return *var' works for field idents, but not for any other
-            // idents, e.g. params and locals.
+            // TODO: is this the only case where this is needed?
             if (is_field)
                 return *var;
 
-#if 0
-            // TODO: does this even do anything?
-            if (llvm::LoadInst *i = llvm::dyn_cast<llvm::LoadInst>(*var))
-            {
-                if (llvm::AllocaInst *j = llvm::dyn_cast<llvm::AllocaInst>(i->getPointerOperand()))
-                    return j;
-            }
-#endif
-
-            // FIXME: do this for non-fields?
             return builder.CreateLoad(*var, ident->str);
         }
         case AST_EXPR_LIT:

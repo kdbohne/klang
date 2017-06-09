@@ -34,10 +34,16 @@ fn main()
     let y i64 = 42;
     let z = 17;
 
+    let t1 = 3;
+    let t2 = 2;
+    let t3 = t1 + t2;
+
 //    x = 43;
 
     let v Vec3;
     v.x = 3.14159;
+    v.y = 22.84;
+    v.z = v.x + v.y;
 
     /*
     x := factorial(5);
