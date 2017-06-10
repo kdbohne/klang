@@ -5,6 +5,7 @@
 struct AstRoot;
 struct AstStruct;
 
+// TODO: why are these in the header?
 enum TypeDefnFlags
 {
     TYPE_DEFN_IS_POINTER = 0x1,
@@ -21,6 +22,6 @@ struct TypeDefn
 extern TypeDefn global_type_defns[];
 
 void register_type_defn(const char *name, AstStruct *struct_ = NULL);
-TypeDefn *get_type_defn(const char *name);
+TypeDefn *get_type_defn(const char *name, bool is_pointer = false);
 
 bool type_check(AstRoot *root);

@@ -133,17 +133,20 @@ void register_type_defn(const char *name, AstStruct *struct_)
     }
 }
 
-TypeDefn *get_type_defn(const char *name)
+TypeDefn *get_type_defn(const char *name, bool is_pointer)
 {
     // TODO: optimize if needed
     for (int i = 0; i < global_type_defns_count; ++i)
     {
         TypeDefn *defn = &global_type_defns[i];
+        if (is_pointer != (defn->flags & TYPE_DEFN_IS_POINTER))
+            continue;
+
         if (strings_match(defn->name, name))
             return defn;
     }
 
-    report_error("Unknown type \"%s\".\n", name);
+    report_error("Unknown type \"%s%s\".\n", is_pointer ? "*" : "", name);
 
     return NULL;
 }
