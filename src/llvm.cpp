@@ -49,6 +49,11 @@ llvm::Type *get_type_by_name(const char *name, bool is_pointer)
     if (strings_match(name, "f64"))
         type = llvm::Type::getDoubleTy(context);
 
+    // NOTE: this type must match the type for CreatePointerCast()
+    // in gen_lit's LIT_STR case.
+    if (strings_match(name, "str"))
+        type = llvm::Type::getInt8PtrTy(context);
+
     if (strings_match(name, "void"))
         type = llvm::Type::getVoidTy(context);
 
@@ -124,7 +129,12 @@ static llvm::Value *gen_lit(AstExprLit *lit)
             auto alloca = builder.CreateAlloca(str->getType());
             builder.CreateStore(str, alloca);
 
-            return builder.CreateGEP(alloca, llvm::ConstantInt::get(llvm::IntegerType::getInt64Ty(context), 0));
+            // NOTE: the destination type must match the type for 'str'
+            // defined in get_type_by_name().
+            return builder.CreatePointerCast(alloca, llvm::Type::getInt8PtrTy(context), "strcast");
+
+            // TODO: CreateInBoundsGep()?
+//            return builder.CreateGEP(alloca, llvm::ConstantInt::get(llvm::IntegerType::getInt64Ty(context), 0));
         }
         default:
         {

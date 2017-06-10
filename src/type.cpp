@@ -235,7 +235,7 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
                 }
                 case LIT_STR:
                 {
-                    lit->type_defn = get_type_defn("string");
+                    lit->type_defn = get_type_defn("str");
                     break;
                 }
                 default:
@@ -586,7 +586,7 @@ bool type_check(AstRoot *root)
     register_type_defn("f32");
     register_type_defn("f64");
 
-    register_type_defn("string");
+    register_type_defn("str");
 
     register_type_defn("void");
 
