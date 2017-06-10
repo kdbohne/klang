@@ -117,20 +117,13 @@ void register_type_defn(const char *name, AstStruct *struct_)
     // Register two types: the plain type, and a pointer to the type.
     TypeDefn *defn = &global_type_defns[global_type_defns_count++];
     defn->name = string_duplicate(name);
+    defn->struct_ = struct_;
 
     TypeDefn *defn_ptr = &global_type_defns[global_type_defns_count++];
 //    defn_ptr->name = string_concatenate("*", name);
     defn_ptr->name = defn->name;
-    defn_ptr->flags |= TYPE_DEFN_IS_POINTER;
-
-    if (struct_)
-    {
-        defn->struct_ = struct_;
-        defn->flags |= TYPE_DEFN_IS_STRUCT;
-
-        defn_ptr->struct_ = struct_;
-        defn_ptr->flags |= TYPE_DEFN_IS_STRUCT;
-    }
+    defn_ptr->ptr = defn;
+    defn_ptr->struct_ = struct_;
 }
 
 TypeDefn *get_type_defn(const char *name, bool is_pointer)
@@ -139,7 +132,7 @@ TypeDefn *get_type_defn(const char *name, bool is_pointer)
     for (int i = 0; i < global_type_defns_count; ++i)
     {
         TypeDefn *defn = &global_type_defns[i];
-        if (is_pointer != (defn->flags & TYPE_DEFN_IS_POINTER))
+        if (is_pointer != (defn->ptr != NULL))
             continue;
 
         if (strings_match(defn->name, name))
@@ -157,7 +150,7 @@ static TypeDefn *get_type_defn(AstExprType *type)
     for (int i = 0; i < global_type_defns_count; ++i)
     {
         TypeDefn *defn = &global_type_defns[i];
-        if ((type->flags & TYPE_DEFN_IS_POINTER) != (defn->flags & TYPE_DEFN_IS_POINTER))
+        if ((type->flags & TYPE_IS_POINTER) != (defn->ptr != NULL))
             continue;
 
         if (strings_match(defn->name, type->name->str))
@@ -165,7 +158,7 @@ static TypeDefn *get_type_defn(AstExprType *type)
     }
 
     report_error("Unknown type \"%s%s\".\n",
-                 (type->flags & TYPE_DEFN_IS_POINTER) ? "*" : "",
+                 (type->flags & TYPE_IS_POINTER) ? "*" : "",
                  type->name->str);
 
     return NULL;
@@ -321,8 +314,8 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
                     {
                         report_error("Type mismatch in argument %d of \"%s\" call. Expected %s%s, got %s%s.\n",
                                      i, func->name->str,
-                                     (param->name->type_defn->flags & TYPE_DEFN_IS_POINTER) ? "*" : "", param->name->type_defn->name,
-                                     (arg->type_defn->flags & TYPE_DEFN_IS_POINTER) ? "*" : "", arg->type_defn->name);
+                                     param->name->type_defn->ptr ? "*" : "", param->name->type_defn->name,
+                                     arg->type_defn->ptr ? "*" : "", arg->type_defn->name);
                     }
                 }
             }
@@ -429,7 +422,7 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
             field->name->scope = field->scope;
 
             auto lhs_type = determine_expr_type(field->expr);
-            assert(lhs_type->flags & TYPE_DEFN_IS_STRUCT);
+            assert(lhs_type->struct_);
 
             AstExprType *type = NULL;
             foreach(lhs_type->struct_->fields)

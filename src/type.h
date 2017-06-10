@@ -6,18 +6,13 @@ struct AstRoot;
 struct AstStruct;
 
 // TODO: why are these in the header?
-enum TypeDefnFlags
-{
-    TYPE_DEFN_IS_POINTER = 0x1,
-    TYPE_DEFN_IS_STRUCT = 0x2,
-};
-
 struct TypeDefn
 {
     u32 flags = 0;
     char *name = NULL;
 
-    AstStruct *struct_;
+    AstStruct *struct_ = NULL;
+    TypeDefn *ptr = NULL;
 };
 extern TypeDefn global_type_defns[];
 

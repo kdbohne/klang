@@ -569,8 +569,8 @@ static llvm::Value *gen_stmt(AstStmt *stmt)
             {
                 // TODO: both methods work, which one is better?
                 auto defn = decl->bind->type_defn;
-                auto type = get_type_by_name(defn->name, defn->flags & TYPE_DEFN_IS_POINTER);
-//                auto type = get_type_by_name(decl->type->name->str, defn->flags & TYPE_DEFN_IS_POINTER);
+                auto type = get_type_by_name(defn->name, defn->ptr);
+//                auto type = get_type_by_name(decl->type->name->str, defn->ptr);
 
                 auto alloca = create_alloca(type, ident->str);
 
