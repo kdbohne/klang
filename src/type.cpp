@@ -394,13 +394,12 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
         {
             auto if_expr = static_cast<AstExprIf *>(expr);
             if_expr->cond->scope = if_expr->scope;
-            if_expr->block->scope = if_expr->scope;
 
             // TODO: are these assignments necessary? just do determine_expr_type()
             // and it should already set the node's type_defn
             if_expr->cond->type_defn = determine_expr_type(if_expr->cond);
 
-            if_expr->block->scope = make_scope(if_expr->block->scope);
+            if_expr->block->scope = make_scope(if_expr->scope);
             if_expr->block->type_defn = determine_expr_type(if_expr->block);
             if_expr->type_defn = if_expr->block->type_defn;
 
