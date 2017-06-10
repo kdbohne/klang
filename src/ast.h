@@ -154,6 +154,7 @@ struct AstExprCall : AstExpr
 
 enum AstExprTypeFlags
 {
+    // TODO: refactor to use pointer depth instead of flag
     TYPE_IS_POINTER = 0x1,
 };
 

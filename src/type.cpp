@@ -114,54 +114,77 @@ void register_type_defn(const char *name, AstStruct *struct_)
         }
     }
 
-    // Register two types: the plain type, and a pointer to the type.
     TypeDefn *defn = &global_type_defns[global_type_defns_count++];
     defn->name = string_duplicate(name);
     defn->struct_ = struct_;
-
-    TypeDefn *defn_ptr = &global_type_defns[global_type_defns_count++];
-//    defn_ptr->name = string_concatenate("*", name);
-    defn_ptr->name = defn->name;
-    defn_ptr->ptr = defn;
-    defn_ptr->struct_ = struct_;
+    defn->ptr = NULL;
 }
 
-TypeDefn *get_type_defn(const char *name, bool is_pointer)
+static int get_pointer_depth(TypeDefn *defn)
+{
+    int depth = 0;
+    while (defn->ptr)
+    {
+        ++depth;
+        defn = defn->ptr;
+    }
+
+    return depth;
+}
+
+TypeDefn *get_type_defn(const char *name, int pointer_depth)
 {
     // TODO: optimize if needed
+
+    TypeDefn *base_type = NULL;
     for (int i = 0; i < global_type_defns_count; ++i)
     {
         TypeDefn *defn = &global_type_defns[i];
-        if (is_pointer != (defn->ptr != NULL))
+        if (!strings_match(defn->name, name))
             continue;
 
-        if (strings_match(defn->name, name))
+        int depth = get_pointer_depth(defn);
+        if (depth == pointer_depth)
             return defn;
+
+        if (depth == 0)
+            base_type = defn;
     }
 
-    report_error("Unknown type \"%s%s\".\n", is_pointer ? "*" : "", name);
+    // The type exists, but there is not a version of it with the specified
+    // pointer depth. Create it now from the base type.
+    // TODO: better way of doing nested pointer types!
+    if (base_type)
+    {
+        TypeDefn *parent = base_type;
+
+        if (pointer_depth > 1)
+        {
+            for (int i = 0; i < pointer_depth - 1; ++i)
+                parent = get_type_defn(parent->name, 1);
+        }
+
+        TypeDefn *defn = &global_type_defns[global_type_defns_count++];
+        defn->name = string_duplicate(name);
+        defn->struct_ = NULL;
+        defn->ptr = parent;
+
+        return defn;
+    }
+
+    report_error("Unknown type \"%*s%s\".\n", pointer_depth, "*", name);
 
     return NULL;
 }
 
 static TypeDefn *get_type_defn(AstExprType *type)
 {
-    // TODO: optimize if needed
-    for (int i = 0; i < global_type_defns_count; ++i)
-    {
-        TypeDefn *defn = &global_type_defns[i];
-        if ((type->flags & TYPE_IS_POINTER) != (defn->ptr != NULL))
-            continue;
+    // TODO: refactor AstExprType to use pointer depth
+    int depth = 0;
+    if (type->flags & TYPE_IS_POINTER)
+        depth = 1;
 
-        if (strings_match(defn->name, type->name->str))
-            return defn;
-    }
-
-    report_error("Unknown type \"%s%s\".\n",
-                 (type->flags & TYPE_IS_POINTER) ? "*" : "",
-                 type->name->str);
-
-    return NULL;
+    return get_type_defn(type->name->str, depth);
 }
 
 static void type_check_func(AstFunc *func)
@@ -274,6 +297,14 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
             un->expr->scope = un->scope;
 
             un->expr->type_defn = determine_expr_type(un->expr);
+
+#if 0
+            switch (un->op)
+            {
+                case UN_ADDR:
+            }
+#endif
+
             un->type_defn = un->expr->type_defn;
 
             return un->type_defn;

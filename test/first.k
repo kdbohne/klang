@@ -1,4 +1,5 @@
 extern fn syscall5(num *i64, arg1 *i64, arg2 *i64, arg3 *i64, arg4 *i64, arg5 *i64) -> i64;
+extern fn malloc(bytes i64) -> *u8;
 
 /*
 fn inc(x i64) -> i64
@@ -28,6 +29,33 @@ struct Vec3
     z f32;
 };
 
+struct String
+{
+    data str;
+    len i64;
+};
+
+fn string_make(data str) -> String
+{
+    let s String;
+    s.data = data;
+    s.len = 0;
+
+/*
+    let p = data;
+    loop {
+        if *p == 0 {
+            break;
+        };
+
+//        s.len = s.len + 1;
+//        p = p + 1;
+    };
+    */
+
+    s
+}
+
 fn main()
 {
     let x i32;
@@ -38,12 +66,23 @@ fn main()
     let t2 = 2;
     let t3 = t1 + t2;
 
+    let a = 5;
+    let b = &a;
+    let c = b + 3;
+    let d = &b;
+    let e = &d;
+
 //    x = 43;
 
     let v Vec3;
     v.x = 3.14159;
     v.y = 22.84;
     v.z = v.x + v.y;
+
+    let s = string_make("test string!");
+
+    let m = malloc(256);
+    syscall5(cast(*i64) 1, cast(*i64) 1, cast(*i64) "120\n", cast(*i64) 4, cast(*i64) 0, cast(*i64) 0);
 
     /*
     x := factorial(5);
