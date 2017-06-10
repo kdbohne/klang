@@ -202,6 +202,22 @@ static AstExpr *parse_expr(Parser *parser)
 
             break;
         }
+        case TOK_KEY_LOOP:
+        {
+            AstExprLoop *loop = ast_alloc(AstExprLoop);
+
+            expect(parser, TOK_OPEN_BRACE);
+            loop->block = parse_block(parser);
+
+            lhs = loop;
+
+            break;
+        }
+        case TOK_KEY_BREAK:
+        {
+            AstExprBreak *brk = ast_alloc(AstExprBreak);
+            return brk;
+        }
 
         // Unary operators.
         // Add more here!

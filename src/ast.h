@@ -38,6 +38,8 @@ enum AstNodeType : u32
     AST_EXPR_IF,
     AST_EXPR_BLOCK,
     AST_EXPR_FIELD,
+    AST_EXPR_LOOP,
+    AST_EXPR_BREAK,
 
     // Stmt
     AST_STMT_EXPR,
@@ -212,6 +214,21 @@ struct AstExprField : AstExpr
 
     // TODO: storing this feels wrong. Use LLVM API to look it up somehow?
     i32 index = -1;
+};
+
+struct AstExprLoop : AstExpr
+{
+    AstExprLoop() : AstExpr(AST_EXPR_LOOP) {}
+
+    AstExprBlock *block = NULL;
+};
+
+struct AstExprBreak : AstExpr
+{
+    AstExprBreak() : AstExpr(AST_EXPR_BREAK) {}
+
+    // TODO: support labels?
+//    AstExprIdent *label = NULL;
 };
 
 struct AstStmt : AstNode
