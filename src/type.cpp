@@ -444,6 +444,22 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
 
             return field->type_defn;
         }
+        case AST_EXPR_LOOP:
+        {
+            auto loop = static_cast<AstExprLoop *>(expr);
+
+            loop->block->scope = make_scope(loop->scope);
+            loop->block->type_defn = determine_expr_type(loop->block);
+            loop->type_defn = loop->block->type_defn;
+
+            return loop->type_defn;
+        }
+        case AST_EXPR_BREAK:
+        {
+            // TODO: support labels?
+            // TODO: optimize, avoid looking up void each time
+            return get_type_defn("void");
+        }
         default:
         {
             fprintf(stderr, "Internal error: unhandled expression type %d\n", expr->type);
