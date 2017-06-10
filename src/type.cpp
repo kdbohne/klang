@@ -380,7 +380,8 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
             if (block->expr)
             {
                 block->expr->scope = block->scope;
-                block->type_defn = determine_expr_type(block->expr);
+                block->expr->type_defn = determine_expr_type(block->expr);
+                block->type_defn = block->expr->type_defn;
             }
             else
             {
