@@ -66,11 +66,9 @@ fn main()
     let t2 = 2;
     let t3 = t1 + t2;
 
-    let a = 5;
+    let a = 4;
     let b = &a;
-    let c = b + 3;
-    let d = &b;
-    let e = &d;
+    let c = *b;
 
 //    x = 43;
 
@@ -83,6 +81,15 @@ fn main()
 
     let m = malloc(256);
     syscall5(cast(*i64) 1, cast(*i64) 1, cast(*i64) "120\n", cast(*i64) 4, cast(*i64) 0, cast(*i64) 0);
+
+    /*
+    let a = 5;
+    let b = &a;
+    let c = b + &a;
+    let d = &b;
+    let e = &d;
+    let f = &e + 3;
+    */
 
     /*
     x := factorial(5);

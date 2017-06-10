@@ -152,18 +152,12 @@ struct AstExprCall : AstExpr
     Array<AstExpr *> args;
 };
 
-enum AstExprTypeFlags
-{
-    // TODO: refactor to use pointer depth instead of flag
-    TYPE_IS_POINTER = 0x1,
-};
-
 struct AstExprType : AstExpr
 {
     AstExprType() : AstExpr(AST_EXPR_TYPE) {}
 
-    u32 flags = 0;
     AstExprIdent *name = NULL;
+    i32 pointer_depth = 0;
 };
 
 struct AstExprParam : AstExpr

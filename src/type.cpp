@@ -120,16 +120,19 @@ void register_type_defn(const char *name, AstStruct *struct_)
     defn->ptr = NULL;
 }
 
-static int get_pointer_depth(TypeDefn *defn)
+static char *get_type_string(TypeDefn *defn)
 {
-    int depth = 0;
-    while (defn->ptr)
-    {
-        ++depth;
-        defn = defn->ptr;
-    }
+    static const char *xxx_hack = "***********************";
 
-    return depth;
+    int depth = get_pointer_depth(defn);
+    assert(depth < string_length(xxx_hack));
+
+    // FIXME: memory leak
+    int buf_size = 256;
+    char *buf = (char *)malloc(buf_size);
+
+    snprintf(buf, buf_size, "%.*s%s", depth, xxx_hack, defn->name);
+    return buf;
 }
 
 TypeDefn *get_type_defn(const char *name, int pointer_depth)
@@ -172,19 +175,88 @@ TypeDefn *get_type_defn(const char *name, int pointer_depth)
         return defn;
     }
 
-    report_error("Unknown type \"%*s%s\".\n", pointer_depth, "*", name);
+    static const char *xxx_hack = "***********************";
+    assert(pointer_depth < string_length(xxx_hack));
+    report_error("Unknown type \"%.*s%s\".\n", pointer_depth, xxx_hack, name);
 
     return NULL;
 }
 
+static TypeDefn *get_pointer_to(TypeDefn *defn)
+{
+    int depth = get_pointer_depth(defn) + 1;
+
+    // Check if a pointer to the type already exists.
+    for (int i = 0; i < global_type_defns_count; ++i)
+    {
+        TypeDefn *cand = &global_type_defns[i];
+        if (!strings_match(cand->name, defn->name))
+            continue;
+
+        int cand_depth = get_pointer_depth(cand);
+        if (cand_depth == depth)
+            return cand;
+    }
+
+    TypeDefn *new_defn = &global_type_defns[global_type_defns_count++];
+    new_defn->name = defn->name;
+    new_defn->struct_ = defn->struct_;
+    new_defn->ptr = defn;
+
+    return new_defn;
+}
+
+static TypeDefn *get_deref(TypeDefn *defn)
+{
+    int depth = get_pointer_depth(defn) - 1;
+    if (depth < 0)
+    {
+        report_error("Dereferencing non-pointer type %s.\n", get_type_string(defn));
+        return NULL;
+    }
+
+    // Check if a pointer to the type already exists.
+    TypeDefn *parent = NULL;
+    for (int i = 0; i < global_type_defns_count; ++i)
+    {
+        TypeDefn *cand = &global_type_defns[i];
+        if (!strings_match(cand->name, defn->name))
+            continue;
+
+        int cand_depth = get_pointer_depth(cand);
+        if (cand_depth == depth - 1)
+            parent = cand;
+
+        if (cand_depth == depth)
+            return cand;
+    }
+
+    if (depth > 0)
+        assert(parent != NULL);
+
+    TypeDefn *new_defn = &global_type_defns[global_type_defns_count++];
+    new_defn->name = defn->name;
+    new_defn->struct_ = defn->struct_;
+    new_defn->ptr = parent;
+
+    return NULL;
+}
+
+int get_pointer_depth(TypeDefn *defn)
+{
+    int depth = 0;
+    while (defn->ptr)
+    {
+        ++depth;
+        defn = defn->ptr;
+    }
+
+    return depth;
+}
+
 static TypeDefn *get_type_defn(AstExprType *type)
 {
-    // TODO: refactor AstExprType to use pointer depth
-    int depth = 0;
-    if (type->flags & TYPE_IS_POINTER)
-        depth = 1;
-
-    return get_type_defn(type->name->str, depth);
+    return get_type_defn(type->name->str, type->pointer_depth);
 }
 
 static void type_check_func(AstFunc *func)
@@ -198,7 +270,8 @@ static void type_check_func(AstFunc *func)
     if (func->ret && !blk->expr)
     {
         report_error("Function \"%s\" returns a %s, but its block does not have an expression.\n",
-                     func->name->str, func->ret->type_defn->name);
+                     func->name->str,
+                     get_type_string(func->ret->type_defn));
     }
     else if (!func->ret && blk->expr)
     {
@@ -213,7 +286,9 @@ static void type_check_func(AstFunc *func)
         if (a != b)
         {
             report_error("Block expression does not match the return type of function \"%s\".\nBlock: %s\nReturn type: %s",
-                         func->name->str, b->name, a->name);
+                         func->name->str,
+                         get_type_string(b),
+                         get_type_string(a));
         }
     }
 }
@@ -282,7 +357,9 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
             if (lhs->type_defn != rhs->type_defn)
             {
                 report_error("Type mismatch in binary operation:\n    %s %s %s\n",
-                             lhs->type_defn->name, bin_op_strings[bin->op], rhs->type_defn->name);
+                             get_type_string(lhs->type_defn),
+                             bin_op_strings[bin->op],
+                             get_type_string(rhs->type_defn));
             }
 
             // NOTE: setting type to LHS regardless of whether types match or not.
@@ -298,12 +375,25 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
 
             un->expr->type_defn = determine_expr_type(un->expr);
 
-#if 0
             switch (un->op)
             {
                 case UN_ADDR:
+                {
+                    un->expr->type_defn = get_pointer_to(un->expr->type_defn);
+                    break;
+                }
+                case UN_DEREF:
+                {
+                    un->expr->type_defn = get_deref(un->expr->type_defn);
+                    break;
+                }
+                default:
+                {
+                    // TODO: error message
+                    assert(false);
+                    break;
+                }
             }
-#endif
 
             un->type_defn = un->expr->type_defn;
 
@@ -343,10 +433,10 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
                     // NOTE: the param type is only attached to the 'name' field of the param.
                     if (arg->type_defn != param->name->type_defn)
                     {
-                        report_error("Type mismatch in argument %d of \"%s\" call. Expected %s%s, got %s%s.\n",
+                        report_error("Type mismatch in argument %d of \"%s\" call. Expected %s, got %s.\n",
                                      i, func->name->str,
-                                     param->name->type_defn->ptr ? "*" : "", param->name->type_defn->name,
-                                     arg->type_defn->ptr ? "*" : "", arg->type_defn->name);
+                                     get_type_string(param->name->type_defn),
+                                     get_type_string(arg->type_defn));
                     }
                 }
             }
@@ -386,8 +476,8 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
             if (lhs->type_defn != rhs->type_defn)
             {
                 report_error("Assigning rvalue of type \"%s\" to lvalue of type \"%s\".\n",
-                             rhs->type_defn ? rhs->type_defn->name : "(null)",
-                             lhs->type_defn ? lhs->type_defn->name : "(null)");
+                             get_type_string(rhs->type_defn),
+                             get_type_string(lhs->type_defn));
             }
             assign->type_defn = lhs->type_defn;
 
@@ -439,8 +529,8 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
                 if (if_expr->type_defn != else_expr->type_defn)
                 {
                     report_error("Type mismatch between if-block and else-block: \"%s\" vs \"%s\".\n",
-                                 if_expr->type_defn ? if_expr->type_defn->name : "null",
-                                 else_expr->type_defn ? else_expr->type_defn->name : "null");
+                                 get_type_string(if_expr->type_defn),
+                                 get_type_string(else_expr->type_defn));
                 }
             }
 
@@ -553,10 +643,12 @@ static void determine_stmt_type(AstStmt *stmt)
                 // the rvalue expression being assigned has the same type.
                 if (decl->type)
                 {
-                    if (type != get_type_defn(decl->type->name->str))
+                    auto decl_type = get_type_defn(decl->type->name->str);
+                    if (type != decl_type)
                     {
                         report_error("Assigning rvalue of type \"%s\" to a declaration with type \"%s\".\n",
-                                    type->name, decl->type->name->str);
+                                     get_type_string(type),
+                                     get_type_string(decl_type));
                     }
                 }
 

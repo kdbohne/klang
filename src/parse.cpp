@@ -92,16 +92,15 @@ static UnOp get_un_op(TokenType type)
 
 static AstExprType *parse_type(Parser *parser)
 {
-    bool is_pointer = false;
-    if (eat_optional(parser, TOK_ASTERISK))
-        is_pointer = true;
+    int pointer_depth = 0;
+    while (eat_optional(parser, TOK_ASTERISK))
+        ++pointer_depth;
 
     Token type_tok = expect(parser, TOK_IDENT);
 
     AstExprType *type = ast_alloc(AstExprType);
     type->name = make_ident(type_tok);
-    if (is_pointer)
-        type->flags |= TYPE_IS_POINTER;
+    type->pointer_depth = pointer_depth;
 
     return type;
 }

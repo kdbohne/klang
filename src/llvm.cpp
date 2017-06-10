@@ -18,9 +18,8 @@ Array<llvm::StructType *> structs; // TODO: hash map?
 
 static llvm::Value *gen_stmt(AstStmt *stmt);
 
-llvm::Type *get_type_by_name(const char *name, bool is_pointer)
+static llvm::Type *get_type_by_name(const char *name, int pointer_depth)
 {
-    // TODO: support arbitrary types
     // TODO: optimize by reordering based on most common cases?
 
     llvm::Type *type = NULL;
@@ -71,17 +70,21 @@ llvm::Type *get_type_by_name(const char *name, bool is_pointer)
         return NULL;
     }
 
-    if (is_pointer)
+    for (int i = 0; i < pointer_depth; ++i)
         type = type->getPointerTo();
 
     return type;
 }
 
-llvm::Type *get_type_by_expr(AstExprType *expr)
+static llvm::Type *get_type_by_expr(AstExprType *expr)
 {
-    // TODO: support arbitrary types
-    auto name = expr->name->str;
-    return get_type_by_name(name, expr->flags & TYPE_IS_POINTER);
+    return get_type_by_name(expr->name->str, expr->pointer_depth);
+}
+
+static llvm::Type *get_type_by_defn(TypeDefn *defn)
+{
+    int depth = get_pointer_depth(defn);
+    return get_type_by_name(defn->name, depth);
 }
 
 static llvm::StructType *gen_struct(AstStruct *s)
@@ -288,6 +291,10 @@ static llvm::Value *gen_un(AstExprUn *un)
             // a CreateLoad() in the AST_EXPR_IDENT branch of gen_expr().
             return expr;
             */
+        }
+        case UN_DEREF:
+        {
+            return builder.CreateLoad(expr);
         }
         default:
         {
@@ -569,7 +576,7 @@ static llvm::Value *gen_stmt(AstStmt *stmt)
             {
                 // TODO: both methods work, which one is better?
                 auto defn = decl->bind->type_defn;
-                auto type = get_type_by_name(defn->name, defn->ptr);
+                auto type = get_type_by_defn(defn);
 //                auto type = get_type_by_name(decl->type->name->str, defn->ptr);
 
                 auto alloca = create_alloca(type, ident->str);
