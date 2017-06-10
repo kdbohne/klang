@@ -276,6 +276,10 @@ static Token get_token(Lexer *lexer)
                     tok.type = TOK_KEY_STRUCT;
                 else if (token_matches(tok, "let"))
                     tok.type = TOK_KEY_LET;
+                else if (token_matches(tok, "loop"))
+                    tok.type = TOK_KEY_LOOP;
+                else if (token_matches(tok, "break"))
+                    tok.type = TOK_KEY_BREAK;
             }
             else if (is_number(c))
             {

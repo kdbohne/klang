@@ -36,6 +36,8 @@ enum TokenType : u32
     TOK_KEY_ELSE,
     TOK_KEY_STRUCT,
     TOK_KEY_LET,
+    TOK_KEY_LOOP,
+    TOK_KEY_BREAK,
 
     TOK_EOF,
     TOK_UNKNOWN,

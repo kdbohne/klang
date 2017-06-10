@@ -34,6 +34,8 @@ const char *token_type_strings[]
     "key else",
     "key struct",
     "key let",
+    "key loop",
+    "key break",
 
     "eof",
     "unknown",
