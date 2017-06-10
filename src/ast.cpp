@@ -28,7 +28,8 @@ const char *bin_op_strings[] =
 
 const char *un_op_strings[] =
 {
-    "&", // UN_ADD
+    "&", // UN_ADDR
+    "*", // UN_DEREF
 
     "?", // UN_ERR
 };

@@ -130,6 +130,7 @@ struct AstExprBin : AstExpr
 enum UnOp : u32
 {
     UN_ADDR,
+    UN_DEREF,
 
     UN_ERR,
 };
