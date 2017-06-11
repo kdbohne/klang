@@ -8,7 +8,6 @@ struct AstStruct;
 // TODO: why are these in the header?
 struct TypeDefn
 {
-    u32 flags = 0;
     char *name = NULL;
 
     AstStruct *struct_ = NULL;
