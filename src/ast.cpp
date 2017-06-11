@@ -30,6 +30,7 @@ const char *un_op_strings[] =
 {
     "&", // UN_ADDR
     "*", // UN_DEREF
+    "-", // UN_NEG
 
     "?", // UN_ERR
 };

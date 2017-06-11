@@ -82,6 +82,7 @@ static UnOp get_un_op(TokenType type)
     {
         case TOK_AND:      return UN_ADDR;
         case TOK_ASTERISK: return UN_DEREF;
+        case TOK_MINUS:    return UN_NEG;
         default:
         {
             assert(false);
@@ -223,6 +224,7 @@ static AstExpr *parse_expr(Parser *parser, bool is_unary = false)
         // Add more here!
         case TOK_AND:
         case TOK_ASTERISK:
+        case TOK_MINUS:
         {
             UnOp op = get_un_op(tok.type);
             AstExpr *expr = parse_expr(parser, true);

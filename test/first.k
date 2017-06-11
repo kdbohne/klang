@@ -58,6 +58,7 @@ fn main()
 {
     let xx i8;
     xx = 129;
+    xx = -128;
 
     let x i32;
     let y i64 = 42;
