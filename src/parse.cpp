@@ -105,7 +105,7 @@ static AstExprType *parse_type(Parser *parser)
     return type;
 }
 
-static AstExpr *parse_expr(Parser *parser)
+static AstExpr *parse_expr(Parser *parser, bool is_unary = false)
 {
     AstExpr *lhs = NULL;
 
@@ -225,9 +225,11 @@ static AstExpr *parse_expr(Parser *parser)
         case TOK_ASTERISK:
         {
             UnOp op = get_un_op(tok.type);
-            AstExpr *expr = parse_expr(parser);
+            AstExpr *expr = parse_expr(parser, true);
 
-            return make_un(op, expr);
+            lhs = make_un(op, expr);
+
+            break;
         }
 
         default:
@@ -254,6 +256,9 @@ static AstExpr *parse_expr(Parser *parser)
 
         lhs = field;
     }
+
+    if (is_unary)
+        return lhs;
 
     TokenType next = peek(parser);
     switch (next)
