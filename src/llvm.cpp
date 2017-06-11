@@ -114,10 +114,22 @@ static llvm::Value *gen_lit(AstExprLit *lit)
     {
         case LIT_INT:
         {
-            // TODO: 32-bit
-            // TODO: unsigned
-            auto type = llvm::IntegerType::get(context, 64);
-            return llvm::ConstantInt::get(type, lit->value_int, true);
+            // TODO: unsigned?
+            llvm::Type *type = NULL;
+            switch (lit->value_int.type)
+            {
+                case INT_8:  { type = llvm::Type::getInt8Ty(context);  break; }
+                case INT_16: { type = llvm::Type::getInt16Ty(context); break; }
+                case INT_32: { type = llvm::Type::getInt32Ty(context); break; }
+                case INT_64: { type = llvm::Type::getInt64Ty(context); break; }
+                default:
+                {
+                    assert(false);
+                    break;
+                }
+            }
+
+            return llvm::ConstantInt::get(type, lit->value_int.value, true);
         }
         case LIT_FLOAT:
         {

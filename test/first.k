@@ -31,36 +31,39 @@ struct Vec3
 
 struct String
 {
-    data str;
+    data *i8;
     len i64;
 };
 
-fn string_make(data str) -> String
+fn string_make(data *i8) -> String
 {
     let s String;
     s.data = data;
     s.len = 0;
 
-/*
     let p = data;
     loop {
-        if *p == 0 {
+        if *p == cast(i8) 0 {
             break;
         };
 
-//        s.len = s.len + 1;
-//        p = p + 1;
+        s.len = s.len + 1;
+        p = p + 1;
     };
-    */
 
     s
 }
 
 fn main()
 {
+    let xx i8;
+    xx = 129;
+
     let x i32;
     let y i64 = 42;
     let z = 17;
+
+    x = 43;
 
     let t1 = 3;
     let t2 = 2;
@@ -69,8 +72,6 @@ fn main()
     let a = 4;
     let b = &a;
     let c = *b;
-
-//    x = 43;
 
     let v Vec3;
     v.x = 3.14159;

@@ -100,7 +100,10 @@ AstExprLit *make_lit_int(Token tok)
 {
     AstExprLit *lit = ast_alloc(AstExprLit);
     lit->lit_type = LIT_INT;
-    lit->value_int = make_int_from_token(tok);
+    lit->value_int.value = make_int_from_token(tok);
+
+    // Assume 64-bit by default.
+    lit->value_int.type = INT_64;
 
     return lit;
 }
@@ -161,9 +164,9 @@ static void debug_dump_expr(AstExpr *expr)
             switch (lit->lit_type)
             {
 //                case LIT_INT:   { fprintf(stderr, "%lld", (i64)lit->value_int); break; }
-                case LIT_INT:   { fprintf(stderr, "%d", (i32)lit->value_int); break; }
-                case LIT_FLOAT: { fprintf(stderr, "%f", lit->value_float);    break; }
-                case LIT_STR:   { fprintf(stderr, "%s", lit->value_str);      break; }
+                case LIT_INT:   { fprintf(stderr, "%d", (i32)lit->value_int.value); break; }
+                case LIT_FLOAT: { fprintf(stderr, "%f", lit->value_float);          break; }
+                case LIT_STR:   { fprintf(stderr, "%s", lit->value_str);            break; }
                 default:
                 {
                     assert(false);

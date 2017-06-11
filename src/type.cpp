@@ -21,6 +21,7 @@ static Scope scope_pool[512];
 static i32 scope_pool_count;
 
 static void determine_stmt_type(AstStmt *stmt);
+static TypeDefn *determine_expr_type(AstExpr *expr);
 
 static void dump_type_defns()
 {
@@ -123,6 +124,10 @@ void register_type_defn(const char *name, AstStruct *struct_)
 static char *get_type_string(TypeDefn *defn)
 {
     static const char *xxx_hack = "***********************";
+    static const char *null_type_string = "(null)";
+
+    if (!defn)
+        return (char *)null_type_string;
 
     int depth = get_pointer_depth(defn);
     assert(depth < string_length(xxx_hack));
@@ -293,6 +298,34 @@ static void type_check_func(AstFunc *func)
     }
 }
 
+static TypeDefn *narrow_lit_type(TypeDefn *target, AstExprLit *lit)
+{
+    // Do nothing for non-integers.
+    // TODO: are there other types that need to be narrowed?
+    if (lit->lit_type != LIT_INT)
+        return determine_expr_type(lit);
+
+    auto val = &lit->value_int;
+
+    // TODO: optimize
+    if (target == get_type_defn("i8"))
+    {
+        val->type = INT_8;
+
+        fprintf(stderr, "%lx\n", val->value);
+        if ((val->value & (~0xff)) != 0)
+        {
+            report_error("Integer literal %d overflows %s.\n",
+                         (i32)val->value,
+                         get_type_string(target));
+        }
+
+        lit->type_defn = target;
+    }
+
+    return lit->type_defn;
+}
+
 static TypeDefn *determine_expr_type(AstExpr *expr)
 {
     switch (expr->type)
@@ -319,7 +352,19 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
                 // looking them up every time
                 case LIT_INT:
                 {
-                    lit->type_defn = get_type_defn("i64");
+                    switch (lit->value_int.type)
+                    {
+                        case INT_8:  { lit->type_defn = get_type_defn("i8");  break; }
+                        case INT_16: { lit->type_defn = get_type_defn("i16"); break; }
+                        case INT_32: { lit->type_defn = get_type_defn("i32"); break; }
+                        case INT_64: { lit->type_defn = get_type_defn("i64"); break; }
+                        default:
+                        {
+                            assert(false);
+                            break;
+                        }
+                    }
+
                     break;
                 }
                 case LIT_FLOAT:
@@ -353,6 +398,13 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
             lhs->type_defn = determine_expr_type(lhs);
             rhs->type_defn = determine_expr_type(rhs);
 
+#if 0
+            if (lhs->type == AST_EXPR_LIT)
+            {
+                auto lit = static_cast<AstExprLit *>(lhs);
+            }
+#endif
+
             // TODO: should this check be done here?
             if (lhs->type_defn != rhs->type_defn)
             {
@@ -370,7 +422,6 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
         case AST_EXPR_UN:
         {
             auto un = static_cast<AstExprUn *>(expr);
-
             un->expr->scope = un->scope;
 
             un->expr->type_defn = determine_expr_type(un->expr);
@@ -464,7 +515,16 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
             rhs->scope = assign->scope;
 
             lhs->type_defn = determine_expr_type(lhs);
-            rhs->type_defn = determine_expr_type(rhs);
+
+            if (rhs->type == AST_EXPR_LIT)
+            {
+                auto lit = static_cast<AstExprLit *>(rhs);
+                rhs->type_defn = narrow_lit_type(lhs->type_defn, lit);
+            }
+            else
+            {
+                rhs->type_defn = determine_expr_type(rhs);
+            }
 
             // TODO: optimize, don't look up void each time
             if (rhs->type_defn == get_type_defn("void"))

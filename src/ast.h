@@ -92,6 +92,23 @@ enum LitType : u32
     LIT_ERR,
 };
 
+// TODO: unsigned?
+enum IntType : u32
+{
+    INT_8,
+    INT_16,
+    INT_32,
+    INT_64,
+
+    INT_ERR,
+};
+
+struct LitInt
+{
+    IntType type = INT_ERR;
+    u64 value = 0;
+};
+
 struct AstExprLit : AstExpr
 {
     AstExprLit() : AstExpr(AST_EXPR_LIT) {}
@@ -99,9 +116,9 @@ struct AstExprLit : AstExpr
     LitType lit_type = LIT_ERR;
     union
     {
-        u64 value_int = 0;
-        float value_float;
-        char *value_str;
+        LitInt value_int;
+        float value_float; // TODO: LitFloat
+        char *value_str;   // TODO: LitStr
     };
 };
 
