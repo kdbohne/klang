@@ -6,7 +6,7 @@
 #include <stdio.h>
 #define report_error(str, ast, ...) \
 do { \
-    fprintf(stderr, "(%s:%d:%d) " str, ast->path, ast->line, ast->col, __VA_ARGS__); \
+    fprintf(stderr, "(%s:%d:%d) " str, ast->file.path, ast->line, ast->col, __VA_ARGS__); \
     ++global_error_count; \
 } while (0)
 

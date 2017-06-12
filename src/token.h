@@ -59,7 +59,7 @@ struct Token
     i32 len = 0;
 
     // Location info for error reporting.
-    char *path = NULL;
+    File file;
     i32 line = 0;
     i32 col = 0;
 };

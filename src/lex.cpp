@@ -4,7 +4,7 @@ struct Lexer
 {
     char *cur;
 
-    char *path;
+    File file;
     i32 line;
     i32 col;
 };
@@ -127,7 +127,7 @@ static Token get_token(Lexer *lex)
     tok.len = 1;
     tok.str = lex->cur;
 
-    tok.path = lex->path;
+    tok.file = lex->file;
     tok.line = lex->line;
     tok.col = lex->col;
 
@@ -323,13 +323,13 @@ static Token get_token(Lexer *lex)
     return tok;
 }
 
-Array<Token> lex_file(char *path, char *source)
+Array<Token> lex_file(File file)
 {
     Array<Token> tokens;
 
     Lexer lexer;
-    lexer.cur = source;
-    lexer.path = path;
+    lexer.cur = file.src;
+    lexer.file = file;
     lexer.line = 1;
     lexer.col = 1;
 

@@ -12,3 +12,9 @@ typedef uint64_t u64;
 
 #undef NULL
 #define NULL 0
+
+struct File
+{
+    char *path = NULL;
+    char *src = NULL;
+};

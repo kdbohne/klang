@@ -137,7 +137,7 @@ AstExprLit *make_lit_str(Token tok)
 
 void copy_loc(AstNode *node, Token tok)
 {
-    node->path = tok.path;
+    node->file = tok.file;
     node->line = tok.line;
     node->col = tok.col;
     node->span = tok.len;

@@ -9,23 +9,26 @@
 #include "parse.h"
 #include "llvm.h"
 
-static char *read_file(char *path)
+static File read_file(char *path)
 {
-    FILE *file = fopen(path, "r");
-    if (!file)
-        return NULL;
+    File file = {};
+    file.path = string_duplicate(path);
 
-    fseek(file, 0, SEEK_END);
-    int length = ftell(file);
-    fseek(file, 0, SEEK_SET);
+    FILE *f = fopen(path, "r");
+    if (!f)
+        return file;
 
-    char *result = (char *)malloc(length + 1);
-    fread(result, length, 1, file);
-    result[length] = '\0';
+    fseek(f, 0, SEEK_END);
+    int len = ftell(f);
+    fseek(f, 0, SEEK_SET);
 
-    fclose(file);
+    file.src = (char *)malloc(len + 1);
+    fread(file.src, len, 1, f);
+    file.src[len] = '\0';
 
-    return result;
+    fclose(f);
+
+    return file;
 }
 
 static void print_help()
@@ -46,14 +49,14 @@ int main(int argc, char *argv[])
     for (int i = 1; i < argc; ++i)
     {
         char *path = argv[i];
-        char *file = read_file(path);
-        if (!file)
+        File file = read_file(path);
+        if (!file.src)
         {
             fprintf(stderr, "Error: missing input file \"%s\"\n", path);
             return 1;
         }
 
-        Array<Token> tokens = lex_file(path, file);
+        Array<Token> tokens = lex_file(file);
 #if 0
         foreach(tokens)
             printf("%s: \"%.*s\"\n", token_type_strings[it.type], it.len, it.str);
