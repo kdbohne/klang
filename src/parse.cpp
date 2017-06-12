@@ -229,6 +229,12 @@ static AstExpr *parse_expr(Parser *parser, bool is_unary = false)
             UnOp op = get_un_op(tok.type);
             AstExpr *expr = parse_expr(parser, true);
 
+            if (expr->type == AST_EXPR_LIT)
+            {
+                auto lit = static_cast<AstExprLit *>(expr);
+                lit->value_int.negative = true;
+            }
+
             lhs = make_un(op, expr);
 
             break;

@@ -298,6 +298,51 @@ static void type_check_func(AstFunc *func)
     }
 }
 
+static void check_int_overflow(LitInt *i)
+{
+    bool overflow = false;
+    switch (i->type)
+    {
+        case INT_8:
+        {
+            overflow = i->value > (127 + (i->negative ? 1 : 0));
+            break;
+        }
+        case INT_16:
+        {
+            overflow = i->value > (32767 + (i->negative ? 1 : 0));
+            break;
+        }
+        case INT_32:
+        {
+            overflow = i->value > (2147483647 + (i->negative ? 1 : 0));
+            break;
+        }
+        case INT_64:
+        {
+            overflow = i->value > (9223372036854775807 + (i->negative ? 1 : 0));
+            break;
+        }
+        default:
+        {
+            assert(false);
+            break;
+        }
+    }
+
+    if (overflow)
+    {
+        report_error("Integer literal %s%lu overflows %s.\n",
+                     i->negative ? "-" : "",
+                     i->value,
+                     i->type == INT_8  ? "i8"  :
+                     i->type == INT_16 ? "i16" :
+                     i->type == INT_32 ? "i32" :
+                     i->type == INT_64 ? "i64" :
+                     "(error)");
+    }
+}
+
 static TypeDefn *narrow_lit_type(TypeDefn *target, AstExprLit *lit)
 {
     // Do nothing for non-integers.
@@ -309,19 +354,19 @@ static TypeDefn *narrow_lit_type(TypeDefn *target, AstExprLit *lit)
 
     // TODO: optimize
     if (target == get_type_defn("i8"))
-    {
         val->type = INT_8;
+    else if (target == get_type_defn("i16"))
+        val->type = INT_16;
+    else if (target == get_type_defn("i32"))
+        val->type = INT_32;
+    else if (target == get_type_defn("i64"))
+        val->type = INT_64;
+    else
+        assert(false);
 
-        fprintf(stderr, "%lx\n", val->value);
-        if ((val->value & (~0xff)) != 0)
-        {
-            report_error("Integer literal %d overflows %s.\n",
-                         (i32)val->value,
-                         get_type_string(target));
-        }
+    check_int_overflow(val);
 
-        lit->type_defn = target;
-    }
+    lit->type_defn = target;
 
     return lit->type_defn;
 }
@@ -438,6 +483,20 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
                     un->expr->type_defn = get_deref(un->expr->type_defn);
                     break;
                 }
+                case UN_NEG:
+                {
+                    un->expr->type_defn = determine_expr_type(un->expr);
+
+                    // Sanity check to make sure the literal has been flagged
+                    // negative by the parser.
+                    if (un->expr->type == AST_EXPR_LIT)
+                    {
+                        auto lit = static_cast<AstExprLit *>(un->expr);
+                        assert(lit->value_int.negative);
+                    }
+
+                    break;
+                }
                 default:
                 {
                     // TODO: error message
@@ -516,10 +575,22 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
 
             lhs->type_defn = determine_expr_type(lhs);
 
+            // Two cases need to be narrowed:
+            //     1) Integer literal
+            //     2) Unary minus + integer literal
             if (rhs->type == AST_EXPR_LIT)
             {
                 auto lit = static_cast<AstExprLit *>(rhs);
-                rhs->type_defn = narrow_lit_type(lhs->type_defn, lit);
+                lit->type_defn = narrow_lit_type(lhs->type_defn, lit);
+            }
+            else if (rhs->type == AST_EXPR_UN)
+            {
+                auto un = static_cast<AstExprUn *>(rhs);
+                if ((un->op == UN_NEG) && (un->expr->type == AST_EXPR_LIT))
+                {
+                    auto lit = static_cast<AstExprLit *>(un->expr);
+                    lit->type_defn = narrow_lit_type(lhs->type_defn, lit);
+                }
             }
             else
             {

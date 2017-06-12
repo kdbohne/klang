@@ -107,6 +107,7 @@ struct LitInt
 {
     IntType type = INT_ERR;
     u64 value = 0;
+    bool negative = false;
 };
 
 struct AstExprLit : AstExpr
