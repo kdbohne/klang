@@ -94,6 +94,8 @@ AstExprIdent *make_ident(Token tok)
     AstExprIdent *ident = ast_alloc(AstExprIdent);
     ident->str = make_str_from_token(tok);
 
+    copy_loc(ident, tok);
+
     return ident;
 }
 
@@ -106,6 +108,8 @@ AstExprLit *make_lit_int(Token tok)
     // Assume 64-bit by default.
     lit->value_int.type = INT_64;
 
+    copy_loc(lit, tok);
+
     return lit;
 }
 
@@ -114,6 +118,8 @@ AstExprLit *make_lit_float(Token tok)
     AstExprLit *lit = ast_alloc(AstExprLit);
     lit->lit_type = LIT_FLOAT;
     lit->value_float = make_float_from_token(tok);
+
+    copy_loc(lit, tok);
 
     return lit;
 }
@@ -124,26 +130,17 @@ AstExprLit *make_lit_str(Token tok)
     lit->lit_type = LIT_STR;
     lit->value_str = make_str_from_token(tok);
 
+    copy_loc(lit, tok);
+
     return lit;
 }
 
-AstExprBin *make_bin(AstExpr *lhs, AstExpr *rhs, BinOp op)
+void copy_loc(AstNode *node, Token tok)
 {
-    AstExprBin *bin = ast_alloc(AstExprBin);
-    bin->lhs = lhs;
-    bin->rhs = rhs;
-    bin->op = op;
-
-    return bin;
-}
-
-AstExprUn *make_un(UnOp op, AstExpr *expr)
-{
-    AstExprUn *un = ast_alloc(AstExprUn);
-    un->op = op;
-    un->expr = expr;
-
-    return un;
+    node->path = tok.path;
+    node->line = tok.line;
+    node->col = tok.col;
+    node->span = tok.len;
 }
 
 #include <stdio.h>

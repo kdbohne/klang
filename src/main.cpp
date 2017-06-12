@@ -53,7 +53,7 @@ int main(int argc, char *argv[])
             return 1;
         }
 
-        Array<Token> tokens = lex_file(file);
+        Array<Token> tokens = lex_file(path, file);
 #if 0
         foreach(tokens)
             printf("%s: \"%.*s\"\n", token_type_strings[it.type], it.len, it.str);

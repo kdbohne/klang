@@ -17,10 +17,10 @@ do { \
 
 static AstExprBlock *parse_block(Parser *parser);
 
-static TokenType peek(Parser *parser)
+static Token peek(Parser *parser)
 {
     assert(parser->index < parser->tokens->count);
-    return parser->tokens->data[parser->index].type;
+    return parser->tokens->data[parser->index];
 }
 
 static Token next(Parser *parser)
@@ -50,7 +50,7 @@ static void eat(Parser *parser)
 
 static bool eat_optional(Parser *parser, TokenType type)
 {
-    if (peek(parser) == type)
+    if (peek(parser).type == type)
     {
         eat(parser);
         return true;
@@ -118,7 +118,7 @@ static AstExpr *parse_expr(Parser *parser, bool is_unary = false)
             lhs = make_ident(tok);
 
             // Function call.
-            if (peek(parser) == TOK_OPEN_PAREN)
+            if (peek(parser).type == TOK_OPEN_PAREN)
             {
                 eat(parser);
 
@@ -126,11 +126,11 @@ static AstExpr *parse_expr(Parser *parser, bool is_unary = false)
                 call->name = static_cast<AstExprIdent *>(lhs);
                 assert(call->name);
 
-                if (peek(parser) != TOK_CLOSE_PAREN)
+                if (peek(parser).type != TOK_CLOSE_PAREN)
                 {
                     while (true)
                     {
-                        if (peek(parser) == TOK_CLOSE_PAREN)
+                        if (peek(parser).type == TOK_CLOSE_PAREN)
                             break;
 
                         eat_optional(parser, TOK_COMMA);
@@ -235,7 +235,11 @@ static AstExpr *parse_expr(Parser *parser, bool is_unary = false)
                 lit->value_int.negative = true;
             }
 
-            lhs = make_un(op, expr);
+            auto un = ast_alloc(AstExprUn);
+            un->op = op;
+            un->expr = expr;
+
+            lhs = un;
 
             break;
         }
@@ -251,7 +255,7 @@ static AstExpr *parse_expr(Parser *parser, bool is_unary = false)
 
     while (true)
     {
-        if (peek(parser) != TOK_DOT)
+        if (peek(parser).type != TOK_DOT)
             break;
 
         eat(parser);
@@ -268,8 +272,8 @@ static AstExpr *parse_expr(Parser *parser, bool is_unary = false)
     if (is_unary)
         return lhs;
 
-    TokenType next = peek(parser);
-    switch (next)
+    Token next = peek(parser);
+    switch (next.type)
     {
         // Binary operators.
         case TOK_PLUS:
@@ -281,9 +285,16 @@ static AstExpr *parse_expr(Parser *parser, bool is_unary = false)
             eat(parser);
 
             AstExpr *rhs = parse_expr(parser);
-            BinOp op = get_bin_op(next);
+            BinOp op = get_bin_op(next.type);
 
-            return make_bin(lhs, rhs, op);
+            auto bin = ast_alloc(AstExprBin);
+            bin->lhs = lhs;
+            bin->rhs = rhs;
+            bin->op = op;
+
+            copy_loc(bin, next);
+
+            return bin;
         }
         case TOK_EQ:
         {
@@ -292,6 +303,8 @@ static AstExpr *parse_expr(Parser *parser, bool is_unary = false)
             AstExprAssign *assign = ast_alloc(AstExprAssign);
             assign->lhs = lhs;
             assign->rhs = parse_expr(parser);
+
+            copy_loc(assign, next);
 
             return assign;
         }
@@ -320,7 +333,7 @@ static AstStmt *parse_stmt(Parser *parser)
         AstExpr *bind = make_ident(ident);
 
         AstExprType *type = NULL;
-        if (peek(parser) == TOK_IDENT)
+        if (peek(parser).type == TOK_IDENT)
             type = parse_type(parser);
 
         AstExpr *rhs = NULL;
@@ -360,7 +373,7 @@ static AstExprBlock *parse_block(Parser *parser)
 
     while (true)
     {
-        if (peek(parser) == TOK_CLOSE_BRACE)
+        if (peek(parser).type == TOK_CLOSE_BRACE)
             break;
 
         AstStmt *stmt = parse_stmt(parser);
@@ -409,7 +422,7 @@ static AstFunc *parse_func(Parser *parser)
     expect(parser, TOK_OPEN_PAREN);
     while (true)
     {
-        if (peek(parser) == TOK_CLOSE_PAREN)
+        if (peek(parser).type == TOK_CLOSE_PAREN)
             break;
 
         AstExprParam *param = parse_param(parser);
@@ -457,7 +470,7 @@ AstStruct *parse_struct(Parser *parser)
     expect(parser, TOK_OPEN_BRACE);
     while (true)
     {
-        if (peek(parser) == TOK_CLOSE_BRACE)
+        if (peek(parser).type == TOK_CLOSE_BRACE)
             break;
 
         AstStructField *field = parse_field(parser);
@@ -480,16 +493,16 @@ void parse_file(AstRoot *root, Array<Token> *tokens)
 
     while (true)
     {
-        TokenType tok = peek(&parser);
-        if (tok == TOK_EOF)
+        Token tok = peek(&parser);
+        if (tok.type == TOK_EOF)
             break;
 
-        if ((tok == TOK_KEY_FN) || (tok == TOK_KEY_EXTERN))
+        if ((tok.type == TOK_KEY_FN) || (tok.type == TOK_KEY_EXTERN))
         {
             AstFunc *func = parse_func(&parser);
             root->funcs.add(func);
         }
-        else if (tok == TOK_KEY_STRUCT)
+        else if (tok.type == TOK_KEY_STRUCT)
         {
             AstStruct *struct_ = parse_struct(&parser);
             root->structs.add(struct_);

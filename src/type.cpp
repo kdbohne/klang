@@ -4,9 +4,16 @@
 #include "core/hash_map.h"
 
 #include <stdio.h>
-#define report_error(str, ...) \
+#define report_error(str, ast, ...) \
 do { \
-    fprintf(stderr, "Type error: " str, __VA_ARGS__); \
+    fprintf(stderr, "(%s:%d:%d) " str, ast->path, ast->line, ast->col, __VA_ARGS__); \
+    ++global_error_count; \
+} while (0)
+
+// Report an error without an associated AstNode.
+#define report_error_anon(str, ...) \
+do { \
+    fprintf(stderr, "Error: " str, __VA_ARGS__); \
     ++global_error_count; \
 } while (0)
 
@@ -77,7 +84,9 @@ static void scope_add_func(Scope *scope, const char *name, AstFunc *func)
     auto existing = scope_get_func(scope, name);
     if (existing)
     {
-        report_error("Redeclaring existing function \"%s\".\n", name);
+        report_error("Redeclaring existing function \"%s\".\n",
+                     func,
+                     name);
         return;
     }
 
@@ -91,7 +100,9 @@ static void scope_add_var(Scope *scope, const char *name, AstExprIdent *var)
     auto existing = scope_get_var(scope, name);
     if (existing)
     {
-        report_error("Redeclaring existing identifier \"%s\".\n", name);
+        report_error("Redeclaring existing identifier \"%s\".\n",
+                     var,
+                     name);
         return;
     }
 
@@ -182,7 +193,7 @@ TypeDefn *get_type_defn(const char *name, int pointer_depth)
 
     static const char *xxx_hack = "***********************";
     assert(pointer_depth < string_length(xxx_hack));
-    report_error("Unknown type \"%.*s%s\".\n", pointer_depth, xxx_hack, name);
+    report_error_anon("Unknown type \"%.*s%s\".\n", pointer_depth, xxx_hack, name);
 
     return NULL;
 }
@@ -211,12 +222,15 @@ static TypeDefn *get_pointer_to(TypeDefn *defn)
     return new_defn;
 }
 
-static TypeDefn *get_deref(TypeDefn *defn)
+// NOTE: expr is only passed for error reporting purposes.
+static TypeDefn *get_deref(AstExpr *expr, TypeDefn *defn)
 {
     int depth = get_pointer_depth(defn) - 1;
     if (depth < 0)
     {
-        report_error("Dereferencing non-pointer type %s.\n", get_type_string(defn));
+        report_error("Dereferencing non-pointer type %s.\n",
+                     expr,
+                     get_type_string(defn));
         return NULL;
     }
 
@@ -275,12 +289,14 @@ static void type_check_func(AstFunc *func)
     if (func->ret && !blk->expr)
     {
         report_error("Function \"%s\" returns a %s, but its block does not have an expression.\n",
+                     func->ret,
                      func->name->str,
                      get_type_string(func->ret->type_defn));
     }
     else if (!func->ret && blk->expr)
     {
         report_error("Function \"%s\" does not return a value, but its block has an expression.\n",
+                     blk->expr,
                      func->name->str);
     }
     else if (func->ret)
@@ -291,6 +307,7 @@ static void type_check_func(AstFunc *func)
         if (a != b)
         {
             report_error("Block expression does not match the return type of function \"%s\".\nBlock: %s\nReturn type: %s",
+                         func,
                          func->name->str,
                          get_type_string(b),
                          get_type_string(a));
@@ -298,8 +315,10 @@ static void type_check_func(AstFunc *func)
     }
 }
 
-static void check_int_overflow(LitInt *i)
+static void check_int_overflow(AstExprLit *lit)
 {
+    LitInt *i = &lit->value_int;
+
     bool overflow = false;
     switch (i->type)
     {
@@ -333,6 +352,7 @@ static void check_int_overflow(LitInt *i)
     if (overflow)
     {
         report_error("Integer literal %s%lu overflows %s.\n",
+                     lit,
                      i->negative ? "-" : "",
                      i->value,
                      i->type == INT_8  ? "i8"  :
@@ -354,20 +374,19 @@ static TypeDefn *narrow_lit_type(TypeDefn *target, AstExprLit *lit)
 
     // TODO: optimize
     if (target == get_type_defn("i8"))
-        val->type = INT_8;
+        lit->value_int.type = INT_8;
     else if (target == get_type_defn("i16"))
-        val->type = INT_16;
+        lit->value_int.type = INT_16;
     else if (target == get_type_defn("i32"))
-        val->type = INT_32;
+        lit->value_int.type = INT_32;
     else if (target == get_type_defn("i64"))
-        val->type = INT_64;
+        lit->value_int.type = INT_64;
     else
         assert(false);
 
-    check_int_overflow(val);
+    check_int_overflow(lit);
 
     lit->type_defn = target;
-
     return lit->type_defn;
 }
 
@@ -382,7 +401,9 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
             auto var = scope_get_var(expr->scope, ident->str);
             if (!var)
             {
-                report_error("Undeclared identifier \"%s\".\n", ident->str);
+                report_error("Undeclared identifier \"%s\".\n",
+                             ident,
+                             ident->str);
                 return NULL;
             }
 
@@ -454,6 +475,7 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
             if (lhs->type_defn != rhs->type_defn)
             {
                 report_error("Type mismatch in binary operation:\n    %s %s %s\n",
+                             bin,
                              get_type_string(lhs->type_defn),
                              bin_op_strings[bin->op],
                              get_type_string(rhs->type_defn));
@@ -480,7 +502,7 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
                 }
                 case UN_DEREF:
                 {
-                    un->expr->type_defn = get_deref(un->expr->type_defn);
+                    un->expr->type_defn = get_deref(un->expr, un->expr->type_defn);
                     break;
                 }
                 case UN_NEG:
@@ -522,13 +544,16 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
             if (!func)
             {
                 // TODO: dependency issue
-                report_error("Calling undeclared function \"%s\".\n", call->name->str);
+                report_error("Calling undeclared function \"%s\".\n",
+                             call,
+                             call->name->str);
                 assert(false);
             }
 
             if (call->args.count != func->params.count)
             {
                 report_error("Invalid number of arguments passed to \"%s\": %d vs %d.\n",
+                             call,
                              func->name->str, call->args.count, func->params.count);
             }
             else
@@ -544,6 +569,7 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
                     if (arg->type_defn != param->name->type_defn)
                     {
                         report_error("Type mismatch in argument %d of \"%s\" call. Expected %s, got %s.\n",
+                                     arg,
                                      i, func->name->str,
                                      get_type_string(param->name->type_defn),
                                      get_type_string(arg->type_defn));
@@ -601,12 +627,15 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
             if (rhs->type_defn == get_type_defn("void"))
             {
                 // TODO: output lhs expr
-                report_error("Assigning \"%s\" to a block with a void return value.\n", "(expr)");
+                report_error("Assigning \"%s\" to a block with a void return value.\n",
+                             assign,
+                             "(expr)");
             }
 
             if (lhs->type_defn != rhs->type_defn)
             {
                 report_error("Assigning rvalue of type \"%s\" to lvalue of type \"%s\".\n",
+                             assign,
                              get_type_string(rhs->type_defn),
                              get_type_string(lhs->type_defn));
             }
@@ -660,6 +689,7 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
                 if (if_expr->type_defn != else_expr->type_defn)
                 {
                     report_error("Type mismatch between if-block and else-block: \"%s\" vs \"%s\".\n",
+                                 if_expr,
                                  get_type_string(if_expr->type_defn),
                                  get_type_string(else_expr->type_defn));
                 }
@@ -767,6 +797,7 @@ static void determine_stmt_type(AstStmt *stmt)
                 if (type == get_type_defn("void"))
                 {
                     report_error("Assigning \"%s\" to a block with a void return value.\n",
+                                 decl,
                                  lhs->str);
                 }
 
@@ -778,6 +809,7 @@ static void determine_stmt_type(AstStmt *stmt)
                     if (type != decl_type)
                     {
                         report_error("Assigning rvalue of type \"%s\" to a declaration with type \"%s\".\n",
+                                     decl,
                                      get_type_string(type),
                                      get_type_string(decl_type));
                     }
@@ -792,7 +824,9 @@ static void determine_stmt_type(AstStmt *stmt)
                     auto func = scope_get_func(call->scope, call->name->str);
 
                     if (!func->ret || !func->ret->type_defn)
-                        report_error("Attempting to assign void return value from function \"%s\".\n", func->name->str);
+                        report_error("Attempting to assign void return value from function \"%s\".\n",
+                                     decl,
+                                     func->name->str);
                 }
             }
 

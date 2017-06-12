@@ -2,10 +2,11 @@
 
 struct Lexer
 {
-    char *cursor;
+    char *cur;
 
+    char *path;
     i32 line;
-    i32 column;
+    i32 col;
 };
 
 static bool is_number(char c)
@@ -29,68 +30,68 @@ static bool is_whitespace(char c)
     return (c == ' ') || (c == '\t') || is_newline(c);
 }
 
-static void advance(Lexer *lexer)
+static void advance(Lexer *lex)
 {
-    if (is_newline(*lexer->cursor))
+    if (is_newline(*lex->cur))
     {
-        ++lexer->line;
-        lexer->column = 0;
+        ++lex->line;
+        lex->col = 0;
     }
 
-    ++lexer->cursor;
-    ++lexer->column;
+    ++lex->cur;
+    ++lex->col;
 }
 
-static void advance_by(Lexer *lexer, int count)
+static void advance_by(Lexer *lex, int count)
 {
     for (int i = 0; i < count; ++i)
-        advance(lexer);
+        advance(lex);
 }
 
-static void eat_block_comment(Lexer *lexer)
+static void eat_block_comment(Lexer *lex)
 {
     int depth = 0;
 
     while (true)
     {
-        if ((*lexer->cursor == '/') && (lexer->cursor[1] == '*'))
+        if ((*lex->cur == '/') && (lex->cur[1] == '*'))
         {
             ++depth;
-            advance_by(lexer, 2);
+            advance_by(lex, 2);
         }
-        else if ((*lexer->cursor == '*') && (lexer->cursor[1] == '/'))
+        else if ((*lex->cur == '*') && (lex->cur[1] == '/'))
         {
             --depth;
-            advance_by(lexer, 2);
+            advance_by(lex, 2);
 
             if (depth == 0)
                 break;
         }
         else
         {
-            advance(lexer);
+            advance(lex);
         }
     }
 }
 
-static void eat_whitespace(Lexer *lexer)
+static void eat_whitespace(Lexer *lex)
 {
     while (true)
     {
-        if (is_whitespace(*lexer->cursor))
+        if (is_whitespace(*lex->cur))
         {
-            advance(lexer);
+            advance(lex);
         }
-        else if ((*lexer->cursor == '/') && (lexer->cursor[1] == '/'))
+        else if ((*lex->cur == '/') && (lex->cur[1] == '/'))
         {
-            while (!is_newline(*lexer->cursor))
-                advance(lexer);
+            while (!is_newline(*lex->cur))
+                advance(lex);
 
-            advance(lexer);
+            advance(lex);
         }
-        else if ((*lexer->cursor == '/') && (lexer->cursor[1] == '*'))
+        else if ((*lex->cur == '/') && (lex->cur[1] == '*'))
         {
-            eat_block_comment(lexer);
+            eat_block_comment(lex);
         }
         else
         {
@@ -117,17 +118,21 @@ static bool token_matches(Token tok, const char *str)
     return !(*str);
 }
 
-static Token get_token(Lexer *lexer)
+static Token get_token(Lexer *lex)
 {
-    eat_whitespace(lexer);
+    eat_whitespace(lex);
 
     Token tok = {};
     tok.type = TOK_UNKNOWN;
     tok.len = 1;
-    tok.str = lexer->cursor;
+    tok.str = lex->cur;
 
-    char c = *lexer->cursor;
-    advance(lexer);
+    tok.path = lex->path;
+    tok.line = lex->line;
+    tok.col = lex->col;
+
+    char c = *lex->cur;
+    advance(lex);
 
     switch (c)
     {
@@ -148,12 +153,12 @@ static Token get_token(Lexer *lexer)
 
         case '=':
         {
-            if (*lexer->cursor == '=')
+            if (*lex->cur == '=')
             {
                 tok.type = TOK_EQ_EQ;
                 tok.len = 2;
 
-                advance(lexer);
+                advance(lex);
             }
             else
             {
@@ -165,12 +170,12 @@ static Token get_token(Lexer *lexer)
 
         case '-':
         {
-            if (*lexer->cursor == '>')
+            if (*lex->cur == '>')
             {
                 tok.type = TOK_R_ARROW;
                 tok.len = 2;
 
-                advance(lexer);
+                advance(lex);
             }
             else
             {
@@ -183,12 +188,12 @@ static Token get_token(Lexer *lexer)
 #if 0
         case ':':
         {
-            if (*lexer->cursor == '=')
+            if (*lex->cur == '=')
             {
                 tok.type = TOK_COLON_EQ;
                 tok.len = 2;
 
-                advance(lexer);
+                advance(lex);
             }
             else
             {
@@ -204,16 +209,16 @@ static Token get_token(Lexer *lexer)
             tok.type = TOK_STR;
 
             int escape_count = 0;
-            while (*lexer->cursor != '"')
+            while (*lex->cur != '"')
             {
-                if (*lexer->cursor == '\\')
+                if (*lex->cur == '\\')
                     ++escape_count;
 
-                advance(lexer);
+                advance(lex);
             }
-            advance(lexer);
+            advance(lex);
 
-            int raw_len = lexer->cursor - tok.str - 2;
+            int raw_len = lex->cur - tok.str - 2;
             char *raw_str = tok.str + 1;
 
             // TODO: leak, free after parsing
@@ -255,11 +260,11 @@ static Token get_token(Lexer *lexer)
         {
             if (is_letter(c) || (c == '_'))
             {
-                while (is_letter(*lexer->cursor) || is_number(*lexer->cursor) || (*lexer->cursor == '_'))
-                    advance(lexer);
+                while (is_letter(*lex->cur) || is_number(*lex->cur) || (*lex->cur == '_'))
+                    advance(lex);
 
                 tok.type = TOK_IDENT;
-                tok.len = lexer->cursor - tok.str;
+                tok.len = lex->cur - tok.str;
 
                 // TODO: optimize
                 if (token_matches(tok, "fn"))
@@ -286,10 +291,10 @@ static Token get_token(Lexer *lexer)
                 bool is_float = false;
                 while (true)
                 {
-                    if (!is_number(*lexer->cursor) && (*lexer->cursor != '.'))
+                    if (!is_number(*lex->cur) && (*lex->cur != '.'))
                         break;
 
-                    if (*lexer->cursor == '.')
+                    if (*lex->cur == '.')
                     {
                         if (is_float)
                             assert(false);
@@ -297,14 +302,14 @@ static Token get_token(Lexer *lexer)
                         is_float = true;
                     }
 
-                    advance(lexer);
+                    advance(lex);
                 }
 
                 if (is_float)
                     tok.flags |= TOKEN_IS_FLOAT;
 
                 tok.type = TOK_NUM;
-                tok.len = lexer->cursor - tok.str;
+                tok.len = lex->cur - tok.str;
             }
             else
             {
@@ -318,14 +323,15 @@ static Token get_token(Lexer *lexer)
     return tok;
 }
 
-Array<Token> lex_file(char *source)
+Array<Token> lex_file(char *path, char *source)
 {
     Array<Token> tokens;
 
     Lexer lexer;
-    lexer.cursor = source;
+    lexer.cur = source;
+    lexer.path = path;
     lexer.line = 1;
-    lexer.column = 1;
+    lexer.col = 1;
 
     while (true)
     {

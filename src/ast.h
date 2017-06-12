@@ -61,6 +61,12 @@ struct AstNode
 
     TypeDefn *type_defn = NULL;
     Scope *scope = NULL;
+
+    // Location info for error reporting.
+    char *path = NULL;
+    i32 line = 0;
+    i32 col = 0;
+    i32 span = 0;
 };
 
 struct AstRoot : AstNode
@@ -318,7 +324,7 @@ AstExprIdent *make_ident(Token tok);
 AstExprLit *make_lit_int(Token tok);
 AstExprLit *make_lit_float(Token tok);
 AstExprLit *make_lit_str(Token tok);
-AstExprBin *make_bin(AstExpr *lhs, AstExpr *rhs, BinOp op);
-AstExprUn *make_un(UnOp op, AstExpr *expr);
+
+void copy_loc(AstNode *node, Token tok);
 
 void debug_dump(AstRoot *root);
