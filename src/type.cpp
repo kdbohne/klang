@@ -397,8 +397,6 @@ static TypeDefn *narrow_lit_type(TypeDefn *target, AstExprLit *lit)
     if (lit->lit_type != LIT_INT)
         return determine_expr_type(lit);
 
-    auto val = &lit->value_int;
-
     // TODO: optimize
     if (target == get_type_defn("i8"))
         lit->value_int.type = INT_8;
