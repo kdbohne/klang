@@ -7,6 +7,7 @@
 #define report_error(str, ast, ...) \
 do { \
     fprintf(stderr, "(%s:%d:%d) " str, ast->file.path, ast->line, ast->col, __VA_ARGS__); \
+    print_line(ast->file.src, ast->line); \
     ++global_error_count; \
 } while (0)
 
@@ -29,6 +30,32 @@ static i32 scope_pool_count;
 
 static void determine_stmt_type(AstStmt *stmt);
 static TypeDefn *determine_expr_type(AstExpr *expr);
+
+static void print_line(char *src, int line)
+{
+    int cur = 1;
+    while (*src)
+    {
+        if (cur == line)
+        {
+            // TODO: optimize?
+            while (*src && (*src != '\n') && (*src != '\r'))
+                fputc(*src++, stderr);
+
+            fputc('\n', stderr);
+            fputc('\n', stderr);
+
+            return;
+        }
+
+        if ((*src == '\n') || (*src == '\r'))
+            ++cur;
+
+        ++src;
+    }
+
+    assert(false);
+}
 
 static void dump_type_defns()
 {
