@@ -38,13 +38,11 @@ static void print_line(char *src, int line)
     {
         if (cur == line)
         {
-            // TODO: optimize?
+            char *str = src;
             while (*src && (*src != '\n') && (*src != '\r'))
-                fputc(*src++, stderr);
+                ++src;
 
-            fputc('\n', stderr);
-            fputc('\n', stderr);
-
+            fprintf(stderr, "%.*s\n\n", (int)(src - str), str);
             return;
         }
 
