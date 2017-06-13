@@ -640,7 +640,9 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
                 if ((un->op == UN_NEG) && (un->expr->type == AST_EXPR_LIT))
                 {
                     auto lit = static_cast<AstExprLit *>(un->expr);
+
                     lit->type_defn = narrow_lit_type(lhs->type_defn, lit);
+                    un->type_defn = lit->type_defn;
                 }
             }
             else
