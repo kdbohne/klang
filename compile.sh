@@ -1,5 +1,11 @@
-#/bin/sh
-./bin/klang test/first.k | llc -O0 -filetype=obj -o build/first.o
+#!/bin/bash
+
+ir=$(./bin/klang test/first.k)
+if [ "$?" -ne 0 ] ; then
+    exit
+fi
+
+echo "$ir" | llc -O0 -filetype=obj -o build/first.o
 
 # Compile core utils
 clang -m64 -c lang/core/start.s -o build/start.o
