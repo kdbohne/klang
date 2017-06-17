@@ -6,6 +6,9 @@ if [ "$?" -ne 0 ] ; then
 fi
 
 echo "$ir" | llc -O0 -filetype=obj -o build/first.o
+if [ "$?" -ne 0 ] ; then
+    exit
+fi
 
 # Compile core utils
 clang -m64 -c lang/core/start.s -o build/start.o
