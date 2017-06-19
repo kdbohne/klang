@@ -129,7 +129,7 @@ static llvm::Value *gen_lit(AstExprLit *lit)
                 }
             }
 
-            return llvm::ConstantInt::get(type, lit->value_int.value, true);
+            return llvm::ConstantInt::get(type, lit->value_int.value, lit->value_int.negative);
         }
         case LIT_FLOAT:
         {
