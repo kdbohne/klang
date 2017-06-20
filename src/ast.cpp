@@ -104,6 +104,7 @@ AstExprLit *make_lit_int(Token tok)
     AstExprLit *lit = ast_alloc(AstExprLit);
     lit->lit_type = LIT_INT;
     lit->value_int.value = make_int_from_token(tok);
+    lit->value_int.negative = false;
 
     // Assume 64-bit by default.
     lit->value_int.type = INT_64;
