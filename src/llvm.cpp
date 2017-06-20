@@ -87,6 +87,15 @@ static llvm::Type *get_type_by_defn(TypeDefn *defn)
     return get_type_by_name(defn->name, depth);
 }
 
+static llvm::AllocaInst *create_alloca(llvm::Type *type, const char *name)
+{
+    auto func = builder.GetInsertBlock()->getParent();
+
+//    llvm::IRBuilder<> tmp(&func->getEntryBlock(), func->getEntryBlock().begin());
+    llvm::IRBuilder<> tmp(&func->getEntryBlock(), func->getEntryBlock().begin());
+    return tmp.CreateAlloca(type, 0, llvm::Twine(name));
+}
+
 static llvm::StructType *gen_struct(AstStruct *s)
 {
     Array<llvm::Type *> fields;
@@ -106,7 +115,7 @@ static llvm::StructType *gen_struct(AstStruct *s)
     return struct_;
 }
 
-static llvm::Value *gen_expr(AstExpr *expr, bool is_field = false);
+static llvm::Value *gen_expr(AstExpr *expr, bool ret_addr = false);
 
 static llvm::Value *gen_lit(AstExprLit *lit)
 {
@@ -141,7 +150,7 @@ static llvm::Value *gen_lit(AstExprLit *lit)
             auto str = llvm::ConstantDataArray::getString(context, ref);
 
             // TODO: global instead of alloca?
-            auto alloca = builder.CreateAlloca(str->getType());
+            auto alloca = create_alloca(str->getType(), "litstr");
             builder.CreateStore(str, alloca);
 
             // NOTE: the destination type must match the type for 'str'
@@ -202,16 +211,59 @@ static llvm::Value *gen_bin(AstExprBin *bin)
     auto lhs = gen_expr(bin->lhs);
     auto rhs = gen_expr(bin->rhs);
 
+    auto lt = lhs->getType();
+    auto rt = rhs->getType();
+
+#if 0
+    // FIXME: allow swapping order, e.g. (&x + 1) -> (1 + &x)
+    if (lt->isPointerTy())
+    {
+        assert(rt->isIntegerTy());
+
+        switch (bin->op)
+        {
+            case BIN_ADD:
+            case BIN_SUB:
+            {
+                // TODO: optimize, cache getInt32Ty() globally
+                auto zero = llvm::ConstantInt::get(llvm::IntegerType::getInt32Ty(context), 0);
+                auto index = rhs;
+
+                auto type = lt;
+
+                llvm::SmallVector<llvm::Value *, 2> indices;
+                indices.push_back(zero);
+                indices.push_back(index);
+
+                return builder.CreateInBoundsGEP(type, lhs, indices);
+            }
+            case BIN_MUL:
+            case BIN_DIV:
+            {
+                assert(false);
+                break;
+            }
+            default:
+            {
+                break;
+            }
+        }
+    }
+#endif
+
+#if 0
     // TODO: pointer arithmetic?
     // TODO: why are pointers being passed here at all?
     //       assuming it's a bug in the AST_EXPR_FIELD expr handling
-    if (lhs->getType()->isPointerTy())
+    if (lt->isPointerTy())
         lhs = builder.CreateLoad(lhs);
-    if (rhs->getType()->isPointerTy())
+    if (rt->isPointerTy())
         rhs = builder.CreateLoad(rhs);
+#endif
 
-    auto lt = lhs->getType();
-    auto rt = rhs->getType();
+    // Update types.
+    lt = lhs->getType();
+    rt = rhs->getType();
 
     // Check if the types are floats or not. This is needed in order to decide
     // whether an Add or FAdd should be generated, for example.
@@ -279,15 +331,13 @@ static llvm::Value *gen_un(AstExprUn *un)
     {
         case UN_ADDR:
         {
-            // TODO: use dyn_cast LoadInst -> AllocaInst like in AST_EXPR_FIELD?
-
-            // TODO: should this use create_alloca or IRBuilder::CreateAlloca()?
-//            auto alloca = create_alloca(expr->getType(), NULL);
-            auto alloca = builder.CreateAlloca(expr->getType());
+            auto alloca = create_alloca(expr->getType(), "addr");
             builder.CreateStore(expr, alloca);
 
+            return alloca;
+
             // TODO: CreateInBoundsGEP()?
-            return builder.CreateGEP(alloca, llvm::ConstantInt::get(llvm::IntegerType::getInt64Ty(context), 0));
+//            return builder.CreateGEP(alloca, llvm::ConstantInt::get(llvm::IntegerType::getInt64Ty(context), 0));
 
             /*
             return builder.CreateIntToPtr(expr, llvm::PointerType::getUnqual(expr->getType()));
@@ -306,7 +356,14 @@ static llvm::Value *gen_un(AstExprUn *un)
         }
         case UN_DEREF:
         {
-            return builder.CreateLoad(expr);
+            // FIXME: multiple derefs
+            return expr;
+//            return builder.CreateLoad(expr);
+        }
+        case UN_NEG:
+        {
+            // FIXME
+            break;
         }
         default:
         {
@@ -318,17 +375,7 @@ static llvm::Value *gen_un(AstExprUn *un)
     return NULL;
 }
 
-static llvm::AllocaInst *create_alloca(llvm::Type *type, const char *name)
-{
-    auto func = builder.GetInsertBlock()->getParent();
-
-//    llvm::IRBuilder<> tmp(&func->getEntryBlock(), func->getEntryBlock().begin());
-    llvm::IRBuilder<> tmp(&func->getEntryBlock(), func->getEntryBlock().begin());
-    return tmp.CreateAlloca(type, 0, llvm::Twine(name));
-}
-
-// TODO: better way of doing is_field hack?
-static llvm::Value *gen_expr(AstExpr *expr, bool is_field)
+static llvm::Value *gen_expr(AstExpr *expr, bool ret_addr)
 {
     switch (expr->type)
     {
@@ -338,8 +385,7 @@ static llvm::Value *gen_expr(AstExpr *expr, bool is_field)
             auto var = vars.get(ident->str);
             assert(var);
 
-            // TODO: is this the only case where this is needed?
-            if (is_field)
+            if (ret_addr)
                 return *var;
 
             return builder.CreateLoad(*var, ident->str);
@@ -367,18 +413,8 @@ static llvm::Value *gen_expr(AstExpr *expr, bool is_field)
             llvm::ArrayRef<llvm::Value *> args = llvm::None;
             if (call->args.count > 0)
             {
-#if 0
-                // TODO: nicer way of doing this
-                if (strings_match(call->name->str, "print"))
-                {
-//                    auto array = llvm::ConstantDataArray::getString(context, "%d\n");
-                    auto array = builder.CreateGlobalStringPtr("%d\n", "tmpstr");
-                    args_.add(array);
-                }
-#endif
-
                 foreach(call->args)
-                    args_.add(gen_expr(it, is_field));
+                    args_.add(gen_expr(it, ret_addr));
 
                 args = llvm::ArrayRef<llvm::Value *>(args_.data, args_.count);
             }
@@ -399,7 +435,7 @@ static llvm::Value *gen_expr(AstExpr *expr, bool is_field)
         {
             auto cast = static_cast<AstExprCast *>(expr);
 
-            auto src = gen_expr(cast->expr, is_field);
+            auto src = gen_expr(cast->expr, ret_addr);
             auto dest = get_type_by_expr(cast->type);
 
             // FIXME: signed vs unsigned?
@@ -410,10 +446,25 @@ static llvm::Value *gen_expr(AstExpr *expr, bool is_field)
         {
             auto assign = static_cast<AstExprAssign *>(expr);
 
-            auto lhs = gen_expr(assign->lhs, is_field);
-            auto rhs = gen_expr(assign->rhs, is_field);
+            auto lhs = gen_expr(assign->lhs, ret_addr);
+            auto rhs = gen_expr(assign->rhs, ret_addr);
 
-//            assert(lhs->getType() == rhs->getType()->getPointerTo());
+            if (lhs->getType()->getPointerTo() == rhs->getType())
+                rhs = builder.CreateLoad(rhs);
+
+#if 0
+            if (!lhs->getType()->isPointerTy())
+            {
+                auto alloca = create_alloca(lhs->getType(), "tmpassign");
+                builder.CreateStore(lhs, alloca);
+                lhs = alloca;
+            }
+#endif
+
+#if 0
+            if (auto pt = llvm::dyn_cast<llvm::PointerType>(rhs->getType()))
+                rhs = builder.CreateLoad(rhs);
+#endif
 
             builder.CreateStore(rhs, lhs);
 
@@ -438,7 +489,7 @@ static llvm::Value *gen_expr(AstExpr *expr, bool is_field)
 
             llvm::Value *block_expr = NULL;
             if (block->expr)
-                block_expr = gen_expr(block->expr, is_field);
+                block_expr = gen_expr(block->expr, ret_addr);
 
             // Pop args from var table.
             vars = vars_old;
@@ -449,7 +500,7 @@ static llvm::Value *gen_expr(AstExpr *expr, bool is_field)
         {
             auto if_expr = static_cast<AstExprIf *>(expr);
 
-            auto cond = gen_expr(if_expr->cond, is_field);
+            auto cond = gen_expr(if_expr->cond, ret_addr);
 
 #if 0
             // TODO: optimize, don't look up void each time
@@ -482,7 +533,7 @@ static llvm::Value *gen_expr(AstExpr *expr, bool is_field)
             // Emit if-block.
             builder.SetInsertPoint(if_bb);
 
-            auto if_val = gen_expr(if_expr->block, is_field);
+            auto if_val = gen_expr(if_expr->block, ret_addr);
             if (if_val)
             {
                 // The type of the if-expression is now known, so the result
@@ -501,7 +552,7 @@ static llvm::Value *gen_expr(AstExpr *expr, bool is_field)
                 func->getBasicBlockList().push_back(else_bb);
                 builder.SetInsertPoint(else_bb);
 
-                auto else_val = gen_expr(if_expr->else_expr, is_field);
+                auto else_val = gen_expr(if_expr->else_expr, ret_addr);
                 if (else_val)
                     builder.CreateStore(else_val, result);
 
@@ -522,9 +573,13 @@ static llvm::Value *gen_expr(AstExpr *expr, bool is_field)
 
             auto lhs = gen_expr(field->expr, true);
 
-            llvm::Type *type = lhs->getType();
-            if (auto pt = llvm::dyn_cast<llvm::PointerType>(type))
-                type = pt->getElementType();
+//            auto alloca = builder.CreateAlloca(lhs->getType());
+//            auto alloca = create_alloca(lhs->getType(), "tmpfield");
+//            builder.CreateStore(lhs, alloca);
+
+            auto type = lhs->getType();
+            if (auto ai = llvm::dyn_cast<llvm::AllocaInst>(lhs))
+                type = ai->getAllocatedType();
 
             // TODO: optimize, cache getInt32Ty() globally
             auto zero = llvm::ConstantInt::get(llvm::IntegerType::getInt32Ty(context), 0);
@@ -535,6 +590,19 @@ static llvm::Value *gen_expr(AstExpr *expr, bool is_field)
             indices.push_back(index);
 
             return builder.CreateInBoundsGEP(type, lhs, indices, llvm::StringRef(field->name->str));
+        }
+        case AST_EXPR_LOOP:
+        {
+            auto loop = static_cast<AstExprLoop *>(expr);
+
+            auto func = builder.GetInsertBlock()->getParent();
+            auto bb = llvm::BasicBlock::Create(context, "loop", func);
+
+            builder.CreateBr(bb);
+            builder.SetInsertPoint(bb);
+
+            // TODO: should this be a valid rvalue?
+            return gen_expr(loop->block);
         }
         default:
         {
@@ -578,6 +646,9 @@ static llvm::Value *gen_stmt(AstStmt *stmt)
             {
                 auto rhs = gen_expr(decl->rhs);
                 assert(rhs);
+
+                if (auto pt = llvm::dyn_cast<llvm::PointerType>(rhs->getType()))
+                    rhs = builder.CreateLoad(rhs);
 
                 auto alloca = create_alloca(rhs->getType(), ident->str);
                 builder.CreateStore(rhs, alloca);

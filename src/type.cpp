@@ -413,6 +413,15 @@ static TypeDefn *narrow_lit_type(TypeDefn *target, AstExprLit *lit)
     return lit->type_defn;
 }
 
+static bool is_integer_type(TypeDefn *defn)
+{
+    // TODO: optimize
+    return ((defn == get_type_defn("i8")) ||
+            (defn == get_type_defn("i16")) ||
+            (defn == get_type_defn("i32")) ||
+            (defn == get_type_defn("i64")));
+}
+
 static TypeDefn *determine_expr_type(AstExpr *expr)
 {
     switch (expr->type)
@@ -487,21 +496,22 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
             lhs->type_defn = determine_expr_type(lhs);
             rhs->type_defn = determine_expr_type(rhs);
 
-#if 0
-            if (lhs->type == AST_EXPR_LIT)
-            {
-                auto lit = static_cast<AstExprLit *>(lhs);
-            }
-#endif
-
             // TODO: should this check be done here?
             if (lhs->type_defn != rhs->type_defn)
             {
-                report_error("Type mismatch in binary operation:\n    %s %s %s\n",
-                             bin,
-                             get_type_string(lhs->type_defn),
-                             bin_op_strings[bin->op],
-                             get_type_string(rhs->type_defn));
+                // Pointer arithmetic.
+                if (lhs->type_defn->ptr && !rhs->type_defn->ptr && is_integer_type(rhs->type_defn))
+                {
+                    // TODO: does anything need to be checked here?
+                }
+                else
+                {
+                    report_error("Type mismatch in binary operation:\n    %s %s %s\n",
+                                 bin,
+                                 get_type_string(lhs->type_defn),
+                                 bin_op_strings[bin->op],
+                                 get_type_string(rhs->type_defn));
+                }
             }
 
             // NOTE: setting type to LHS regardless of whether types match or not.
@@ -642,6 +652,10 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
                     lit->type_defn = narrow_lit_type(lhs->type_defn, lit);
                     un->type_defn = lit->type_defn;
                 }
+                else
+                {
+                    rhs->type_defn = determine_expr_type(rhs);
+                }
             }
             else
             {
@@ -744,6 +758,7 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
             }
 
             field->type_defn = get_type_defn(type);
+            field->expr->type_defn = lhs_type;
 
             return field->type_defn;
         }

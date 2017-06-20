@@ -29,7 +29,12 @@ struct Vec3
     z f32;
 };
 
-/*
+struct Foo
+{
+    v Vec3;
+    t i64;
+};
+
 struct String
 {
     data *i8;
@@ -54,123 +59,31 @@ fn string_make(data *i8) -> String
 
     s
 }
-*/
 
 fn main()
 {
-    let xx i8;
-    xx = 127;
-    xx = -128;
-    xx = 128;
-    xx = -129;
-
-    let yy i16;
-    yy = 32767;
-    yy = -32768;
-    yy = 32768;
-    yy = -32769;
-
-    let x i32;
-    let y i64 = 42;
-    let z = 17;
-
-    x = 43;
-
-    let t1 = 3;
-    let t2 = 2;
-    let t3 = t1 + t2;
-
-    let a = 4;
-    let b = &a;
-    let c = *b;
-
+    /*
     let v Vec3;
     v.x = 3.14159;
     v.y = 22.84;
     v.z = v.x + v.y;
 
-    /*
-    let s = string_make("test string!");
+    let vx = v.x;
+    let vy = v.y;
+    vy = v.x;
+    let vz = vx + vy;
+    v.z = vz;
 
+    let f Foo;
+    f.v = v;
+//    f.v.x = 41.23;
+    f.t = 97;
+    */
+
+    let s = string_make(cast(*i8) "test string!");
+
+    /*
     let m = malloc(256);
     syscall5(cast(*i64) 1, cast(*i64) 1, cast(*i64) "120\n", cast(*i64) 4, cast(*i64) 0, cast(*i64) 0);
-    */
-
-    /*
-    let a = 5;
-    let b = &a;
-    let c = b + &a;
-    let d = &b;
-    let e = &d;
-    let f = &e + 3;
-    */
-
-    /*
-    x := factorial(5);
-    if x == 120 {
-        syscall5(cast(*i64) 1, cast(*i64) 1, cast(*i64) "120\n", cast(*i64) 4, cast(*i64) 0, cast(*i64) 0);
-    };
-    */
-
-    /*
-    x := 3;
-    y := (x = 4) + 3;
-
-    if add(81, 256) == inc(add(inc(299), 36)) {
-        syscall5(cast(*i64) 1, cast(*i64) 1, cast(*i64) "asdf", cast(*i64) 4, cast(*i64) 0, cast(*i64) 0);
-    };
-    syscall5(cast(*i64) 1, cast(*i64) 1, cast(*i64) "\n", cast(*i64) 1, cast(*i64) 0, cast(*i64) 0);
-    */
-
-    /*
-    x := 3;
-    y := inc(x);
-    z := add(x, y);
-
-    f := 3.14159;
-
-    x := 3;
-    xp := &x;
-    xpp := &xp;
-
-    x = 8;
-
-    str := "hello!\n";
-    stri := cast(*i64) str;
-    strp := &str;
-
-    ptr := &f;
-    ptri := cast(*i64) ptr;
-
-    syscall5(cast(*i64) 1, cast(*i64) 1, cast(*i64) "test\n", cast(*i64) 5, cast(*i64) 0, cast(*i64) 0);
-    */
-
-    /*
-    a :=
-    {
-        b := 3;
-        b2 := b * b;
-
-        b2 * b2
-    };
-
-    /*
-    a =
-    {
-        b := 4;
-        b2 := b * b;
-
-        b2 + b2
-    };
-    */
-
-    if a == 80 {
-        syscall5(cast(*i64) 1, cast(*i64) 1, cast(*i64) "true", cast(*i64) 4, cast(*i64) 0, cast(*i64) 0);
-    } else if a == 81 {
-        syscall5(cast(*i64) 1, cast(*i64) 1, cast(*i64) "true2", cast(*i64) 5, cast(*i64) 0, cast(*i64) 0);
-    } else {
-        syscall5(cast(*i64) 1, cast(*i64) 1, cast(*i64) "false", cast(*i64) 5, cast(*i64) 0, cast(*i64) 0);
-    };
-    syscall5(cast(*i64) 1, cast(*i64) 1, cast(*i64) "\n", cast(*i64) 1, cast(*i64) 0, cast(*i64) 0);
     */
 }

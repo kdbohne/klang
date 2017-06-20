@@ -8,6 +8,7 @@
 #include "lex.h"
 #include "parse.h"
 #include "llvm.h"
+#include "c.h"
 
 static File read_file(char *path)
 {
@@ -72,7 +73,8 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    llvm_gen_ir(root);
+    c_gen_ir(root);
+//    llvm_gen_ir(root);
 
     return 0;
 }

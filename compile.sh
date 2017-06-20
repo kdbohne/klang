@@ -5,10 +5,13 @@ if [ "$?" -ne 0 ] ; then
     exit
 fi
 
+#opt_ir=$(echo "$ir" | opt -O0 -mem2reg)
+#if [ "$?" -ne 0 ] ; then
+#    exit
+#fi
+
+#echo "$opt_ir" | llc -O0 -filetype=obj -o build/first.o
 echo "$ir" | llc -O0 -filetype=obj -o build/first.o
-if [ "$?" -ne 0 ] ; then
-    exit
-fi
 
 # Compile core utils
 clang -m64 -c lang/core/start.s -o build/start.o
