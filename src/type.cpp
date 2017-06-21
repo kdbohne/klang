@@ -776,10 +776,8 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
         case AST_EXPR_FOR:
         {
             auto for_ = static_cast<AstExprFor *>(expr);
-
             for_->block->scope = make_scope(for_->scope);
-            for_->block->type_defn = determine_expr_type(for_->block);
-            for_->type_defn = for_->block->type_defn;
+            for_->range->scope = for_->block->scope;
 
             // TODO: multiple decls, patterns, etc.
             // Declare the iterator.
@@ -787,11 +785,17 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
             auto it = static_cast<AstExprIdent *>(for_->it);
             scope_add_var(for_->scope, it->str, it);
 
+            for_->range->type_defn = determine_expr_type(for_->range);
+            for_->block->type_defn = determine_expr_type(for_->block);
+
+            for_->type_defn = for_->block->type_defn;
             return for_->type_defn;
         }
         case AST_EXPR_RANGE:
         {
             auto range = static_cast<AstExprRange *>(expr);
+            range->start->scope = range->scope;
+            range->end->scope = range->scope;
 
             range->start->type_defn = determine_expr_type(range->start);
             range->end->type_defn = determine_expr_type(range->end);
