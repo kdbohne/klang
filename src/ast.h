@@ -40,6 +40,8 @@ enum AstNodeType : u32
     AST_EXPR_FIELD,
     AST_EXPR_LOOP,
     AST_EXPR_BREAK,
+    AST_EXPR_FOR,
+    AST_EXPR_RANGE,
 
     // Stmt
     AST_STMT_EXPR,
@@ -256,6 +258,24 @@ struct AstExprBreak : AstExpr
 
     // TODO: support labels?
 //    AstExprIdent *label = NULL;
+};
+
+struct AstExprFor : AstExpr
+{
+    AstExprFor() : AstExpr(AST_EXPR_FOR) {}
+
+    AstExpr *it = NULL;
+    AstExpr *range = NULL;
+
+    AstExprBlock *block = NULL;
+};
+
+struct AstExprRange : AstExpr
+{
+    AstExprRange() : AstExpr(AST_EXPR_RANGE) {}
+
+    AstExpr *start = NULL;
+    AstExpr *end = NULL;
 };
 
 struct AstStmt : AstNode

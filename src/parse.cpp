@@ -223,6 +223,21 @@ static AstExpr *parse_expr(Parser *parser, bool is_unary = false)
             AstExprBreak *brk = ast_alloc(AstExprBreak);
             return brk;
         }
+        case TOK_KEY_FOR:
+        {
+            AstExprFor *for_ = ast_alloc(AstExprFor);
+
+            for_->it = parse_expr(parser);
+            expect(parser, TOK_KEY_IN);
+            for_->range = parse_expr(parser);
+
+            expect(parser, TOK_OPEN_BRACE);
+            for_->block = parse_block(parser);
+
+            lhs = for_;
+
+            break;
+        }
 
         // Unary operators.
         // Add more here!
@@ -315,6 +330,18 @@ static AstExpr *parse_expr(Parser *parser, bool is_unary = false)
             copy_loc(assign, next);
 
             return assign;
+        }
+        case TOK_DOT_DOT:
+        {
+            eat(parser);
+
+            AstExprRange *range = ast_alloc(AstExprRange);
+            range->start = lhs;
+            range->end = parse_expr(parser);
+
+            copy_loc(range, next);
+
+            return range;
         }
         default:
         {

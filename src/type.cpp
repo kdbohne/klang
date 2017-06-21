@@ -782,6 +782,40 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
             // TODO: optimize, avoid looking up void each time
             return get_type_defn("void");
         }
+        case AST_EXPR_FOR:
+        {
+            auto for_ = static_cast<AstExprFor *>(expr);
+
+            for_->block->scope = make_scope(for_->scope);
+            for_->block->type_defn = determine_expr_type(for_->block);
+            for_->type_defn = for_->block->type_defn;
+
+            // TODO: multiple decls, patterns, etc.
+            // Declare the iterator.
+            assert(for_->it->type == AST_EXPR_IDENT);
+            auto it = static_cast<AstExprIdent *>(for_->it);
+            scope_add_var(for_->scope, it->str, it);
+
+            return for_->type_defn;
+        }
+        case AST_EXPR_RANGE:
+        {
+            auto range = static_cast<AstExprRange *>(expr);
+
+            range->start->type_defn = determine_expr_type(range->start);
+            range->end->type_defn = determine_expr_type(range->end);
+
+            if (range->start->type_defn != range->end->type_defn)
+            {
+                report_error("Type mismatch between start and end of range: \"%s\" vs \"%s\".\n",
+                             range,
+                             get_type_string(range->start->type_defn),
+                             get_type_string(range->end->type_defn));
+            }
+            range->type_defn = range->start->type_defn;
+
+            return range->type_defn;
+        }
         default:
         {
             fprintf(stderr, "Internal error: unhandled expression type %d\n", expr->type);

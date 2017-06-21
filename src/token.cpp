@@ -14,6 +14,7 @@ const char *token_type_strings[]
     "semi",
     "comma",
     "dot",
+    "dot dot",
 
     "plus",
     "minus",
@@ -40,6 +41,8 @@ const char *token_type_strings[]
     "key let",
     "key loop",
     "key break",
+    "key for",
+    "key in",
 
     "eof",
     "unknown",

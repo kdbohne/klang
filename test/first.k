@@ -86,6 +86,10 @@ fn main()
 {
     let s = string_make(cast(*u8) "test string!");
 
+    for i in 0..10 {
+        syscall5(cast(*i64) 1, cast(*i64) 1, cast(*i64) "test\n", cast(*i64) 5, cast(*i64) 0, cast(*i64) 0);
+    };
+
     /*
     let v Vec3;
     v.x = 3.14159;

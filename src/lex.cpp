@@ -143,13 +143,29 @@ static Token get_token(Lexer *lex)
         case '}':  { tok.type = TOK_CLOSE_BRACE; break; }
         case ';':  { tok.type = TOK_SEMI;        break; }
         case ',':  { tok.type = TOK_COMMA;       break; }
-        case '.':  { tok.type = TOK_DOT;         break; }
 
         case '&':  { tok.type = TOK_AND;         break; }
 
         case '+':  { tok.type = TOK_PLUS;        break; }
         case '*':  { tok.type = TOK_ASTERISK;    break; }
         case '/':  { tok.type = TOK_SLASH;       break; }
+
+        case '.':
+        {
+            if (*lex->cur == '.')
+            {
+                tok.type = TOK_DOT_DOT;
+                tok.len = 2;
+
+                advance(lex);
+            }
+            else
+            {
+                tok.type = TOK_DOT;
+            }
+
+            break;
+        }
 
         case '<':
         {
@@ -318,6 +334,10 @@ static Token get_token(Lexer *lex)
                     tok.type = TOK_KEY_LOOP;
                 else if (token_matches(tok, "break"))
                     tok.type = TOK_KEY_BREAK;
+                else if (token_matches(tok, "for"))
+                    tok.type = TOK_KEY_FOR;
+                else if (token_matches(tok, "in"))
+                    tok.type = TOK_KEY_IN;
             }
             else if (is_number(c))
             {
@@ -325,6 +345,10 @@ static Token get_token(Lexer *lex)
                 while (true)
                 {
                     if (!is_number(*lex->cur) && (*lex->cur != '.'))
+                        break;
+
+                    // This is a range, not a floating point literal.
+                    if ((*lex->cur == '.') && (lex->cur[1] == '.'))
                         break;
 
                     if (*lex->cur == '.')

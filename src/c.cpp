@@ -241,6 +241,44 @@ static void gen_expr(AstExpr *expr)
 
             break;
         }
+        case AST_EXPR_FOR:
+        {
+            auto for_ = static_cast<AstExprFor *>(expr);
+
+            // TODO: HACK: make more robust (iterators?)
+            assert(for_->it->type == AST_EXPR_IDENT);
+            assert(for_->range->type == AST_EXPR_RANGE);
+
+            auto it = static_cast<AstExprIdent *>(for_->it);
+            auto range = static_cast<AstExprRange *>(for_->range);
+
+            // TODO: HACK: make more robust (iterators?)
+            assert(range->start->type == AST_EXPR_LIT);
+            assert(range->end->type == AST_EXPR_LIT);
+            assert(static_cast<AstExprLit *>(range->start)->lit_type == LIT_INT);
+            assert(static_cast<AstExprLit *>(range->end)->lit_type == LIT_INT);
+
+            printf("for (i64 ");
+            gen_expr(it);
+            printf(" = ");
+            gen_expr(range->start);
+            printf("; ");
+
+            gen_expr(it);
+            printf(" < ");
+            gen_expr(range->end);
+            printf("; ++");
+            gen_expr(it);
+
+            printf(")");
+            newline();
+
+            printf("{");
+            gen_expr(for_->block);
+            printf("}");
+
+            break;
+        }
         default:
         {
             assert(false);
@@ -269,9 +307,14 @@ static void gen_stmt(AstStmt *stmt)
 
             gen_expr(semi->expr);
 
+#if 0
+            // Avoid printing unnecessary semicolons.
             auto t = semi->expr->type;
             if ((t != AST_EXPR_BLOCK) && (t != AST_EXPR_IF) && (t != AST_EXPR_LOOP))
                 printf(";");
+#else
+            printf(";");
+#endif
 
             break;
         }
