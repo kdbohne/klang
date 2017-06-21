@@ -413,15 +413,6 @@ static TypeDefn *narrow_lit_type(TypeDefn *target, AstExprLit *lit)
     return lit->type_defn;
 }
 
-static bool is_integer_type(TypeDefn *defn)
-{
-    // TODO: optimize
-    return ((defn == get_type_defn("i8")) ||
-            (defn == get_type_defn("i16")) ||
-            (defn == get_type_defn("i32")) ||
-            (defn == get_type_defn("i64")));
-}
-
 static TypeDefn *determine_expr_type(AstExpr *expr)
 {
     switch (expr->type)
@@ -501,7 +492,7 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
             if (lhs->type_defn != rhs->type_defn)
             {
                 // Pointer arithmetic.
-                if (lhs->type_defn->ptr && !rhs->type_defn->ptr && is_integer_type(rhs->type_defn))
+                if (lhs->type_defn->ptr && !rhs->type_defn->ptr && is_int_type(rhs->type_defn))
                 {
                     // TODO: does anything need to be checked here?
                 }
@@ -946,6 +937,15 @@ static void determine_node_types(AstRoot *root)
             it->block->type_defn = determine_expr_type(it->block);
         }
     }
+}
+
+bool is_int_type(TypeDefn *defn)
+{
+    // TODO: optimize
+    return ((defn == get_type_defn("i8")) ||
+            (defn == get_type_defn("i16")) ||
+            (defn == get_type_defn("i32")) ||
+            (defn == get_type_defn("i64")));
 }
 
 bool type_check(AstRoot *root)

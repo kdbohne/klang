@@ -20,4 +20,6 @@ TypeDefn *get_type_defn(const char *name, int pointer_depth = 0);
 
 int get_pointer_depth(TypeDefn *defn);
 
+bool is_int_type(TypeDefn *defn);
+
 bool type_check(AstRoot *root);
