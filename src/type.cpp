@@ -619,7 +619,10 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
         case AST_EXPR_CAST:
         {
             auto cast = static_cast<AstExprCast *>(expr);
+            cast->expr->scope = cast->scope;
+
             cast->type_defn = get_type_defn(cast->type);
+            cast->expr->type_defn = determine_expr_type(cast->expr);
 
             return cast->type_defn;
         }
