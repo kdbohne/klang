@@ -900,7 +900,7 @@ static void determine_node_types(AstRoot *root)
         }
 
         if (it->ret)
-            it->ret->type_defn = get_type_defn(it->ret->name->str);
+            it->ret->type_defn = get_type_defn(it->ret);
 
         if (it->block)
         {
