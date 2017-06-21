@@ -34,7 +34,7 @@ static void gen_lit(AstExprLit *lit)
         }
         case LIT_STR:
         {
-            printf("%s", lit->value_str);
+            printf("\"%s\"", lit->value_str);
             break;
         }
         default:
