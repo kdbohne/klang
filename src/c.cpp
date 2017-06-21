@@ -34,7 +34,21 @@ static void gen_lit(AstExprLit *lit)
         }
         case LIT_STR:
         {
-            printf("\"%s\"", lit->value_str);
+            printf("\"");
+            auto s = lit->value_str;
+            for (int i = 0; i < string_length(lit->value_str); ++i)
+            {
+                char c = s[i];
+                switch (c)
+                {
+                    case '\n': { printf("\\n");   break; }
+                    case '\r': { printf("\\r");   break; }
+                    case '\t': { printf("\\t");   break; }
+                    default:   { printf("%c", c); break; }
+                }
+            }
+            printf("\"");
+
             break;
         }
         default:
