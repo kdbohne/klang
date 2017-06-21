@@ -1,7 +1,7 @@
-/*
 extern fn syscall5(num *i64, arg1 *i64, arg2 *i64, arg3 *i64, arg4 *i64, arg5 *i64) -> i64;
-extern fn malloc(bytes i64) -> *u8;
+extern fn malloc(bytes u64) -> *c_void;
 
+/*
 fn inc(x i64) -> i64
 {
     x + 1
@@ -37,24 +37,46 @@ struct Foo
 
 struct String
 {
-    data *i8;
+    data *u8;
     len i64;
 };
 
-fn string_make(data *i8) -> String
+fn string_len(str *u8) -> i64
 {
-    let s String;
-    s.data = data;
-    s.len = 0;
+    let len = 0;
 
-    let p = data;
+    let p = str;
     loop {
-        if *p == cast(i8) 0 {
+        if *p == cast(u8) 0 {
             break;
         };
 
-        s.len = s.len + 1;
+        len = len + 1;
         p = p + 1;
+    };
+
+    len
+}
+
+fn string_make(str *u8) -> String
+{
+    let s String;
+    s.len = string_len(str);
+    s.data = cast(*u8) malloc(cast(u64) (s.len + 1));
+
+    let i = 0;
+    let p = s.data;
+    loop {
+        if i >= s.len {
+            break;
+        };
+
+        *p = *str;
+
+        p = p + 1;
+        str = str + 1;
+
+        i = i + 1;
     };
 
     s
@@ -62,6 +84,8 @@ fn string_make(data *i8) -> String
 
 fn main()
 {
+    let s = string_make(cast(*u8) "test string!");
+
     /*
     let v Vec3;
     v.x = 3.14159;
@@ -79,8 +103,6 @@ fn main()
 //    f.v.x = 41.23;
     f.t = 97;
     */
-
-    let s = string_make(cast(*i8) "test string!");
 
     /*
     let m = malloc(256);

@@ -352,6 +352,7 @@ void c_gen_ir(AstRoot *ast)
     printf("typedef uint64_t u64;\n");
     printf("typedef float    f32;\n");
     printf("typedef double   f64;\n");
+    printf("#define c_void void\n");
 
     printf("\n");
 
@@ -385,6 +386,9 @@ void c_gen_ir(AstRoot *ast)
 
     foreach(ast->funcs)
     {
+        if (it->flags & FUNC_EXTERN)
+            continue;
+
         gen_func_sig(it);
         printf("\n");
 

@@ -472,7 +472,8 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
                 }
                 case LIT_STR:
                 {
-                    lit->type_defn = get_type_defn("str");
+                    // TODO: primitive str type?
+                    lit->type_defn = get_type_defn("u8", 1);
                     break;
                 }
                 default:
@@ -929,9 +930,11 @@ bool type_check(AstRoot *root)
     register_type_defn("f32");
     register_type_defn("f64");
 
-    register_type_defn("str");
+//    register_type_defn("str");
 
     register_type_defn("void");
+
+    register_type_defn("c_void");
 
     // TODO: register these to scoped type tables instead of dumping
     // all of them into the global type table?

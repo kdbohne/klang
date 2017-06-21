@@ -2,3 +2,6 @@ Fix:
     [ ] Codegen for dereferences
         [ ] Is single dereference working?
         [ ] Multiple dereferences
+
+Type checking:
+    [ ] Immutable arguments
