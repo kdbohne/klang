@@ -267,10 +267,8 @@ static void gen_expr(AstExpr *expr)
             auto range = static_cast<AstExprRange *>(for_->range);
 
             // TODO: HACK: make more robust (iterators?)
-            assert(range->start->type == AST_EXPR_LIT);
-            assert(range->end->type == AST_EXPR_LIT);
-            assert(static_cast<AstExprLit *>(range->start)->lit_type == LIT_INT);
-            assert(static_cast<AstExprLit *>(range->end)->lit_type == LIT_INT);
+            assert(is_int_type(range->start->type_defn));
+            assert(is_int_type(range->end->type_defn));
 
             printf("for (i64 ");
             gen_expr(it);
