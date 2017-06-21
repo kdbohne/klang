@@ -67,6 +67,10 @@ static BinOp get_bin_op(TokenType type)
         case TOK_MINUS:    return BIN_SUB;
         case TOK_ASTERISK: return BIN_MUL;
         case TOK_SLASH:    return BIN_DIV;
+        case TOK_LT:       return BIN_LT;
+        case TOK_LE:       return BIN_LE;
+        case TOK_GT:       return BIN_GT;
+        case TOK_GE:       return BIN_GE;
         case TOK_EQ_EQ:    return BIN_EQ;
         default:
         {
@@ -280,6 +284,10 @@ static AstExpr *parse_expr(Parser *parser, bool is_unary = false)
         case TOK_MINUS:
         case TOK_ASTERISK:
         case TOK_SLASH:
+        case TOK_LT:
+        case TOK_LE:
+        case TOK_GT:
+        case TOK_GE:
         case TOK_EQ_EQ:
         {
             eat(parser);
@@ -333,7 +341,7 @@ static AstStmt *parse_stmt(Parser *parser)
         AstExpr *bind = make_ident(ident);
 
         AstExprType *type = NULL;
-        if (peek(parser).type == TOK_IDENT)
+        if ((peek(parser).type != TOK_EQ) && (peek(parser).type != TOK_SEMI))
             type = parse_type(parser);
 
         AstExpr *rhs = NULL;

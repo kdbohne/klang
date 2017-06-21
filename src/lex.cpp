@@ -151,6 +151,39 @@ static Token get_token(Lexer *lex)
         case '*':  { tok.type = TOK_ASTERISK;    break; }
         case '/':  { tok.type = TOK_SLASH;       break; }
 
+        case '<':
+        {
+            if (*lex->cur == '=')
+            {
+                tok.type = TOK_LE;
+                tok.len = 2;
+
+                advance(lex);
+            }
+            else
+            {
+                tok.type = TOK_LT;
+            }
+
+            break;
+        }
+        case '>':
+        {
+            if (*lex->cur == '=')
+            {
+                tok.type = TOK_GE;
+                tok.len = 2;
+
+                advance(lex);
+            }
+            else
+            {
+                tok.type = TOK_GT;
+            }
+
+            break;
+        }
+
         case '=':
         {
             if (*lex->cur == '=')

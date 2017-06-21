@@ -25,8 +25,12 @@ enum TokenType : u32
 
     TOK_AND,
 
+    TOK_LT,
+    TOK_LE,
+    TOK_GT,
+    TOK_GE,
     TOK_EQ_EQ,
-//    TOK_COLON_EQ,
+
     TOK_R_ARROW,
 
     TOK_KEY_FN,

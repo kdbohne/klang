@@ -21,9 +21,14 @@ const char *bin_op_strings[] =
     "*",  // BIN_MUL
     "/",  // BIN_DIV
 
+    "<",  // BIN_LT
+    "<=", // BIN_LE
+    ">",  // BIN_GT
+    ">=", // BIN_GE
+
     "==", // BIN_EQ
 
-    "?", // BIN_ERR
+    "?",  // BIN_ERR
 };
 
 const char *un_op_strings[] =

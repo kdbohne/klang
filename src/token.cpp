@@ -23,6 +23,10 @@ const char *token_type_strings[]
 
     "and",
 
+    "lt",
+    "le",
+    "gt",
+    "ge",
     "eq eq",
 //    "colon eq",
     "r arrow",
