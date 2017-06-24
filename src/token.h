@@ -23,6 +23,7 @@ enum TokenType : u32
     TOK_ASTERISK,
     TOK_SLASH,
     TOK_EQ,
+    TOK_PERCENT,
 
     TOK_AND,
 

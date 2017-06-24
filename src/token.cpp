@@ -21,6 +21,7 @@ const char *token_type_strings[]
     "asterisk",
     "slash",
     "eq",
+    "percent",
 
     "and",
 

@@ -137,6 +137,7 @@ enum BinOp : u32
     BIN_SUB,
     BIN_MUL,
     BIN_DIV,
+    BIN_MOD,
 
     BIN_LT,
     BIN_LE,

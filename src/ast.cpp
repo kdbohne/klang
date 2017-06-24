@@ -20,6 +20,7 @@ const char *bin_op_strings[] =
     "-",  // BIN_SUB
     "*",  // BIN_MUL
     "/",  // BIN_DIV
+    "%",  // BIN_MOD
 
     "<",  // BIN_LT
     "<=", // BIN_LE

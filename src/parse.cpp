@@ -67,6 +67,7 @@ static BinOp get_bin_op(TokenType type)
         case TOK_MINUS:    return BIN_SUB;
         case TOK_ASTERISK: return BIN_MUL;
         case TOK_SLASH:    return BIN_DIV;
+        case TOK_PERCENT:  return BIN_MOD;
         case TOK_LT:       return BIN_LT;
         case TOK_LE:       return BIN_LE;
         case TOK_GT:       return BIN_GT;
@@ -299,6 +300,7 @@ static AstExpr *parse_expr(Parser *parser, bool is_unary = false)
         case TOK_MINUS:
         case TOK_ASTERISK:
         case TOK_SLASH:
+        case TOK_PERCENT:
         case TOK_LT:
         case TOK_LE:
         case TOK_GT:

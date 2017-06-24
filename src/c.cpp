@@ -101,6 +101,7 @@ static void gen_expr(AstExpr *expr)
                 case BIN_SUB: { printf(" - ");  break; }
                 case BIN_MUL: { printf(" * ");  break; }
                 case BIN_DIV: { printf(" / ");  break; }
+                case BIN_MOD: { printf(" %% "); break; }
                 case BIN_LT:  { printf(" < ");  break; }
                 case BIN_LE:  { printf(" <= "); break; }
                 case BIN_GT:  { printf(" > ");  break; }

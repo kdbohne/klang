@@ -149,6 +149,7 @@ static Token get_token(Lexer *lex)
         case '+':  { tok.type = TOK_PLUS;        break; }
         case '*':  { tok.type = TOK_ASTERISK;    break; }
         case '/':  { tok.type = TOK_SLASH;       break; }
+        case '%':  { tok.type = TOK_PERCENT;     break; }
 
         case '.':
         {
