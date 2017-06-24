@@ -198,7 +198,6 @@ static void gen_expr(AstExpr *expr)
             printf("{");
             gen_expr(if_->block);
             printf("}");
-            newline();
 
             if (if_->else_expr)
                 gen_expr(if_->else_expr);
