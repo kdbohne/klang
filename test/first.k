@@ -1,27 +1,6 @@
 extern fn syscall5(num *i64, arg1 *i64, arg2 *i64, arg3 *i64, arg4 *i64, arg5 *i64) -> i64;
 extern fn malloc(bytes u64) -> *c_void;
 
-/*
-fn inc(x i64) -> i64
-{
-    x + 1
-}
-
-fn add(a i64, b i64) -> i64
-{
-    a + b
-}
-
-fn factorial(n i64) -> i64
-{
-    if n == 0 {
-        1
-    } else {
-        n * factorial(n - 1)
-    }
-}
-*/
-
 struct Vec3
 {
     x f32;
@@ -91,25 +70,62 @@ fn print_string_literal(str *u8)
     write(str, len);
 }
 
-fn print_i64(i i64)
+fn print_i64(x i64)
 {
-    let s String;
-    s.len = 128;
-    s.data = cast(*u8) malloc(cast(u64) s.len);
+    let cap = 128;
+    let len = 0;
+    let buf = cast(*u8) malloc(cast(u64) cap);
 
-    if i < 0 {
+    if x < 0 {
         print_string_literal("-");
+        x = -x;
     };
+
+    // HACK: no character literals yet
+    let zero = 48;
+
+    let p = buf;
+    loop {
+        let d = x % 10;
+        x = x / 10;
+
+        let c = d + zero;
+        *p = cast(u8) c;
+
+        p = p + 1;
+        len = len + 1;
+
+        if x == 0 {
+            break;
+        };
+    };
+
+    let l = buf;
+    let r = p - 1;
+    loop {
+        if l >= r {
+            break;
+        };
+
+        let tmp = *l;
+        *l = *r;
+        *r = tmp;
+
+        l = l + 1;
+        r = r - 1;
+    };
+
+    write(buf, len);
 }
 
 fn main()
 {
-    let s = string_make("test string!\n");
-    print_string(s);
+    print_i64(123456789);
+    print_string_literal("\n");
 
-    print_i64(-34);
+    print_i64(-347);
+    print_string_literal("\n");
 
-    for i in 0..10 {
-        print_string_literal("test\n");
-    };
+    print_i64(238947 - 123 + 45 * 34);
+    print_string_literal("\n");
 }
