@@ -45,7 +45,7 @@ static void gen_lit(AstExprLit *lit)
         }
         case LIT_STR:
         {
-            printf("\"");
+            printf("((u8 *)\"");
             auto s = lit->value_str;
             for (int i = 0; i < string_length(lit->value_str); ++i)
             {
@@ -58,7 +58,7 @@ static void gen_lit(AstExprLit *lit)
                     default:   { printf("%c", c); break; }
                 }
             }
-            printf("\"");
+            printf("\")");
 
             break;
         }

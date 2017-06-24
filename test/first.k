@@ -98,18 +98,18 @@ fn print_i64(i i64)
     s.data = cast(*u8) malloc(cast(u64) s.len);
 
     if i < 0 {
-        print_string_literal(cast(*u8) "-");
+        print_string_literal("-");
     };
 }
 
 fn main()
 {
-    let s = string_make(cast(*u8) "test string!\n");
+    let s = string_make("test string!\n");
     print_string(s);
 
     print_i64(-34);
 
     for i in 0..10 {
-        syscall5(cast(*i64) 1, cast(*i64) 1, cast(*i64) "test\n", cast(*i64) 5, cast(*i64) 0, cast(*i64) 0);
+        print_string_literal("test\n");
     };
 }
