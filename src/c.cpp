@@ -20,8 +20,19 @@ static void gen_lit(AstExprLit *lit)
     {
         case LIT_INT:
         {
+            // NOTE: negative literals are parsed as:
+            //               - 34
+            //  unary minus--^ ^^--integer literal
+            //
+            // This means the negative sign has already been
+            // printed by gen_expr() for the unary minus.
+            //
+            // TODO: avoid flagging the integer as negative then?
+            //       or remove the unary expression?
+            /*
             if (lit->value_int.negative)
                 printf("-");
+            */
 
             printf("%lu", lit->value_int.value);
 

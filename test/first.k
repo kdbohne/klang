@@ -64,52 +64,52 @@ fn string_make(str *u8) -> String
     s.len = string_len(str);
     s.data = cast(*u8) malloc(cast(u64) (s.len + 1));
 
-    let i = 0;
     let p = s.data;
-    loop {
-        if i >= s.len {
-            break;
-        };
-
+    for i in 0..s.len {
         *p = *str;
 
         p = p + 1;
         str = str + 1;
-
-        i = i + 1;
     };
 
     s
 }
 
+fn write(data *u8, len i64)
+{
+    syscall5(cast(*i64) 1, cast(*i64) 1, cast(*i64) data, cast(*i64) len, cast(*i64) 0, cast(*i64) 0);
+}
+
+fn print_string(str String)
+{
+    write(str.data, str.len);
+}
+
+fn print_string_literal(str *u8)
+{
+    let len = string_len(str);
+    write(str, len);
+}
+
+fn print_i64(i i64)
+{
+    let s String;
+    s.len = 128;
+    s.data = cast(*u8) malloc(cast(u64) s.len);
+
+    if i < 0 {
+        print_string_literal(cast(*u8) "-");
+    };
+}
+
 fn main()
 {
-    let s = string_make(cast(*u8) "test string!");
+    let s = string_make(cast(*u8) "test string!\n");
+    print_string(s);
+
+    print_i64(-34);
 
     for i in 0..10 {
         syscall5(cast(*i64) 1, cast(*i64) 1, cast(*i64) "test\n", cast(*i64) 5, cast(*i64) 0, cast(*i64) 0);
     };
-
-    /*
-    let v Vec3;
-    v.x = 3.14159;
-    v.y = 22.84;
-    v.z = v.x + v.y;
-
-    let vx = v.x;
-    let vy = v.y;
-    vy = v.x;
-    let vz = vx + vy;
-    v.z = vz;
-
-    let f Foo;
-    f.v = v;
-//    f.v.x = 41.23;
-    f.t = 97;
-    */
-
-    /*
-    let m = malloc(256);
-    syscall5(cast(*i64) 1, cast(*i64) 1, cast(*i64) "120\n", cast(*i64) 4, cast(*i64) 0, cast(*i64) 0);
-    */
 }
