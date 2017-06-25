@@ -192,10 +192,8 @@ static void gen_expr(AstExpr *expr)
 
             printf("if (");
             gen_expr(if_->cond);
-            printf(")");
-            newline();
+            printf(") {");
 
-            printf("{");
             gen_expr(if_->block);
             printf("}");
 
@@ -249,10 +247,8 @@ static void gen_expr(AstExpr *expr)
         {
             auto loop = static_cast<AstExprLoop *>(expr);
 
-            printf("while (1)");
-            newline();
+            printf("while (1) {");
 
-            printf("{");
             gen_expr(loop->block);
             printf("}");
 
