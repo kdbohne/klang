@@ -239,6 +239,19 @@ static AstExpr *parse_expr(Parser *parser, bool is_unary = false)
 
             break;
         }
+        case TOK_KEY_WHILE:
+        {
+            AstExprWhile *while_ = ast_alloc(AstExprWhile);
+
+            while_->cond = parse_expr(parser);
+
+            expect(parser, TOK_OPEN_BRACE);
+            while_->block = parse_block(parser);
+
+            lhs = while_;
+
+            break;
+        }
 
         // Unary operators.
         // Add more here!

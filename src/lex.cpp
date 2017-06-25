@@ -339,6 +339,8 @@ static Token get_token(Lexer *lex)
                     tok.type = TOK_KEY_FOR;
                 else if (token_matches(tok, "in"))
                     tok.type = TOK_KEY_IN;
+                else if (token_matches(tok, "while"))
+                    tok.type = TOK_KEY_WHILE;
             }
             else if (is_number(c))
             {

@@ -42,6 +42,7 @@ enum AstNodeType : u32
     AST_EXPR_BREAK,
     AST_EXPR_FOR,
     AST_EXPR_RANGE,
+    AST_EXPR_WHILE,
 
     // Stmt
     AST_STMT_EXPR,
@@ -277,6 +278,14 @@ struct AstExprRange : AstExpr
 
     AstExpr *start = NULL;
     AstExpr *end = NULL;
+};
+
+struct AstExprWhile : AstExpr
+{
+    AstExprWhile() : AstExpr(AST_EXPR_WHILE) {}
+
+    AstExpr *cond = NULL;
+    AstExprBlock *block = NULL;
 };
 
 struct AstStmt : AstNode

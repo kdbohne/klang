@@ -811,6 +811,19 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
 
             return range->type_defn;
         }
+        case AST_EXPR_WHILE:
+        {
+            auto while_ = static_cast<AstExprWhile *>(expr);
+
+            while_->cond->scope = while_->scope;
+            while_->cond->type_defn = determine_expr_type(while_->cond);
+
+            while_->block->scope = make_scope(while_->scope);
+            while_->block->type_defn = determine_expr_type(while_->block);
+            while_->type_defn = while_->block->type_defn;
+
+            return while_->type_defn;
+        }
         default:
         {
             fprintf(stderr, "Internal error: unhandled expression type %d\n", expr->type);

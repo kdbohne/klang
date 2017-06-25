@@ -44,6 +44,7 @@ const char *token_type_strings[]
     "key break",
     "key for",
     "key in",
+    "key while",
 
     "eof",
     "unknown",

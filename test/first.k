@@ -102,11 +102,7 @@ fn print_i64(x i64)
 
     let l = buf;
     let r = p - 1;
-    loop {
-        if l >= r {
-            break;
-        };
-
+    while l < r {
         let tmp = *l;
         *l = *r;
         *r = tmp;

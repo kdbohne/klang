@@ -298,6 +298,19 @@ static void gen_expr(AstExpr *expr)
 
             break;
         }
+        case AST_EXPR_WHILE:
+        {
+            auto while_ = static_cast<AstExprWhile *>(expr);
+
+            printf("while (");
+            gen_expr(while_->cond);
+            printf(") {");
+
+            gen_expr(while_->block);
+            printf("}");
+
+            break;
+        }
         default:
         {
             assert(false);
