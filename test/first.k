@@ -1,5 +1,6 @@
 extern fn syscall5(num *i64, arg1 *i64, arg2 *i64, arg3 *i64, arg4 *i64, arg5 *i64) -> i64;
 extern fn malloc(bytes u64) -> *c_void;
+extern fn free(mem *c_void);
 
 struct Vec3 {
     x f32;
@@ -98,6 +99,8 @@ fn print_i64(x i64) {
     };
 
     write(buf, len);
+
+    free(cast(*c_void) buf);
 }
 
 struct Foo {
