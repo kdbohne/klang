@@ -1,21 +1,18 @@
 extern fn syscall5(num *i64, arg1 *i64, arg2 *i64, arg3 *i64, arg4 *i64, arg5 *i64) -> i64;
 extern fn malloc(bytes u64) -> *c_void;
 
-struct Vec3
-{
+struct Vec3 {
     x f32;
     y f32;
     z f32;
 };
 
-struct String
-{
+struct String {
     data *u8;
     len i64;
 };
 
-fn string_len(str *u8) -> i64
-{
+fn string_len(str *u8) -> i64 {
     let len = 0;
 
     let p = str;
@@ -31,8 +28,7 @@ fn string_len(str *u8) -> i64
     len
 }
 
-fn string_make(str *u8) -> String
-{
+fn string_make(str *u8) -> String {
     let s String;
     s.len = string_len(str);
     s.data = cast(*u8) malloc(cast(u64) (s.len + 1));
@@ -48,24 +44,20 @@ fn string_make(str *u8) -> String
     s
 }
 
-fn write(data *u8, len i64)
-{
+fn write(data *u8, len i64) {
     syscall5(cast(*i64) 1, cast(*i64) 1, cast(*i64) data, cast(*i64) len, cast(*i64) 0, cast(*i64) 0);
 }
 
-fn print_string(str String)
-{
+fn print_string(str String) {
     write(str.data, str.len);
 }
 
-fn print_string_literal(str *u8)
-{
+fn print_string_literal(str *u8) {
     let len = string_len(str);
     write(str, len);
 }
 
-fn print_i64(x i64)
-{
+fn print_i64(x i64) {
     let cap = 128;
     let len = 0;
     let buf = cast(*u8) malloc(cast(u64) cap);
@@ -118,8 +110,7 @@ fn test(foo *Foo) {
     foo.y = 69;
 }
 
-fn main()
-{
+fn main() {
     print_i64(123456789);
     print_string_literal("\n");
 
