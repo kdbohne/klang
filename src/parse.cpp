@@ -269,7 +269,7 @@ static AstExpr *parse_expr(Parser *parser, bool is_unary = false)
             if (expr->type == AST_EXPR_LIT)
             {
                 auto lit = static_cast<AstExprLit *>(expr);
-                lit->value_int.negative = true;
+                lit->value_int.flags |= INT_IS_NEGATIVE;
             }
 
             auto un = ast_alloc(AstExprUn);

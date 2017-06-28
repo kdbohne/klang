@@ -20,6 +20,12 @@ static bool is_letter(char c)
            ((c >= 'A') && (c <= 'Z'));
 }
 
+static bool is_hex(char c)
+{
+    return ((c >= 'a') && (c <= 'f')) ||
+           ((c >= 'A') && (c <= 'F'));
+}
+
 static bool is_newline(char c)
 {
     return (c == '\n') || (c == '\r');
@@ -344,29 +350,45 @@ static Token get_token(Lexer *lex)
             }
             else if (is_number(c))
             {
-                bool is_float = false;
-                while (true)
+                if ((c == '0') && (*lex->cur == 'x'))
                 {
-                    if (!is_number(*lex->cur) && (*lex->cur != '.'))
-                        break;
+                    advance(lex);
 
-                    // This is a range, not a floating point literal.
-                    if ((*lex->cur == '.') && (lex->cur[1] == '.'))
-                        break;
-
-                    if (*lex->cur == '.')
+                    tok.flags |= TOKEN_IS_HEX;
+                    while (true)
                     {
-                        if (is_float)
-                            assert(false);
+                        if (!is_number(*lex->cur) && !is_hex(*lex->cur))
+                            break;
 
-                        is_float = true;
+                        advance(lex);
+                    }
+                }
+                else
+                {
+                    bool is_float = false;
+                    while (true)
+                    {
+                        if (!is_number(*lex->cur) && (*lex->cur != '.'))
+                            break;
+
+                        // This is a range, not a floating point literal.
+                        if ((*lex->cur == '.') && (lex->cur[1] == '.'))
+                            break;
+
+                        if (*lex->cur == '.')
+                        {
+                            if (is_float)
+                                assert(false);
+
+                            is_float = true;
+                        }
+
+                        advance(lex);
                     }
 
-                    advance(lex);
+                    if (is_float)
+                        tok.flags |= TOKEN_IS_FLOAT;
                 }
-
-                if (is_float)
-                    tok.flags |= TOKEN_IS_FLOAT;
 
                 tok.type = TOK_NUM;
                 tok.len = lex->cur - tok.str;

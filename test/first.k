@@ -103,14 +103,12 @@ fn print_i64(x i64) {
     free(cast(*c_void) buf);
 }
 
-struct Foo {
-    x i64;
-    y i64;
-};
+fn print_f32(x f32) {
+    let cap = 128;
+    let len = 0;
+    let buf = cast(*u8) malloc(cast(u64) cap);
 
-fn test(foo *Foo) {
-    foo.x = 42;
-    foo.y = 69;
+    let xi = cast(i32) x;
 }
 
 fn main() {
@@ -123,10 +121,10 @@ fn main() {
     print_i64(238947 - 123 + 45 * 34);
     print_string_literal("\n");
 
-    let foo Foo;
-    test(&foo);
-    print_i64(foo.x);
+    print_f32(3.141592654);
     print_string_literal("\n");
-    print_i64(foo.y);
-    print_string_literal("\n");
+
+    let x = 0xffffffff;
+//    print_i64(x);
+//    print_string_literal("\n");
 }

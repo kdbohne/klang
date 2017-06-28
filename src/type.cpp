@@ -255,7 +255,7 @@ static TypeDefn *get_deref(AstExpr *expr, TypeDefn *defn)
     int depth = get_pointer_depth(defn) - 1;
     if (depth < 0)
     {
-        report_error("Dereferencing non-pointer type %s.\n",
+        report_error("Dereferencing non-pointer type \"%s\".\n",
                      expr,
                      get_type_string(defn));
         return NULL;
@@ -345,34 +345,76 @@ static void type_check_func(AstFunc *func)
 static void check_int_overflow(AstExprLit *lit)
 {
     LitInt *i = &lit->value_int;
+    bool neg = i->flags & INT_IS_NEGATIVE;
 
     bool overflow = false;
-    switch (i->type)
+
+    // TODO: clean this up
+
+    // Don't check hex literals for overflows based on their value. Just use
+    // the exact representation as it was given; check for 'unsigned' overflow,
+    // i.e. values that are too big to fit in the specified number of bits.
+    if (i->flags & INT_IS_HEX)
     {
-        case INT_8:
+        switch (i->type)
         {
-            overflow = i->value > (127 + (i->negative ? 1 : 0));
-            break;
+            case INT_8:
+            {
+                overflow = i->value > 255;
+                break;
+            }
+            case INT_16:
+            {
+                overflow = i->value > 65535;
+                break;
+            }
+            case INT_32:
+            {
+                overflow = i->value > 4294967295;
+                break;
+            }
+            case INT_64:
+            {
+                // FIXME: this fails... how to check this?
+                overflow = i->value > 18446744073709551615ull;
+                break;
+            }
+            default:
+            {
+                assert(false);
+                break;
+            }
         }
-        case INT_16:
+    }
+    else
+    {
+        switch (i->type)
         {
-            overflow = i->value > (32767 + (i->negative ? 1 : 0));
-            break;
-        }
-        case INT_32:
-        {
-            overflow = i->value > (2147483647 + (i->negative ? 1 : 0));
-            break;
-        }
-        case INT_64:
-        {
-            overflow = i->value > (9223372036854775807 + (i->negative ? 1 : 0));
-            break;
-        }
-        default:
-        {
-            assert(false);
-            break;
+            case INT_8:
+            {
+                overflow = i->value > (127 + (neg ? 1 : 0));
+                break;
+            }
+            case INT_16:
+            {
+                overflow = i->value > (32767 + (neg ? 1 : 0));
+                break;
+            }
+            case INT_32:
+            {
+                overflow = i->value > (2147483647 + (neg ? 1 : 0));
+                break;
+            }
+            case INT_64:
+            {
+                overflow = i->value > (9223372036854775807 + (neg ? 1 : 0));
+                break;
+            }
+            default:
+            {
+                assert(false);
+                break;
+            }
         }
     }
 
@@ -380,7 +422,7 @@ static void check_int_overflow(AstExprLit *lit)
     {
         report_error("Integer literal %s%lu overflows %s.\n",
                      lit,
-                     i->negative ? "-" : "",
+                     neg ? "-" : "",
                      i->value,
                      i->type == INT_8  ? "i8"  :
                      i->type == INT_16 ? "i16" :
@@ -396,6 +438,8 @@ static TypeDefn *narrow_lit_type(TypeDefn *target, AstExprLit *lit)
     // TODO: are there other types that need to be narrowed?
     if (lit->lit_type != LIT_INT)
         return determine_expr_type(lit);
+
+    // TODO: hex?
 
     // TODO: optimize
     if (target == get_type_defn("i8"))
@@ -498,7 +542,6 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
             lhs->type_defn = determine_expr_type(lhs);
             rhs->type_defn = determine_expr_type(rhs);
 
-            // TODO: should this check be done here?
             if (lhs->type_defn != rhs->type_defn)
             {
                 // Pointer arithmetic.
@@ -549,7 +592,7 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
                     if (un->expr->type == AST_EXPR_LIT)
                     {
                         auto lit = static_cast<AstExprLit *>(un->expr);
-                        assert(lit->value_int.negative);
+                        assert(lit->value_int.flags & INT_IS_NEGATIVE);
                     }
 
                     break;
@@ -876,6 +919,7 @@ static void determine_stmt_type(AstStmt *stmt)
             // TODO: multiple decls, patterns, etc.
             assert(decl->bind->type == AST_EXPR_IDENT);
             auto lhs = static_cast<AstExprIdent *>(decl->bind);
+            auto rhs = decl->rhs;
 
             // TODO: avoid looking up void each time
             lhs->type_defn = get_type_defn("void");
@@ -886,38 +930,67 @@ static void determine_stmt_type(AstStmt *stmt)
                 lhs->type_defn = decl->type->type_defn;
             }
 
-            if (decl->rhs)
+            if (rhs)
             {
-                decl->rhs->scope = decl->scope;
+                rhs->scope = decl->scope;
 
-                auto type = determine_expr_type(decl->rhs);
-                if (type == get_type_defn("void"))
+                // TODO: clean up this whole section
+
+                rhs->type_defn = determine_expr_type(rhs);
+                if (rhs->type_defn == get_type_defn("void"))
                 {
                     report_error("Assigning \"%s\" to a block with a void return value.\n",
                                  decl,
                                  lhs->str);
                 }
 
-                // If the declaration was given an explicit type, check to make sure
-                // the rvalue expression being assigned has the same type.
                 if (decl->type)
                 {
+                    // TODO: this is copy-pasted from the AST_EXPR_ASSIGN in determine_expr_type().
+                    // Two cases need to be narrowed:
+                    //     1) Integer literal
+                    //     2) Unary minus + integer literal
+                    if (rhs->type == AST_EXPR_LIT)
+                    {
+                        auto lit = static_cast<AstExprLit *>(rhs);
+                        lit->type_defn = narrow_lit_type(lhs->type_defn, lit);
+                    }
+                    else if (rhs->type == AST_EXPR_UN)
+                    {
+                        auto un = static_cast<AstExprUn *>(rhs);
+                        if ((un->op == UN_NEG) && (un->expr->type == AST_EXPR_LIT))
+                        {
+                            auto lit = static_cast<AstExprLit *>(un->expr);
+
+                            lit->type_defn = narrow_lit_type(lhs->type_defn, lit);
+                            un->type_defn = lit->type_defn;
+                        }
+                        else
+                        {
+                            rhs->type_defn = determine_expr_type(rhs);
+                        }
+                    }
+
+                    // If the declaration was given an explicit type, check to make sure
+                    // the rvalue expression being assigned has the same type.
                     auto decl_type = get_type_defn(decl->type->name->str);
-                    if (type != decl_type)
+                    if (rhs->type_defn != decl_type)
                     {
                         report_error("Assigning rvalue of type \"%s\" to a declaration with type \"%s\".\n",
                                      decl,
-                                     get_type_string(type),
+                                     get_type_string(rhs->type_defn),
                                      get_type_string(decl_type));
                     }
                 }
-
-                lhs->type_defn = type;
+                else
+                {
+                    lhs->type_defn = rhs->type_defn;
+                }
 
                 // If the RHS is a function call, make sure the function actually returns a value.
-                if (decl->rhs->type == AST_EXPR_CALL)
+                if (rhs->type == AST_EXPR_CALL)
                 {
-                    auto call = static_cast<AstExprCall *>(decl->rhs);
+                    auto call = static_cast<AstExprCall *>(rhs);
                     auto func = scope_get_func(call->scope, call->name->str);
 
                     if (!func->ret || !func->ret->type_defn)

@@ -56,6 +56,7 @@ extern const char *token_type_names[];
 enum TokenFlags
 {
     TOKEN_IS_FLOAT = 0x1,
+    TOKEN_IS_HEX = 0x2,
 };
 
 struct Token

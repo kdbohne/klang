@@ -112,11 +112,18 @@ enum IntType : u32
     INT_ERR,
 };
 
+enum IntFlags
+{
+    INT_IS_NEGATIVE = 0x1,
+    INT_IS_HEX = 0x2,
+};
+
 struct LitInt
 {
     IntType type = INT_ERR;
+    u32 flags = 0;
+
     u64 value = 0;
-    bool negative = false;
 };
 
 struct AstExprLit : AstExpr

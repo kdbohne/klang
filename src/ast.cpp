@@ -10,7 +10,7 @@ extern "C"
 {
     void *calloc(u64 nmemb, u64 size);
 
-    i64 strtoll(const char *nptr, char **endptr, int base);
+    u64 strtoull(const char *nptr, char **endptr, int base);
     float strtof(const char *nptr, char **endptr);
 }
 
@@ -72,11 +72,21 @@ static u64 make_int_from_token(Token tok)
     // TODO: what size should this buffer be?
     static char buf[64];
 
+    int base = 10;
+    if (tok.flags & TOKEN_IS_HEX)
+    {
+        // Ignore the '0x' prefix.
+        tok.str += 2;
+        tok.len -= 2;
+
+        base = 16;
+    }
+
     assert(tok.len < (i32)(sizeof(buf) / sizeof(buf[0])));
     string_copy(tok.str, buf, tok.len);
     buf[tok.len] = '\0';
 
-    u64 num = (u64)strtoll(buf, NULL, 10);
+    u64 num = strtoull(buf, NULL, base);
 
     return num;
 }
@@ -110,7 +120,10 @@ AstExprLit *make_lit_int(Token tok)
     AstExprLit *lit = ast_alloc(AstExprLit);
     lit->lit_type = LIT_INT;
     lit->value_int.value = make_int_from_token(tok);
-    lit->value_int.negative = false;
+    lit->value_int.flags = 0;
+
+    if (tok.flags & TOKEN_IS_HEX)
+        lit->value_int.flags |= INT_IS_HEX;
 
     // Assume 64-bit by default.
     lit->value_int.type = INT_64;
