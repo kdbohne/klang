@@ -9,10 +9,13 @@ struct Parser
 };
 
 #include <stdio.h>
+#include <stdlib.h>
 #define report_error(str__, tok__, ...) \
 do { \
-    fprintf(stderr, "Parse error: " str__ "\n", __VA_ARGS__); \
+    fprintf(stderr, "(%s:%d:%d) Parse error: " str__ "\n", tok__.file.path, tok__.line, tok__.col, __VA_ARGS__); \
     fprintf(stderr, "    %.*s\n", tok__.len, tok__.str); \
+    fprintf(stderr, "\nExiting.\n"); \
+    exit(1); \
 } while (0)
 
 static AstExprBlock *parse_block(Parser *parser);
@@ -560,8 +563,9 @@ void parse_file(AstRoot *root, Array<Token> *tokens)
         }
         else
         {
-            // TODO: error message
-            assert(false);
+            report_error("Invalid top-level token of type \"%s\". Only structs and functions are allowed.",
+                         tok,
+                         token_type_names[tok.type]);
         }
     }
 }
