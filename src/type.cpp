@@ -145,8 +145,10 @@ void register_type_defn(const char *name, AstStruct *struct_)
         TypeDefn *defn = &global_type_defns[i];
         if (strings_match(defn->name, name))
         {
-            // TODO: error message
-            assert(false);
+            // TODO: better error message
+            report_error("Redeclaring existing type \"%s\".\n",
+                         struct_->name,
+                         defn->name);
             return;
         }
     }
