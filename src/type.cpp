@@ -415,6 +415,14 @@ static TypeDefn *narrow_lit_type(TypeDefn *target, AstExprLit *lit)
     return lit->type_defn;
 }
 
+static TypeDefn *get_struct_type(TypeDefn *defn)
+{
+    if (defn->ptr)
+        return get_struct_type(defn->ptr);
+
+    return defn;
+}
+
 static TypeDefn *determine_expr_type(AstExpr *expr)
 {
     switch (expr->type)
@@ -740,10 +748,11 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
             field->name->scope = field->scope;
 
             auto lhs_type = determine_expr_type(field->expr);
-            assert(lhs_type->struct_);
+            TypeDefn *struct_type = get_struct_type(lhs_type);
+            assert(struct_type->struct_);
 
             AstExprType *type = NULL;
-            foreach(lhs_type->struct_->fields)
+            foreach(struct_type->struct_->fields)
             {
                 if (strings_match(it->name->str, field->name->str))
                 {
@@ -965,6 +974,11 @@ bool is_int_type(TypeDefn *defn)
             (defn == get_type_defn("i16")) ||
             (defn == get_type_defn("i32")) ||
             (defn == get_type_defn("i64")));
+}
+
+bool is_struct_type(TypeDefn *defn)
+{
+    return get_struct_type(defn) != NULL;
 }
 
 bool type_check(AstRoot *root)

@@ -8,12 +8,6 @@ struct Vec3
     z f32;
 };
 
-struct Foo
-{
-    v Vec3;
-    t i64;
-};
-
 struct String
 {
     data *u8;
@@ -114,6 +108,16 @@ fn print_i64(x i64)
     write(buf, len);
 }
 
+struct Foo {
+    x i64;
+    y i64;
+};
+
+fn test(foo *Foo) {
+    foo.x = 42;
+    foo.y = 69;
+}
+
 fn main()
 {
     print_i64(123456789);
@@ -123,5 +127,12 @@ fn main()
     print_string_literal("\n");
 
     print_i64(238947 - 123 + 45 * 34);
+    print_string_literal("\n");
+
+    let foo Foo;
+    test(&foo);
+    print_i64(foo.x);
+    print_string_literal("\n");
+    print_i64(foo.y);
     print_string_literal("\n");
 }
