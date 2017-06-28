@@ -1,6 +1,6 @@
 #include "token.h"
 
-const char *token_type_strings[]
+const char *token_type_names[]
 {
     "ident",
     "num",

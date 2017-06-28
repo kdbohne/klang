@@ -51,7 +51,7 @@ enum TokenType : u32
     TOK_EOF,
     TOK_UNKNOWN,
 };
-extern const char *token_type_strings[];
+extern const char *token_type_names[];
 
 enum TokenFlags
 {

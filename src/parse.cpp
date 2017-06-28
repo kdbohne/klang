@@ -9,10 +9,10 @@ struct Parser
 };
 
 #include <stdio.h>
-#define report_error(parser, str, ...) \
+#define report_error(str__, tok__, ...) \
 do { \
-    fprintf(stderr, "Parse error: " str "\n", __VA_ARGS__); \
-    fprintf(stderr, "(TODO: print tokens here)\n"); \
+    fprintf(stderr, "Parse error: " str__ "\n", __VA_ARGS__); \
+    fprintf(stderr, "    %.*s\n", tok__.len, tok__.str); \
 } while (0)
 
 static AstExprBlock *parse_block(Parser *parser);
@@ -31,15 +31,16 @@ static Token next(Parser *parser)
 
 static Token expect(Parser *parser, TokenType type)
 {
-    Token token = next(parser);
-    if (token.type != type)
+    Token tok = next(parser);
+    if (tok.type != type)
     {
-        report_error(parser, "Expected token \"%s\", got \"%s\".",
-                     token_type_strings[type], token_type_strings[token.type]);
-        assert(false);
+        report_error("Expected token \"%s\", got \"%s\".",
+                     tok,
+                     token_type_names[type],
+                     token_type_names[tok.type]);
     }
 
-    return token;
+    return tok;
 }
 
 static void eat(Parser *parser)
@@ -279,9 +280,9 @@ static AstExpr *parse_expr(Parser *parser, bool is_unary = false)
 
         default:
         {
-            report_error(parser, "Expected lhs expression, but got token \"%s\": \"%.*s\".",
-                         token_type_strings[tok.type], tok.len, tok.str);
-            assert(false);
+            report_error("Expected lhs expression, got \"%s\"",
+                         tok,
+                         token_type_names[tok.type]);
             break;
         }
     }
