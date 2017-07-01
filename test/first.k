@@ -2,6 +2,11 @@ extern fn syscall5(num *i64, arg1 *i64, arg2 *i64, arg3 *i64, arg4 *i64, arg5 *i
 extern fn malloc(bytes u64) -> *c_void;
 extern fn free(mem *c_void);
 
+extern fn bit_and(a u64, b u64) -> u64;
+extern fn bit_or(a u64, b u64) -> u64;
+extern fn bit_shift_left(x u64, amount u64) -> u64;
+extern fn bit_shift_right(x u64, amount u64) -> u64;
+
 struct Vec3 {
     x f32;
     y f32;
@@ -108,6 +113,10 @@ fn print_f32(x f32) {
     let len = 0;
     let buf = cast(*u8) malloc(cast(u64) cap);
 
+    let a u64 = 0x3;
+    let b u64 = 0x2;
+    print_i64(cast(i64) bit_and(a, b));
+
     let xi = cast(i32) x;
 }
 
@@ -124,7 +133,6 @@ fn main() {
     print_f32(3.141592654);
     print_string_literal("\n");
 
-    let x = 0xffffffff;
 //    print_i64(x);
 //    print_string_literal("\n");
 }
