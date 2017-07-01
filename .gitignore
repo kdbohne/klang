@@ -5,3 +5,5 @@ build
 *.creator*
 *.files
 *.includes
+
+*.el
