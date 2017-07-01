@@ -689,7 +689,7 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
                     {
                         report_error("Type mismatch in argument %d of \"%s\" call. Expected %s, got %s.\n",
                                      arg,
-                                     i, func->name->str,
+                                     i + 1, func->name->str,
                                      get_type_string(param->name->type_defn),
                                      get_type_string(arg->type_defn));
                     }
