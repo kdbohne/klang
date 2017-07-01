@@ -358,22 +358,26 @@ static void check_int_overflow(AstExprLit *lit)
     {
         switch (i->type)
         {
-            case INT_8:
+            case INT_I8:
+            case INT_U8:
             {
                 overflow = i->value > 255;
                 break;
             }
-            case INT_16:
+            case INT_I16:
+            case INT_U16:
             {
                 overflow = i->value > 65535;
                 break;
             }
-            case INT_32:
+            case INT_I32:
+            case INT_U32:
             {
                 overflow = i->value > 4294967295;
                 break;
             }
-            case INT_64:
+            case INT_I64:
+            case INT_U64:
             {
                 // FIXME: this fails... how to check this?
                 overflow = i->value > 18446744073709551615ull;
@@ -390,24 +394,45 @@ static void check_int_overflow(AstExprLit *lit)
     {
         switch (i->type)
         {
-            case INT_8:
+            case INT_I8:
             {
                 overflow = i->value > (127 + (neg ? 1 : 0));
                 break;
             }
-            case INT_16:
+            case INT_I16:
             {
                 overflow = i->value > (32767 + (neg ? 1 : 0));
                 break;
             }
-            case INT_32:
+            case INT_I32:
             {
                 overflow = i->value > (2147483647 + (neg ? 1 : 0));
                 break;
             }
-            case INT_64:
+            case INT_I64:
             {
                 overflow = i->value > (9223372036854775807 + (neg ? 1 : 0));
+                break;
+            }
+            case INT_U8:
+            {
+                overflow = i->value > 255;
+                break;
+            }
+            case INT_U16:
+            {
+                overflow = i->value > 65535;
+                break;
+            }
+            case INT_U32:
+            {
+                overflow = i->value > 4294967295;
+                break;
+            }
+            case INT_U64:
+            {
+                // FIXME: this fails... how to check this?
+                overflow = i->value > 18446744073709551615ull;
                 break;
             }
             default:
@@ -424,10 +449,14 @@ static void check_int_overflow(AstExprLit *lit)
                      lit,
                      neg ? "-" : "",
                      i->value,
-                     i->type == INT_8  ? "i8"  :
-                     i->type == INT_16 ? "i16" :
-                     i->type == INT_32 ? "i32" :
-                     i->type == INT_64 ? "i64" :
+                     i->type == INT_I8  ? "i8"  :
+                     i->type == INT_I16 ? "i16" :
+                     i->type == INT_I32 ? "i32" :
+                     i->type == INT_I64 ? "i64" :
+                     i->type == INT_U8  ? "u8"  :
+                     i->type == INT_U16 ? "u16" :
+                     i->type == INT_U32 ? "u32" :
+                     i->type == INT_U64 ? "u64" :
                      "(error)");
     }
 }
@@ -443,13 +472,21 @@ static TypeDefn *narrow_lit_type(TypeDefn *target, AstExprLit *lit)
 
     // TODO: optimize
     if (target == get_type_defn("i8"))
-        lit->value_int.type = INT_8;
+        lit->value_int.type = INT_I8;
     else if (target == get_type_defn("i16"))
-        lit->value_int.type = INT_16;
+        lit->value_int.type = INT_I16;
     else if (target == get_type_defn("i32"))
-        lit->value_int.type = INT_32;
+        lit->value_int.type = INT_I32;
     else if (target == get_type_defn("i64"))
-        lit->value_int.type = INT_64;
+        lit->value_int.type = INT_I64;
+    else if (target == get_type_defn("u8"))
+        lit->value_int.type = INT_U8;
+    else if (target == get_type_defn("u16"))
+        lit->value_int.type = INT_U16;
+    else if (target == get_type_defn("u32"))
+        lit->value_int.type = INT_U32;
+    else if (target == get_type_defn("u64"))
+        lit->value_int.type = INT_U64;
     else
         assert(false);
 
@@ -497,10 +534,14 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
                 {
                     switch (lit->value_int.type)
                     {
-                        case INT_8:  { lit->type_defn = get_type_defn("i8");  break; }
-                        case INT_16: { lit->type_defn = get_type_defn("i16"); break; }
-                        case INT_32: { lit->type_defn = get_type_defn("i32"); break; }
-                        case INT_64: { lit->type_defn = get_type_defn("i64"); break; }
+                        case INT_I8:  { lit->type_defn = get_type_defn("i8");  break; }
+                        case INT_I16: { lit->type_defn = get_type_defn("i16"); break; }
+                        case INT_I32: { lit->type_defn = get_type_defn("i32"); break; }
+                        case INT_I64: { lit->type_defn = get_type_defn("i64"); break; }
+                        case INT_U8:  { lit->type_defn = get_type_defn("u8");  break; }
+                        case INT_U16: { lit->type_defn = get_type_defn("u16"); break; }
+                        case INT_U32: { lit->type_defn = get_type_defn("u32"); break; }
+                        case INT_U64: { lit->type_defn = get_type_defn("u64"); break; }
                         default:
                         {
                             assert(false);

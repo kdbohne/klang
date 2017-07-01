@@ -101,13 +101,18 @@ enum LitType : u32
     LIT_ERR,
 };
 
-// TODO: unsigned?
 enum IntType : u32
 {
-    INT_8,
-    INT_16,
-    INT_32,
-    INT_64,
+    // TODO: fix weird naming convention here
+    INT_I8,
+    INT_I16,
+    INT_I32,
+    INT_I64,
+
+    INT_U8,
+    INT_U16,
+    INT_U32,
+    INT_U64,
 
     INT_ERR,
 };

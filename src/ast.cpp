@@ -125,8 +125,8 @@ AstExprLit *make_lit_int(Token tok)
     if (tok.flags & TOKEN_IS_HEX)
         lit->value_int.flags |= INT_IS_HEX;
 
-    // Assume 64-bit by default.
-    lit->value_int.type = INT_64;
+    // Assume signed 64-bit by default.
+    lit->value_int.type = INT_I64;
 
     copy_loc(lit, tok);
 

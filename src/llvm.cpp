@@ -127,10 +127,10 @@ static llvm::Value *gen_lit(AstExprLit *lit)
             llvm::Type *type = NULL;
             switch (lit->value_int.type)
             {
-                case INT_8:  { type = llvm::Type::getInt8Ty(context);  break; }
-                case INT_16: { type = llvm::Type::getInt16Ty(context); break; }
-                case INT_32: { type = llvm::Type::getInt32Ty(context); break; }
-                case INT_64: { type = llvm::Type::getInt64Ty(context); break; }
+                case INT_I8:  { type = llvm::Type::getInt8Ty(context);  break; }
+                case INT_I16: { type = llvm::Type::getInt16Ty(context); break; }
+                case INT_I32: { type = llvm::Type::getInt32Ty(context); break; }
+                case INT_I64: { type = llvm::Type::getInt64Ty(context); break; }
                 default:
                 {
                     assert(false);
