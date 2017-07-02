@@ -934,9 +934,11 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
             scope_add_var(for_->scope, it->str, it);
 
             for_->range->type_defn = determine_expr_type(for_->range);
-            for_->block->type_defn = determine_expr_type(for_->block);
+            it->type_defn = for_->range->type_defn;
 
+            for_->block->type_defn = determine_expr_type(for_->block);
             for_->type_defn = for_->block->type_defn;
+
             return for_->type_defn;
         }
         case AST_EXPR_RANGE:
