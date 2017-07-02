@@ -591,6 +591,31 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
                 {
                     // TODO: does anything need to be checked here?
                 }
+                // FIXME: attempt to narrow lhs as well?
+                // TODO: this is copy-pasted from the AST_EXPR_ASSIGN in determine_expr_type().
+                // Two cases need to be narrowed:
+                //     1) Integer literal
+                //     2) Unary minus + integer literal
+                else if (rhs->type == AST_EXPR_LIT)
+                {
+                    auto lit = static_cast<AstExprLit *>(rhs);
+                    lit->type_defn = narrow_lit_type(lhs->type_defn, lit);
+                }
+                else if (rhs->type == AST_EXPR_UN)
+                {
+                    auto un = static_cast<AstExprUn *>(rhs);
+                    if ((un->op == UN_NEG) && (un->expr->type == AST_EXPR_LIT))
+                    {
+                        auto lit = static_cast<AstExprLit *>(un->expr);
+
+                        lit->type_defn = narrow_lit_type(lhs->type_defn, lit);
+                        un->type_defn = lit->type_defn;
+                    }
+                    else
+                    {
+                        rhs->type_defn = determine_expr_type(rhs);
+                    }
+                }
                 else
                 {
                     report_error("Type mismatch in binary operation:\n    %s %s %s\n",

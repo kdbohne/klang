@@ -23,7 +23,7 @@ fn string_len(str *u8) -> i64 {
 
     let p = str;
     loop {
-        if *p == cast(u8) 0 {
+        if *p == 0 {
             break;
         };
 
