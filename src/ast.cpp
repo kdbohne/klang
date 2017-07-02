@@ -71,7 +71,7 @@ static char *make_str_from_token(Token tok)
 static u64 make_int_from_token(Token tok)
 {
     // TODO: what size should this buffer be?
-    static char buf[64];
+    static char buf[128];
 
     // FIXME: overflow checking for hex and binary literals!
     int base = 10;
@@ -104,7 +104,7 @@ static u64 make_int_from_token(Token tok)
 static float make_float_from_token(Token tok)
 {
     // TODO: what size should this buffer be?
-    static char buf[64];
+    static char buf[128];
 
     assert(tok.len < (i32)(sizeof(buf) / sizeof(buf[0])));
     string_copy(tok.str, buf, tok.len);
