@@ -974,6 +974,16 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
 
             return while_->type_defn;
         }
+        case AST_EXPR_PAREN:
+        {
+            auto paren = static_cast<AstExprParen *>(expr);
+            paren->expr->scope = paren->scope;
+
+            paren->expr->type_defn = determine_expr_type(paren->expr);
+            paren->type_defn = paren->expr->type_defn;
+
+            return paren->type_defn;
+        }
         default:
         {
             fprintf(stderr, "Internal error: unhandled expression type %d\n", expr->type);

@@ -172,8 +172,12 @@ static AstExpr *parse_expr(Parser *parser, bool is_unary = false)
         }
         case TOK_OPEN_PAREN:
         {
-            lhs = parse_expr(parser);
+            AstExprParen *paren = ast_alloc(AstExprParen);
+
+            paren->expr = parse_expr(parser);
             expect(parser, TOK_CLOSE_PAREN);
+
+            lhs = paren;
 
             break;
         }

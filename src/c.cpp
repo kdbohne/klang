@@ -322,6 +322,16 @@ static void gen_expr(AstExpr *expr)
 
             break;
         }
+        case AST_EXPR_PAREN:
+        {
+            auto paren = static_cast<AstExprParen *>(expr);
+
+            printf("(");
+            gen_expr(paren->expr);
+            printf(")");
+
+            break;
+        }
         default:
         {
             assert(false);
