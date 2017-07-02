@@ -199,7 +199,16 @@ static void gen_expr(AstExpr *expr)
             printf("}");
 
             if (if_->else_expr)
+            {
+                printf(" else ");
+                if (if_->else_expr->type != AST_EXPR_IF)
+                    printf("{");
+
                 gen_expr(if_->else_expr);
+
+                if (if_->else_expr->type != AST_EXPR_IF)
+                    printf("}");
+            }
 
             break;
         }
