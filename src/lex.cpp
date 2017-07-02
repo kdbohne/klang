@@ -367,33 +367,30 @@ static Token get_token(Lexer *lex)
             }
             else if (is_number(c))
             {
-                if (c == '0')
+                if ((c == '0') && (*lex->cur == 'x'))
                 {
-                    if (*lex->cur == 'x')
+                    advance(lex);
+
+                    tok.flags |= TOKEN_IS_HEX;
+                    while (true)
                     {
+                        if (!is_number(*lex->cur) && !is_hex(*lex->cur))
+                            break;
+
                         advance(lex);
-
-                        tok.flags |= TOKEN_IS_HEX;
-                        while (true)
-                        {
-                            if (!is_number(*lex->cur) && !is_hex(*lex->cur))
-                                break;
-
-                            advance(lex);
-                        }
                     }
-                    else if (*lex->cur == 'b')
+                }
+                else if ((c == '0') && (*lex->cur == 'b'))
+                {
+                    advance(lex);
+
+                    tok.flags |= TOKEN_IS_BINARY;
+                    while (true)
                     {
+                        if ((*lex->cur != '0') && (*lex->cur != '1'))
+                            break;
+
                         advance(lex);
-
-                        tok.flags |= TOKEN_IS_BINARY;
-                        while (true)
-                        {
-                            if ((*lex->cur != '0') && (*lex->cur != '1'))
-                                break;
-
-                            advance(lex);
-                        }
                     }
                 }
                 else
