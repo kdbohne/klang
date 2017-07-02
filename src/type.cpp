@@ -713,11 +713,38 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
                     // NOTE: the param type is only attached to the 'name' field of the param.
                     if (arg->type_defn != param->name->type_defn)
                     {
-                        report_error("Type mismatch in argument %d of \"%s\" call. Expected %s, got %s.\n",
-                                     arg,
-                                     i + 1, func->name->str,
-                                     get_type_string(param->name->type_defn),
-                                     get_type_string(arg->type_defn));
+                        // TODO: this is copy-pasted from the AST_EXPR_ASSIGN in determine_expr_type().
+                        // Two cases need to be narrowed:
+                        //     1) Integer literal
+                        //     2) Unary minus + integer literal
+                        if (arg->type == AST_EXPR_LIT)
+                        {
+                            auto lit = static_cast<AstExprLit *>(arg);
+                            lit->type_defn = narrow_lit_type(param->name->type_defn, lit);
+                        }
+                        else if (arg->type == AST_EXPR_UN)
+                        {
+                            auto un = static_cast<AstExprUn *>(arg);
+                            if ((un->op == UN_NEG) && (un->expr->type == AST_EXPR_LIT))
+                            {
+                                auto lit = static_cast<AstExprLit *>(un->expr);
+
+                                lit->type_defn = narrow_lit_type(param->name->type_defn, lit);
+                                un->type_defn = lit->type_defn;
+                            }
+                            else
+                            {
+                                arg->type_defn = determine_expr_type(arg);
+                            }
+                        }
+                        else
+                        {
+                            report_error("Type mismatch in argument %d of \"%s\" call. Expected %s, got %s.\n",
+                                         arg,
+                                         i + 1, func->name->str,
+                                         get_type_string(param->name->type_defn),
+                                         get_type_string(arg->type_defn));
+                        }
                     }
                 }
             }
