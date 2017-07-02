@@ -241,6 +241,23 @@ static Token get_token(Lexer *lex)
             break;
         }
 
+        case '!':
+        {
+            if (*lex->cur == '=')
+            {
+                tok.type = TOK_NE;
+                tok.len = 2;
+
+                advance(lex);
+            }
+            else
+            {
+                assert(false);
+            }
+
+            break;
+        }
+
 #if 0
         case ':':
         {

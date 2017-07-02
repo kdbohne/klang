@@ -77,6 +77,7 @@ static BinOp get_bin_op(TokenType type)
         case TOK_GT:       return BIN_GT;
         case TOK_GE:       return BIN_GE;
         case TOK_EQ_EQ:    return BIN_EQ;
+        case TOK_NE:       return BIN_NE;
         default:
         {
             assert(false);
@@ -323,6 +324,7 @@ static AstExpr *parse_expr(Parser *parser, bool is_unary = false)
         case TOK_GT:
         case TOK_GE:
         case TOK_EQ_EQ:
+        case TOK_NE:
         {
             eat(parser);
 

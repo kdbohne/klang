@@ -32,6 +32,7 @@ enum TokenType : u32
     TOK_GT,
     TOK_GE,
     TOK_EQ_EQ,
+    TOK_NE,
 
     TOK_R_ARROW,
 

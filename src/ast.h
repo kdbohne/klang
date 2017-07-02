@@ -159,6 +159,7 @@ enum BinOp : u32
 
     // TODO: rename to BIN_EQ_EQ to be consistent with token name?
     BIN_EQ,
+    BIN_NE,
 
     BIN_ERR,
 };

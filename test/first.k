@@ -113,11 +113,12 @@ fn print_f32(x f32) {
     let len = 0;
     let buf = cast(*u8) malloc(cast(u64) cap);
 
-    let a u64 = 0x3;
-    let b u64 = 0x2;
-    print_i64(cast(i64) bit_and(a, b));
+    let xi = cast(u64) x;
 
-    let xi = cast(i32) x;
+    let sign = bit_and(xi, 0x80000000);
+    if sign != 0 {
+       print_string_literal("-");
+    };
 }
 
 fn main() {
@@ -131,6 +132,8 @@ fn main() {
     print_string_literal("\n");
 
     print_f32(3.141592654);
+    print_string_literal("\n");
+    print_f32(-3.141592654);
     print_string_literal("\n");
 
 //    print_i64(x);

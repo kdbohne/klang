@@ -30,6 +30,7 @@ const char *token_type_names[]
     "gt",
     "ge",
     "eq eq",
+    "ne",
 //    "colon eq",
     "r arrow",
 

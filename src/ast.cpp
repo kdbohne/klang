@@ -28,6 +28,7 @@ const char *bin_op_strings[] =
     ">=", // BIN_GE
 
     "==", // BIN_EQ
+    "!=", // BIN_EQ
 
     "?",  // BIN_ERR
 };
