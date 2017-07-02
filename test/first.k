@@ -115,10 +115,12 @@ fn print_f32(x f32) {
 
     let xi = cast(u64) x;
 
-    let sign = bit_and(xi, 0x80000000);
+    let sign = bit_and(xi, 0b10000000000000000000000000000000);
     if sign != 0 {
-       print_string_literal("-");
+        print_string_literal("-");
     };
+
+    let exp = bit_and(xi, 0b01111111100000000000000000000000);
 }
 
 fn main() {

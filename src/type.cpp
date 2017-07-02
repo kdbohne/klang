@@ -351,10 +351,11 @@ static void check_int_overflow(AstExprLit *lit)
 
     // TODO: clean this up
 
-    // Don't check hex literals for overflows based on their value. Just use
-    // the exact representation as it was given; check for 'unsigned' overflow,
-    // i.e. values that are too big to fit in the specified number of bits.
-    if (i->flags & INT_IS_HEX)
+    // Don't check hex or binary literals for overflows based on their value.
+    // Just use the exact representation as it was given; check for 'unsigned'
+    // overflow, i.e. values that are too big to fit in the specified number of
+    // bits.
+    if ((i->flags & INT_IS_HEX) || (i->flags & INT_IS_BINARY))
     {
         switch (i->type)
         {

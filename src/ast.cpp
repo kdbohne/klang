@@ -73,6 +73,7 @@ static u64 make_int_from_token(Token tok)
     // TODO: what size should this buffer be?
     static char buf[64];
 
+    // FIXME: overflow checking for hex and binary literals!
     int base = 10;
     if (tok.flags & TOKEN_IS_HEX)
     {
@@ -81,6 +82,14 @@ static u64 make_int_from_token(Token tok)
         tok.len -= 2;
 
         base = 16;
+    }
+    else if (tok.flags & TOKEN_IS_BINARY)
+    {
+        // Ignore the '0b' prefix.
+        tok.str += 2;
+        tok.len -= 2;
+
+        base = 2;
     }
 
     assert(tok.len < (i32)(sizeof(buf) / sizeof(buf[0])));
@@ -123,11 +132,23 @@ AstExprLit *make_lit_int(Token tok)
     lit->value_int.value = make_int_from_token(tok);
     lit->value_int.flags = 0;
 
+    // NOTE: hex and binary literals are flagged as unsigned integers.
+    // Is this the best thing to do?
     if (tok.flags & TOKEN_IS_HEX)
+    {
         lit->value_int.flags |= INT_IS_HEX;
-
-    // Assume signed 64-bit by default.
-    lit->value_int.type = INT_I64;
+        lit->value_int.type = INT_U64;
+    }
+    else if (tok.flags & TOKEN_IS_BINARY)
+    {
+        lit->value_int.flags |= INT_IS_BINARY;
+        lit->value_int.type = INT_U64;
+    }
+    else
+    {
+        // Assume signed 64-bit by default for base-10 literals.
+        lit->value_int.type = INT_I64;
+    }
 
     copy_loc(lit, tok);
 
