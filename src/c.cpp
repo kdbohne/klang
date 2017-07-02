@@ -107,6 +107,7 @@ static void gen_expr(AstExpr *expr)
                 case BIN_GT:  { printf(" > ");  break; }
                 case BIN_GE:  { printf(" >= "); break; }
                 case BIN_EQ:  { printf(" == "); break; }
+                case BIN_NE:  { printf(" != "); break; }
                 default:      { assert(false);  break; }
             }
             gen_expr(bin->rhs);
