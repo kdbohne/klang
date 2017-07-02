@@ -40,7 +40,8 @@ static void gen_lit(AstExprLit *lit)
         }
         case LIT_FLOAT:
         {
-            printf("%f", lit->value_float);
+            // TODO: use precision given in source
+            printf("%.23f", lit->value_float);
             break;
         }
         case LIT_STR:
