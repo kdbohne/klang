@@ -63,18 +63,13 @@ fn print_string_literal(str *u8) {
     write(str, len);
 }
 
-fn print_i64(x i64) {
+fn print_u64(x u64) {
     let cap = 128;
     let len = 0;
     let buf = cast(*u8) malloc(cast(u64) cap);
 
-    if x < 0 {
-        print_string_literal("-");
-        x = -x;
-    };
-
     // HACK: no character literals yet
-    let zero = 48;
+    let zero u64 = 48;
 
     let p = buf;
     loop {
@@ -108,19 +103,112 @@ fn print_i64(x i64) {
     free(cast(*c_void) buf);
 }
 
+fn print_i64(x i64) {
+    if x < 0 {
+        print_string_literal("-");
+        x = -x;
+    };
+
+    print_u64(cast(u64) x);
+}
+
+fn print_bits(xp *u64, n i64) {
+    let x = *xp;
+
+    for i in 0..n {
+        let shift = cast(u64) (n - i - 1);
+
+        let mask = bit_shift_left(1, shift);
+        let bit = bit_and(x, mask);
+        bit = bit_shift_right(bit, shift);
+
+        print_u64(bit);
+    };
+}
+
 fn print_f32(x f32) {
     let cap = 128;
     let len = 0;
     let buf = cast(*u8) malloc(cast(u64) cap);
 
-    let xi = cast(u64) x;
+    let xp = cast(*u64) &x;
+    print_bits(xp, 32);
+    print_string_literal("\n");
 
-    let sign = bit_and(xi, 0b10000000000000000000000000000000);
+    let sign = bit_and(*xp, 0b10000000000000000000000000000000);
+
+    let exp_u64 = bit_and(*xp, 0b01111111100000000000000000000000);
+    exp_u64 = bit_shift_right(exp_u64, 23);
+
+    let exp = cast(i64) exp_u64;
+    exp = exp - 127;
+
+    print_string_literal("exp: ");
+    print_u64(exp_u64);
+    print_string_literal(" - 127 = ");
+    print_i64(exp);
+    print_string_literal("\n");
+
+    let man = bit_and(*xp, 0b00000000011111111111111111111111);
+    man = bit_or(man,      0b00000000100000000000000000000000);
+
+    let pt = 23;
+    loop {
+        if bit_and(man, 1) != 0 {
+            break;
+        };
+
+        man = bit_shift_right(man, 1);
+        pt = pt - 1;
+    };
+
+    pt = pt - exp;
+    let whole = bit_shift_right(man, cast(u64) pt);
+
     if sign != 0 {
         print_string_literal("-");
     };
+    print_u64(whole);
+    print_string_literal(".");
 
-    let exp = bit_and(xi, 0b01111111100000000000000000000000);
+    man = bit_shift_left(man, cast(u64) (32 - pt));
+    man = bit_shift_right(man, cast(u64) (32 - pt));
+
+    let frac = 0.0;
+    for i in 0..pt {
+        let mask = bit_shift_left(1, cast(u64) (pt - i - 1));
+        let bit = if bit_and(man, mask) != 0 {
+            2
+        } else {
+            0
+        };
+
+        if i > 0 {
+            for j in 0..i-1 {
+                bit = 2 * bit;
+            };
+        };
+
+        frac = frac + 1.0 / cast(f32) bit;
+    };
+
+//    loop {
+    for j in 0..64 {
+        if frac == 0.0 {
+            break;
+        };
+
+        frac = frac * 10.0;
+
+        let d = cast(u64) frac;
+        if d != 0 {
+            print_u64(d);
+        };
+
+        frac = frac - cast(f32) d;
+    };
+
+    print_string_literal("\n");
 }
 
 fn main() {
@@ -133,11 +221,14 @@ fn main() {
     print_i64(238947 - 123 + 45 * 34);
     print_string_literal("\n");
 
+    print_string_literal("\n");
+
+    print_f32(12.625);
+    print_string_literal("\n");
+    /*
     print_f32(3.141592654);
     print_string_literal("\n");
     print_f32(-3.141592654);
     print_string_literal("\n");
-
-//    print_i64(x);
-//    print_string_literal("\n");
+    */
 }

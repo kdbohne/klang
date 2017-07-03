@@ -249,6 +249,8 @@ struct AstExprBlock : AstExpr
 
     Array<AstStmt *> stmts;
     AstExpr *expr = NULL;
+
+    char *codegen_expr_temp_binding = NULL;
 };
 
 struct AstExprField : AstExpr

@@ -71,6 +71,86 @@ static void gen_lit(AstExprLit *lit)
     }
 }
 
+static void gen_expr_temp_bindings(AstExpr *expr)
+{
+    switch (expr->type)
+    {
+        case AST_EXPR_BLOCK:
+        {
+            auto block = static_cast<AstExprBlock *>(expr);
+
+            foreach(block->stmts)
+            {
+                switch (it->type)
+                {
+                    case AST_STMT_EXPR:
+                    {
+                        auto expr_ = static_cast<AstStmtExpr *>(it);
+                        gen_expr_temp_bindings(expr_->expr);
+
+                        break;
+                    }
+                    case AST_STMT_SEMI:
+                    {
+                        auto semi = static_cast<AstStmtSemi *>(it);
+                        gen_expr_temp_bindings(semi->expr);
+
+                        break;
+                    }
+                    case AST_STMT_DECL:
+                    {
+                        auto decl = static_cast<AstStmtDecl *>(it);
+                        gen_expr_temp_bindings(decl->rhs);
+
+                        break;
+                    }
+                    default:
+                    {
+                        assert(false);
+                        break;
+                    }
+                }
+            }
+
+            if (block->expr)
+                gen_expr_temp_bindings(block->expr);
+
+            break;
+        }
+//        case AST_EXPR_LIT:
+        default:
+        {
+//            auto lit = static_cast<AstExprLit *>(expr);
+
+            // TODO: this is copy-pasted from the AST_STMT_DECL case in gen_stmt()
+            TypeDefn *defn = expr->type_defn;
+
+            // TODO: optimize
+            if (defn == get_type_defn("void"))
+                break;
+
+            printf("%s", defn->name);
+            while (defn->ptr)
+            {
+                printf("*");
+                defn = defn->ptr;
+            }
+
+            printf(" __tmp;");
+            newline();
+
+            break;
+        }
+        /*
+        default:
+        {
+            assert(false);
+            break;
+        }
+        */
+    }
+}
+
 static void gen_expr(AstExpr *expr)
 {
     assert(expr);
@@ -217,6 +297,8 @@ static void gen_expr(AstExpr *expr)
         {
             auto block = static_cast<AstExprBlock *>(expr);
 
+            gen_expr_temp_bindings(block);
+
             if (block->stmts.count > 0)
             {
                 ind += 4;
@@ -346,11 +428,8 @@ static void gen_stmt(AstStmt *stmt)
     {
         case AST_STMT_EXPR:
         {
-            assert(false);
-#if 0
-            auto expr = static_cast<AstStmtSemi *>(stmt);
+            auto expr = static_cast<AstStmtExpr *>(stmt);
             gen_expr(expr->expr);
-#endif
 
             break;
         }
