@@ -127,27 +127,18 @@ fn print_bits(xp *u64, n i64) {
 }
 
 fn print_f32(x f32) {
-    let cap = 128;
-    let len = 0;
-    let buf = cast(*u8) malloc(cast(u64) cap);
-
     let xp = cast(*u64) &x;
-    print_bits(xp, 32);
-    print_string_literal("\n");
 
     let sign = bit_and(*xp, 0b10000000000000000000000000000000);
+    if sign != 0 {
+        print_string_literal("-");
+    };
 
     let exp_u64 = bit_and(*xp, 0b01111111100000000000000000000000);
     exp_u64 = bit_shift_right(exp_u64, 23);
 
     let exp = cast(i64) exp_u64;
     exp = exp - 127;
-
-    print_string_literal("exp: ");
-    print_u64(exp_u64);
-    print_string_literal(" - 127 = ");
-    print_i64(exp);
-    print_string_literal("\n");
 
     let man = bit_and(*xp, 0b00000000011111111111111111111111);
     man = bit_or(man,      0b00000000100000000000000000000000);
@@ -161,14 +152,11 @@ fn print_f32(x f32) {
         man = bit_shift_right(man, 1);
         pt = pt - 1;
     };
-
     pt = pt - exp;
-    let whole = bit_shift_right(man, cast(u64) pt);
 
-    if sign != 0 {
-        print_string_literal("-");
-    };
+    let whole = bit_shift_right(man, cast(u64) pt);
     print_u64(whole);
+
     print_string_literal(".");
 
     man = bit_shift_left(man, cast(u64) (32 - pt));
@@ -177,23 +165,21 @@ fn print_f32(x f32) {
     let frac = 0.0;
     for i in 0..pt {
         let mask = bit_shift_left(1, cast(u64) (pt - i - 1));
-        let bit = if bit_and(man, mask) != 0 {
-            2
-        } else {
-            0
+        let bit = 0;
+        if bit_and(man, mask) != 0 {
+            bit = 2;
         };
 
-        if i > 0 {
-            for j in 0..i-1 {
-                bit = 2 * bit;
-            };
+        for j in 0..i {
+            bit = 2 * bit;
         };
 
-        frac = frac + 1.0 / cast(f32) bit;
+        if bit != 0 {
+            frac = frac + 1.0 / cast(f32) bit;
+        };
     };
 
-//    loop {
-    for j in 0..64 {
+    loop {
         if frac == 0.0 {
             break;
         };
@@ -207,8 +193,6 @@ fn print_f32(x f32) {
 
         frac = frac - cast(f32) d;
     };
-
-    print_string_literal("\n");
 }
 
 fn main() {
@@ -225,10 +209,8 @@ fn main() {
 
     print_f32(12.625);
     print_string_literal("\n");
-    /*
     print_f32(3.141592654);
     print_string_literal("\n");
     print_f32(-3.141592654);
     print_string_literal("\n");
-    */
 }

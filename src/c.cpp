@@ -99,7 +99,8 @@ static void gen_expr_temp_bindings(AstExpr *expr)
                     case AST_STMT_DECL:
                     {
                         auto decl = static_cast<AstStmtDecl *>(it);
-                        gen_expr_temp_bindings(decl->rhs);
+                        if (decl->rhs)
+                            gen_expr_temp_bindings(decl->rhs);
 
                         break;
                     }
@@ -116,11 +117,9 @@ static void gen_expr_temp_bindings(AstExpr *expr)
 
             break;
         }
-//        case AST_EXPR_LIT:
+#if 0
         default:
         {
-//            auto lit = static_cast<AstExprLit *>(expr);
-
             // TODO: this is copy-pasted from the AST_STMT_DECL case in gen_stmt()
             TypeDefn *defn = expr->type_defn;
 
@@ -140,13 +139,12 @@ static void gen_expr_temp_bindings(AstExpr *expr)
 
             break;
         }
-        /*
+#endif
         default:
         {
-            assert(false);
+//            assert(false);
             break;
         }
-        */
     }
 }
 
