@@ -1,3 +1,4 @@
+#if 0
 #include <llvm/IR/Verifier.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
@@ -763,3 +764,4 @@ void llvm_gen_ir(AstRoot *ast)
     module.print(llvm::outs(), NULL);
 //    module.dump();
 }
+#endif

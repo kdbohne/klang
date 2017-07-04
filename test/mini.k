@@ -1,9 +1,10 @@
 fn main() {
-    let x = 3;
+    let x i64;
+    x = 15;
 
-    let y = if x == 3 {
-        0
-    } else {
-        1
-    };
+    let y i32;
+    y = 14;
+
+    let z *u8;
+    z = y;
 }

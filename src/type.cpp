@@ -469,9 +469,8 @@ static TypeDefn *narrow_lit_type(TypeDefn *target, AstExprLit *lit)
     if (lit->lit_type != LIT_INT)
         return determine_expr_type(lit);
 
-    // TODO: hex?
-
     // TODO: optimize
+    // TODO: floating-point
     if (target == get_type_defn("i8"))
         lit->value_int.type = INT_I8;
     else if (target == get_type_defn("i16"))
@@ -822,6 +821,20 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
             }
             assign->type_defn = lhs->type_defn;
 
+#if 0
+            // If the RHS is a function call, make sure the function actually returns a value.
+            if (rhs->type == AST_EXPR_CALL)
+            {
+                auto call = static_cast<AstExprCall *>(rhs);
+                auto func = scope_get_func(call->scope, call->name->str);
+
+                if (!func->ret || !func->ret->type_defn)
+                    report_error("Attempting to assign void return value from function \"%s\".\n",
+                                 decl,
+                                 func->name->str);
+            }
+#endif
+
             return assign->type_defn;
         }
         case AST_EXPR_BLOCK:
@@ -1020,12 +1033,13 @@ static void determine_stmt_type(AstStmt *stmt)
         case AST_STMT_DECL:
         {
             auto decl = static_cast<AstStmtDecl *>(stmt);
-            decl->bind->scope = decl->scope;
 
             // TODO: multiple decls, patterns, etc.
             assert(decl->bind->type == AST_EXPR_IDENT);
             auto lhs = static_cast<AstExprIdent *>(decl->bind);
-            auto rhs = decl->rhs;
+            auto rhs = decl->desugared_rhs;
+
+            lhs->scope = decl->scope;
 
             // TODO: avoid looking up void each time
             lhs->type_defn = get_type_defn("void");
@@ -1035,75 +1049,11 @@ static void determine_stmt_type(AstStmt *stmt)
                 decl->type->type_defn = get_type_defn(decl->type);
                 lhs->type_defn = decl->type->type_defn;
             }
-
-            if (rhs)
+            else
             {
+                assert(rhs);
                 rhs->scope = decl->scope;
-
-                // TODO: clean up this whole section
-
-                rhs->type_defn = determine_expr_type(rhs);
-                if (rhs->type_defn == get_type_defn("void"))
-                {
-                    report_error("Assigning \"%s\" to a block with a void return value.\n",
-                                 decl,
-                                 lhs->str);
-                }
-
-                if (decl->type)
-                {
-                    // TODO: this is copy-pasted from the AST_EXPR_ASSIGN in determine_expr_type().
-                    // Two cases need to be narrowed:
-                    //     1) Integer literal
-                    //     2) Unary minus + integer literal
-                    if (rhs->type == AST_EXPR_LIT)
-                    {
-                        auto lit = static_cast<AstExprLit *>(rhs);
-                        lit->type_defn = narrow_lit_type(lhs->type_defn, lit);
-                    }
-                    else if (rhs->type == AST_EXPR_UN)
-                    {
-                        auto un = static_cast<AstExprUn *>(rhs);
-                        if ((un->op == UN_NEG) && (un->expr->type == AST_EXPR_LIT))
-                        {
-                            auto lit = static_cast<AstExprLit *>(un->expr);
-
-                            lit->type_defn = narrow_lit_type(lhs->type_defn, lit);
-                            un->type_defn = lit->type_defn;
-                        }
-                        else
-                        {
-                            rhs->type_defn = determine_expr_type(rhs);
-                        }
-                    }
-
-                    // If the declaration was given an explicit type, check to make sure
-                    // the rvalue expression being assigned has the same type.
-                    auto decl_type = get_type_defn(decl->type->name->str);
-                    if (rhs->type_defn != decl_type)
-                    {
-                        report_error("Assigning rvalue of type \"%s\" to a declaration with type \"%s\".\n",
-                                     decl,
-                                     get_type_string(rhs->type_defn),
-                                     get_type_string(decl_type));
-                    }
-                }
-                else
-                {
-                    lhs->type_defn = rhs->type_defn;
-                }
-
-                // If the RHS is a function call, make sure the function actually returns a value.
-                if (rhs->type == AST_EXPR_CALL)
-                {
-                    auto call = static_cast<AstExprCall *>(rhs);
-                    auto func = scope_get_func(call->scope, call->name->str);
-
-                    if (!func->ret || !func->ret->type_defn)
-                        report_error("Attempting to assign void return value from function \"%s\".\n",
-                                     decl,
-                                     func->name->str);
-                }
+                lhs->type_defn = determine_expr_type(rhs);
             }
 
             scope_add_var(lhs->scope, lhs->str, lhs);

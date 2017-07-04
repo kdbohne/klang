@@ -337,7 +337,8 @@ struct AstStmtDecl : AstStmt
 
     AstExpr *bind = NULL;
     AstExprType *type = NULL;
-    AstExpr *rhs = NULL;
+
+    AstExpr *desugared_rhs = NULL;
 };
 
 enum AstFuncFlags

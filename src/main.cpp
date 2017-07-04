@@ -66,7 +66,6 @@ int main(int argc, char *argv[])
         parse_file(root, &tokens);
     }
 
-//    debug_dump(root);
     if (!type_check(root))
     {
         fprintf(stderr, "There were errors. Exiting.\n");

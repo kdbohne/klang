@@ -377,7 +377,7 @@ static AstExpr *parse_expr(Parser *parser, bool is_unary = false)
     return lhs;
 }
 
-static AstStmt *parse_stmt(Parser *parser)
+static void parse_stmt(Parser *parser, AstExprBlock *block)
 {
     if (eat_optional(parser, TOK_KEY_LET))
     {
@@ -403,27 +403,45 @@ static AstStmt *parse_stmt(Parser *parser)
         AstStmtDecl *decl = ast_alloc(AstStmtDecl);
         decl->bind = bind;
         decl->type = type;
-        decl->rhs = rhs;
+
+        block->stmts.add(decl);
+
+        // Desugar the assignment into a separate statement.
+        //     e.g. let x = 5    =>    let x;
+        //                             x = 5;
+        if (rhs)
+        {
+            decl->desugared_rhs = rhs;
+
+            AstExprAssign *assign = ast_alloc(AstExprAssign);
+            assign->lhs = bind;
+            assign->rhs = rhs;
+
+            AstStmtSemi *semi = ast_alloc(AstStmtSemi);
+            semi->expr = assign;
+
+            block->stmts.add(semi);
+        }
 
         expect(parser, TOK_SEMI);
-
-        return decl;
-    }
-
-    AstExpr *expr = parse_expr(parser);
-    if (eat_optional(parser, TOK_SEMI))
-    {
-        AstStmtSemi *stmt = ast_alloc(AstStmtSemi);
-        stmt->expr = expr;
-
-        return stmt;
     }
     else
     {
-        AstStmtExpr *stmt = ast_alloc(AstStmtExpr);
-        stmt->expr = expr;
+        AstExpr *expr = parse_expr(parser);
+        if (eat_optional(parser, TOK_SEMI))
+        {
+            AstStmtSemi *stmt = ast_alloc(AstStmtSemi);
+            stmt->expr = expr;
 
-        return stmt;
+            block->stmts.add(stmt);
+        }
+        else
+        {
+            AstStmtExpr *stmt = ast_alloc(AstStmtExpr);
+            stmt->expr = expr;
+
+            block->stmts.add(stmt);
+        }
     }
 }
 
@@ -436,8 +454,7 @@ static AstExprBlock *parse_block(Parser *parser)
         if (peek(parser).type == TOK_CLOSE_BRACE)
             break;
 
-        AstStmt *stmt = parse_stmt(parser);
-        block->stmts.add(stmt);
+        parse_stmt(parser, block);
     }
     expect(parser, TOK_CLOSE_BRACE);
 
