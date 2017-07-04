@@ -464,6 +464,8 @@ static void check_int_overflow(AstExprLit *lit)
 
 static TypeDefn *narrow_lit_type(TypeDefn *target, AstExprLit *lit)
 {
+    assert(target);
+
     // Do nothing for non-integers.
     // TODO: are there other types that need to be narrowed?
     if (lit->lit_type != LIT_INT)
@@ -494,6 +496,44 @@ static TypeDefn *narrow_lit_type(TypeDefn *target, AstExprLit *lit)
 
     lit->type_defn = target;
     return lit->type_defn;
+}
+
+static bool try_narrow_lit_type(AstExpr *lhs, AstExpr *rhs)
+{
+    // Make sure the literal is on the rhs.
+    if ((rhs->type != AST_EXPR_LIT) && (rhs->type != AST_EXPR_UN))
+    {
+        auto tmp = lhs;
+        lhs = rhs;
+        rhs = tmp;
+    }
+
+    // FIXME: handle more cases for lhs/rhs combinations?
+    // Two cases need to be narrowed:
+    //     1) Integer literal
+    //     2) Unary minus + integer literal
+    if (rhs->type == AST_EXPR_LIT)
+    {
+        auto lit = static_cast<AstExprLit *>(rhs);
+        lit->type_defn = narrow_lit_type(lhs->type_defn, lit);
+    }
+    else if (rhs->type == AST_EXPR_UN)
+    {
+        auto un = static_cast<AstExprUn *>(rhs);
+        if ((un->op == UN_NEG) && (un->expr->type == AST_EXPR_LIT))
+        {
+            auto lit = static_cast<AstExprLit *>(un->expr);
+
+            lit->type_defn = narrow_lit_type(lhs->type_defn, lit);
+            un->type_defn = lit->type_defn;
+        }
+        else
+        {
+            rhs->type_defn = determine_expr_type(rhs);
+        }
+    }
+
+    return (lhs->type_defn == rhs->type_defn);
 }
 
 static TypeDefn *get_struct_type(TypeDefn *defn)
@@ -590,32 +630,7 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
                 {
                     // TODO: does anything need to be checked here?
                 }
-                // FIXME: attempt to narrow lhs as well?
-                // TODO: this is copy-pasted from the AST_EXPR_ASSIGN in determine_expr_type().
-                // Two cases need to be narrowed:
-                //     1) Integer literal
-                //     2) Unary minus + integer literal
-                else if (rhs->type == AST_EXPR_LIT)
-                {
-                    auto lit = static_cast<AstExprLit *>(rhs);
-                    lit->type_defn = narrow_lit_type(lhs->type_defn, lit);
-                }
-                else if (rhs->type == AST_EXPR_UN)
-                {
-                    auto un = static_cast<AstExprUn *>(rhs);
-                    if ((un->op == UN_NEG) && (un->expr->type == AST_EXPR_LIT))
-                    {
-                        auto lit = static_cast<AstExprLit *>(un->expr);
-
-                        lit->type_defn = narrow_lit_type(lhs->type_defn, lit);
-                        un->type_defn = lit->type_defn;
-                    }
-                    else
-                    {
-                        rhs->type_defn = determine_expr_type(rhs);
-                    }
-                }
-                else
+                else if (!try_narrow_lit_type(lhs, rhs))
                 {
                     report_error("Type mismatch in binary operation:\n    %s %s %s\n",
                                  bin,
@@ -712,31 +727,7 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
                     // NOTE: the param type is only attached to the 'name' field of the param.
                     if (arg->type_defn != param->name->type_defn)
                     {
-                        // TODO: this is copy-pasted from the AST_EXPR_ASSIGN in determine_expr_type().
-                        // Two cases need to be narrowed:
-                        //     1) Integer literal
-                        //     2) Unary minus + integer literal
-                        if (arg->type == AST_EXPR_LIT)
-                        {
-                            auto lit = static_cast<AstExprLit *>(arg);
-                            lit->type_defn = narrow_lit_type(param->name->type_defn, lit);
-                        }
-                        else if (arg->type == AST_EXPR_UN)
-                        {
-                            auto un = static_cast<AstExprUn *>(arg);
-                            if ((un->op == UN_NEG) && (un->expr->type == AST_EXPR_LIT))
-                            {
-                                auto lit = static_cast<AstExprLit *>(un->expr);
-
-                                lit->type_defn = narrow_lit_type(param->name->type_defn, lit);
-                                un->type_defn = lit->type_defn;
-                            }
-                            else
-                            {
-                                arg->type_defn = determine_expr_type(arg);
-                            }
-                        }
-                        else
+                        if (!try_narrow_lit_type(param->name, arg))
                         {
                             report_error("Type mismatch in argument %d of \"%s\" call. Expected %s, got %s.\n",
                                          arg,
@@ -775,33 +766,8 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
 
             lhs->type_defn = determine_expr_type(lhs);
 
-            // Two cases need to be narrowed:
-            //     1) Integer literal
-            //     2) Unary minus + integer literal
-            if (rhs->type == AST_EXPR_LIT)
-            {
-                auto lit = static_cast<AstExprLit *>(rhs);
-                lit->type_defn = narrow_lit_type(lhs->type_defn, lit);
-            }
-            else if (rhs->type == AST_EXPR_UN)
-            {
-                auto un = static_cast<AstExprUn *>(rhs);
-                if ((un->op == UN_NEG) && (un->expr->type == AST_EXPR_LIT))
-                {
-                    auto lit = static_cast<AstExprLit *>(un->expr);
-
-                    lit->type_defn = narrow_lit_type(lhs->type_defn, lit);
-                    un->type_defn = lit->type_defn;
-                }
-                else
-                {
-                    rhs->type_defn = determine_expr_type(rhs);
-                }
-            }
-            else
-            {
+            if (!try_narrow_lit_type(lhs, rhs))
                 rhs->type_defn = determine_expr_type(rhs);
-            }
 
             // TODO: optimize, don't look up void each time
             if (rhs->type_defn == get_type_defn("void"))
