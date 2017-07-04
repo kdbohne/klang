@@ -135,30 +135,6 @@ static void scope_add_var(Scope *scope, const char *name, AstExprIdent *var)
     scope->vars.insert(name, var);
 }
 
-void register_type_defn(const char *name, AstStruct *struct_)
-{
-    assert(global_type_defns_count < (i32)(sizeof(global_type_defns) / sizeof(global_type_defns[0])));
-
-    // Make sure there's not already a type defn with this name.
-    for (int i = 0; i < global_type_defns_count; ++i)
-    {
-        TypeDefn *defn = &global_type_defns[i];
-        if (strings_match(defn->name, name))
-        {
-            // TODO: better error message
-            report_error("Redeclaring existing type \"%s\".\n",
-                         struct_->name,
-                         defn->name);
-            return;
-        }
-    }
-
-    TypeDefn *defn = &global_type_defns[global_type_defns_count++];
-    defn->name = string_duplicate(name);
-    defn->struct_ = struct_;
-    defn->ptr = NULL;
-}
-
 static char *get_type_string(TypeDefn *defn)
 {
     static const char *xxx_hack = "***********************";
@@ -212,6 +188,7 @@ TypeDefn *get_type_defn(const char *name, int pointer_depth)
 
         TypeDefn *defn = &global_type_defns[global_type_defns_count++];
         defn->name = string_duplicate(name);
+        defn->size = 8; // 64-bit pointer size.
         defn->struct_ = NULL;
         defn->ptr = parent;
 
@@ -223,6 +200,11 @@ TypeDefn *get_type_defn(const char *name, int pointer_depth)
     report_error_anon("Unknown type \"%.*s%s\".\n", pointer_depth, xxx_hack, name);
 
     return NULL;
+}
+
+static TypeDefn *get_type_defn(AstExprType *type)
+{
+    return get_type_defn(type->name->str, type->pointer_depth);
 }
 
 static TypeDefn *get_pointer_to(TypeDefn *defn)
@@ -243,6 +225,7 @@ static TypeDefn *get_pointer_to(TypeDefn *defn)
 
     TypeDefn *new_defn = &global_type_defns[global_type_defns_count++];
     new_defn->name = defn->name;
+    new_defn->size = 8; // 64-bit pointer size.
     new_defn->struct_ = defn->struct_;
     new_defn->ptr = defn;
 
@@ -285,6 +268,9 @@ static TypeDefn *get_deref(AstExpr *expr, TypeDefn *defn)
     new_defn->struct_ = defn->struct_;
     new_defn->ptr = parent;
 
+    if (depth > 0)
+        new_defn->size = 8; // 64-bit pointer size.
+
     return NULL;
 }
 
@@ -298,11 +284,6 @@ int get_pointer_depth(TypeDefn *defn)
     }
 
     return depth;
-}
-
-static TypeDefn *get_type_defn(AstExprType *type)
-{
-    return get_type_defn(type->name->str, type->pointer_depth);
 }
 
 static void type_check_func(AstFunc *func)
@@ -1076,32 +1057,75 @@ bool is_struct_type(TypeDefn *defn)
     return get_struct_type(defn) != NULL;
 }
 
+static TypeDefn *register_type_defn(const char *name, int size)
+{
+    assert(global_type_defns_count < (i32)(sizeof(global_type_defns) / sizeof(global_type_defns[0])));
+
+    // Make sure there's not already a type defn with this name.
+    for (int i = 0; i < global_type_defns_count; ++i)
+    {
+        TypeDefn *defn = &global_type_defns[i];
+        if (strings_match(defn->name, name))
+        {
+            // TODO: better error message
+            report_error_anon("Redeclaring existing type \"%s\".\n", defn->name);
+            return NULL;
+        }
+    }
+
+    TypeDefn *defn = &global_type_defns[global_type_defns_count++];
+    defn->name = string_duplicate(name);
+    defn->size = size;
+    defn->struct_ = NULL;
+    defn->ptr = NULL;
+
+    return defn;
+}
+
+static TypeDefn *register_struct(AstStruct *struct_)
+{
+    int size = 0;
+    foreach(struct_->fields)
+    {
+        it->type_defn = get_type_defn(it->type);
+
+        assert(it->type_defn->size > 0);
+        size += it->type_defn->size;
+    }
+
+    TypeDefn *defn = register_type_defn(struct_->name->str, size);
+    defn->struct_ = struct_;
+    defn->ptr = NULL;
+
+    return defn;
+}
+
 bool type_check(AstRoot *root)
 {
     // TODO: optimize by reordering based on most common cases?
-    register_type_defn("i8");
-    register_type_defn("i16");
-    register_type_defn("i32");
-    register_type_defn("i64");
+    register_type_defn("i8",  1);
+    register_type_defn("i16", 2);
+    register_type_defn("i32", 4);
+    register_type_defn("i64", 8);
 
-    register_type_defn("u8");
-    register_type_defn("u16");
-    register_type_defn("u32");
-    register_type_defn("u64");
+    register_type_defn("u8",  1);
+    register_type_defn("u16", 2);
+    register_type_defn("u32", 4);
+    register_type_defn("u64", 8);
 
-    register_type_defn("f32");
-    register_type_defn("f64");
+    register_type_defn("f32", 4);
+    register_type_defn("f64", 8);
 
 //    register_type_defn("str");
 
-    register_type_defn("void");
+    register_type_defn("void", -1);
 
-    register_type_defn("c_void");
+    register_type_defn("c_void", -1);
 
     // TODO: register these to scoped type tables instead of dumping
     // all of them into the global type table?
     foreach(root->structs)
-        register_type_defn(it->name->str, it);
+        register_struct(it);
 
     determine_node_types(root);
 

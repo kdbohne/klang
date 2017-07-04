@@ -10,12 +10,13 @@ struct TypeDefn
 {
     char *name = NULL;
 
+    i64 size = -1;
+
     AstStruct *struct_ = NULL;
     TypeDefn *ptr = NULL;
 };
 extern TypeDefn global_type_defns[];
 
-void register_type_defn(const char *name, AstStruct *struct_ = NULL);
 TypeDefn *get_type_defn(const char *name, int pointer_depth = 0);
 
 int get_pointer_depth(TypeDefn *defn);
