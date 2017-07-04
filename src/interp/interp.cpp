@@ -1,0 +1,266 @@
+#include "interp.h"
+#include "ast.h"
+
+static void add_instr_(Interp *interp, Opcode op, Register r0, Register r1, Register r2)
+{
+    Instr *instr = interp->instrs.next();
+    instr->op = op;
+    instr->r0 = r0;
+    instr->r1 = r1;
+    instr->r2 = r2;
+}
+#define add_instr(op, r0, r1, r2) add_instr_(interp, op, Register(r0), Register(r1), Register(r2))
+
+static i64 get_int_size(LitInt int_)
+{
+    switch (int_.type)
+    {
+        case INT_I8:
+        case INT_U8:
+        {
+            return 1;
+        }
+        case INT_I16:
+        case INT_U16:
+        {
+            return 2;
+        }
+        case INT_I32:
+        case INT_U32:
+        {
+            return 4;
+        }
+        case INT_I64:
+        case INT_U64:
+        {
+            return 8;
+        }
+        default:
+        {
+            assert(false);
+            return -1;
+        }
+    }
+}
+
+static i64 get_type_size(AstExpr *expr)
+{
+    return 0;//expr->type_defn;
+}
+
+static i64 PUSH_(Interp *interp, i64 size)
+{
+    i64 sp = interp->sp;
+
+    add_instr(OP_PUSH, size, -1, -1);
+    sp += size;
+
+    printf("PUSH(%ld)\n", size);
+
+    return sp;
+}
+#define PUSH(size) PUSH_(interp, size)
+
+static i64 gen_expr(Interp *interp, AstExpr *expr)
+{
+    switch (expr->type)
+    {
+        case AST_EXPR_IDENT:
+        {
+            // FIXME
+            assert(false);
+            break;
+        }
+        case AST_EXPR_LIT:
+        {
+            auto lit = static_cast<AstExprLit *>(expr);
+            switch (lit->lit_type)
+            {
+                case LIT_INT:
+                {
+                    i64 size = get_int_size(lit->value_int);
+                    return PUSH(size);
+                }
+                case LIT_FLOAT:
+                {
+                    // FIXME
+                    assert(false);
+                    break;
+                }
+                case LIT_STR:
+                {
+                    // FIXME
+                    assert(false);
+                    break;
+                }
+                default:
+                {
+                    assert(false);
+                    break;
+                }
+            }
+
+            break;
+        }
+        case AST_EXPR_BIN:
+        {
+            auto bin = static_cast<AstExprBin *>(expr);
+
+            i64 lhs = gen_expr(interp, bin->lhs);
+            i64 rhs = gen_expr(interp, bin->rhs);
+
+//            ADD(lhs, rhs);
+
+            break;
+        }
+        case AST_EXPR_UN:
+        {
+            // FIXME
+            assert(false);
+            break;
+        }
+        case AST_EXPR_CALL:
+        {
+            // FIXME
+            assert(false);
+            break;
+        }
+        case AST_EXPR_TYPE:
+        {
+            // FIXME
+            assert(false);
+            break;
+        }
+        case AST_EXPR_PARAM:
+        {
+            // FIXME
+            assert(false);
+            break;
+        }
+        case AST_EXPR_CAST:
+        {
+            // FIXME
+            assert(false);
+            break;
+        }
+        case AST_EXPR_ASSIGN:
+        {
+            // FIXME
+            assert(false);
+            break;
+        }
+        case AST_EXPR_IF:
+        {
+            // FIXME
+            assert(false);
+            break;
+        }
+        case AST_EXPR_BLOCK:
+        {
+            // FIXME
+            assert(false);
+            break;
+        }
+        case AST_EXPR_FIELD:
+        {
+            // FIXME
+            assert(false);
+            break;
+        }
+        case AST_EXPR_LOOP:
+        {
+            // FIXME
+            assert(false);
+            break;
+        }
+        case AST_EXPR_BREAK:
+        {
+            // FIXME
+            assert(false);
+            break;
+        }
+        case AST_EXPR_FOR:
+        {
+            // FIXME
+            assert(false);
+            break;
+        }
+        case AST_EXPR_RANGE:
+        {
+            // FIXME
+            assert(false);
+            break;
+        }
+        case AST_EXPR_WHILE:
+        {
+            // FIXME
+            assert(false);
+            break;
+        }
+        case AST_EXPR_PAREN:
+        {
+            // FIXME
+            assert(false);
+            break;
+        }
+        default:
+        {
+            assert(false);
+            break;
+        }
+    }
+
+    return -1;
+}
+
+static void gen_stmt(Interp *interp, AstStmt *stmt)
+{
+    switch (stmt->type)
+    {
+        case AST_STMT_EXPR:
+        {
+            // FIXME
+            assert(false);
+            break;
+        }
+        case AST_STMT_SEMI:
+        {
+            auto semi = static_cast<AstStmtSemi *>(stmt);
+            gen_expr(interp, semi->expr);
+
+            break;
+        }
+        case AST_STMT_DECL:
+        {
+            // FIXME
+            assert(false);
+            break;
+        }
+        default:
+        {
+            assert(false);
+            break;
+        }
+    }
+}
+
+static void gen_block(Interp *interp, AstExprBlock *block)
+{
+    foreach(block->stmts)
+        gen_stmt(interp, it);
+}
+
+Interp gen_ir(AstRoot *ast)
+{
+    Interp interp;
+
+    foreach(ast->funcs)
+    {
+        if (it->flags & FUNC_EXTERN)
+            continue;
+
+        gen_block(&interp, it->block);
+    }
+
+    return interp;
+}
