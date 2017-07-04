@@ -62,6 +62,13 @@ struct Array
         data[count++] = value;
     }
 
+    T *next()
+    {
+        grow_if_needed();
+
+        return &data[count++];
+    }
+
     T *begin()
     {
         return &data[0];
