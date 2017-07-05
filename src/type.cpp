@@ -31,30 +31,6 @@ static i32 scope_pool_count;
 static void determine_stmt_type(AstStmt *stmt);
 static TypeDefn *determine_expr_type(AstExpr *expr);
 
-static void print_line(char *src, int line)
-{
-    int cur = 1;
-    while (*src)
-    {
-        if (cur == line)
-        {
-            char *str = src;
-            while (*src && (*src != '\n') && (*src != '\r'))
-                ++src;
-
-            fprintf(stderr, "%.*s\n\n", (int)(src - str), str);
-            return;
-        }
-
-        if ((*src == '\n') || (*src == '\r'))
-            ++cur;
-
-        ++src;
-    }
-
-    assert(false);
-}
-
 static void dump_type_defns()
 {
     for (int i = 0; i < global_type_defns_count; ++i)

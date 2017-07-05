@@ -1,4 +1,5 @@
 #include "string.h"
+#include <stdio.h> // fprintf, stderr
 
 // NOTE: djb2 traditionally returns a u32. This u64 variant is untested,
 // but will likely be fine. Test this if needed.
@@ -75,4 +76,28 @@ char *string_concatenate(const char *a, const char *b)
     cat[len] = '\0';
 
     return cat;
+}
+
+void print_line(char *src, int line)
+{
+    int cur = 1;
+    while (*src)
+    {
+        if (cur == line)
+        {
+            char *str = src;
+            while (*src && (*src != '\n') && (*src != '\r'))
+                ++src;
+
+            fprintf(stderr, "%.*s\n\n", (int)(src - str), str);
+            return;
+        }
+
+        if ((*src == '\n') || (*src == '\r'))
+            ++cur;
+
+        ++src;
+    }
+
+    assert(false);
 }

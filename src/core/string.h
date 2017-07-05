@@ -11,3 +11,5 @@ void string_copy(const char *src, char *dest);
 void string_copy(const char *src, char *dest, int length);
 char *string_duplicate(const char *str);
 char *string_concatenate(const char *a, const char *b);
+
+void print_line(char *src, int line);
