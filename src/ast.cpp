@@ -6,12 +6,98 @@ static i32 nodes_pool_count;
 static i32 nodes_pool_capacity = 1024;
 #endif
 
+// TODO: size?
+static Scope scope_pool[512];
+static i32 scope_pool_count;
+
 extern "C"
 {
     void *calloc(u64 nmemb, u64 size);
 
     u64 strtoull(const char *nptr, char **endptr, int base);
     float strtof(const char *nptr, char **endptr);
+}
+
+// TODO: this is copy-pasted from type.cpp. Unify?
+#include <stdio.h>
+#define report_error(str, ast, ...) \
+do { \
+    fprintf(stderr, "(%s:%d:%d) " str, ast->file.path, ast->line, ast->col, __VA_ARGS__); \
+    print_line(ast->file.src, ast->line); \
+} while (0)
+
+Scope *make_scope(Scope *parent)
+{
+    assert(scope_pool_count < (i32)(sizeof(scope_pool) / sizeof(scope_pool[0])));
+
+    Scope *scope = &scope_pool[scope_pool_count++];
+    scope->parent = parent;
+
+    return scope;
+}
+
+AstFunc *scope_get_func(Scope *scope, const char *name)
+{
+    assert(scope != NULL);
+
+    auto func_ptr = scope->funcs.get(name);
+    if (func_ptr)
+        return *func_ptr;
+
+    if (scope->parent)
+        return scope_get_func(scope->parent, name);
+
+    return NULL;
+}
+
+ScopeVar *scope_get_var(Scope *scope, const char *name)
+{
+    assert(scope != NULL);
+
+    auto var_ptr = scope->vars.get(name);
+    if (var_ptr)
+        return var_ptr;
+
+    if (scope->parent)
+        return scope_get_var(scope->parent, name);
+
+    return NULL;
+}
+
+void scope_add_func(Scope *scope, const char *name, AstFunc *func)
+{
+    assert(scope != NULL);
+
+    auto existing = scope_get_func(scope, name);
+    if (existing)
+    {
+        report_error("Redeclaring existing function \"%s\".\n",
+                     func,
+                     name);
+        return;
+    }
+
+    scope->funcs.insert(name, func);
+}
+
+void scope_add_var(Scope *scope, AstExprIdent *name)
+{
+    assert(scope != NULL);
+
+    auto existing = scope_get_var(scope, name->str);
+    if (existing)
+    {
+        report_error("Redeclaring existing identifier \"%s\".\n",
+                     name,
+                     name->str);
+        return;
+    }
+
+    name->scope = scope;
+
+    ScopeVar var;
+    var.name = name;
+    scope->vars.insert(name->str, var);
 }
 
 const char *bin_op_strings[] =

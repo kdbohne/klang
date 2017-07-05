@@ -24,10 +24,6 @@ static i32 global_type_defns_count;
 
 static i32 global_error_count;
 
-// TODO: size?
-static Scope scope_pool[512];
-static i32 scope_pool_count;
-
 static void determine_stmt_type(AstStmt *stmt);
 static TypeDefn *determine_expr_type(AstExpr *expr);
 
@@ -38,77 +34,6 @@ static void dump_type_defns()
         TypeDefn *defn = &global_type_defns[i];
         fprintf(stderr, "%s\n", defn->name);
     }
-}
-
-static Scope *make_scope(Scope *parent)
-{
-    assert(scope_pool_count < (i32)(sizeof(scope_pool) / sizeof(scope_pool[0])));
-
-    Scope *scope = &scope_pool[scope_pool_count++];
-    scope->parent = parent;
-
-    return scope;
-}
-
-static AstFunc *scope_get_func(Scope *scope, const char *name)
-{
-    assert(scope != NULL);
-
-    auto func_ptr = scope->funcs.get(name);
-    if (func_ptr)
-        return *func_ptr;
-
-    if (scope->parent)
-        return scope_get_func(scope->parent, name);
-
-    return NULL;
-}
-
-static AstExprIdent *scope_get_var(Scope *scope, const char *name)
-{
-    assert(scope != NULL);
-
-    auto var_ptr = scope->vars.get(name);
-    if (var_ptr)
-        return *var_ptr;
-
-    if (scope->parent)
-        return scope_get_var(scope->parent, name);
-
-    return NULL;
-}
-
-static void scope_add_func(Scope *scope, const char *name, AstFunc *func)
-{
-    assert(scope != NULL);
-
-    auto existing = scope_get_func(scope, name);
-    if (existing)
-    {
-        report_error("Redeclaring existing function \"%s\".\n",
-                     func,
-                     name);
-        return;
-    }
-
-    scope->funcs.insert(name, func);
-}
-
-static void scope_add_var(Scope *scope, const char *name, AstExprIdent *var)
-{
-    assert(scope != NULL);
-
-    auto existing = scope_get_var(scope, name);
-    if (existing)
-    {
-        report_error("Redeclaring existing identifier \"%s\".\n",
-                     var,
-                     name);
-        return;
-    }
-
-    var->scope = scope;
-    scope->vars.insert(name, var);
 }
 
 static char *get_type_string(TypeDefn *defn)
@@ -518,7 +443,8 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
                 return NULL;
             }
 
-            return var->type_defn;
+            AstExprIdent *name = var->name;
+            return name->type_defn;
         }
         case AST_EXPR_LIT:
         {
@@ -867,7 +793,7 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
             // Declare the iterator.
             assert(for_->it->type == AST_EXPR_IDENT);
             auto it = static_cast<AstExprIdent *>(for_->it);
-            scope_add_var(for_->scope, it->str, it);
+            scope_add_var(for_->scope, it);
 
             for_->range->type_defn = determine_expr_type(for_->range);
             it->type_defn = for_->range->type_defn;
@@ -979,7 +905,7 @@ static void determine_stmt_type(AstStmt *stmt)
                 lhs->type_defn = determine_expr_type(rhs);
             }
 
-            scope_add_var(lhs->scope, lhs->str, lhs);
+            scope_add_var(lhs->scope, lhs);
 
             break;
         }
@@ -1005,7 +931,7 @@ static void determine_node_types(AstRoot *root)
             auto param = it->params[i];
 
             param->name->type_defn = get_type_defn(param->type);
-            scope_add_var(it->scope, param->name->str, param->name);
+            scope_add_var(it->scope, param->name);
         }
 
         if (it->ret)

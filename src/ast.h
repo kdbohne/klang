@@ -13,13 +13,27 @@ struct AstFunc;
 struct AstStruct;
 struct AstStructField;
 
+struct ScopeVar
+{
+    AstExprIdent *name = NULL;
+    i64 register_index = -1;
+};
+
 struct Scope
 {
     HashMap<AstFunc *> funcs;
-    HashMap<AstExprIdent *> vars;
+    HashMap<ScopeVar> vars;
 
     Scope *parent = NULL;
 };
+
+// TODO: move to own file?
+// TODO: are all of these needed here? some are probably only used in type.cpp
+Scope *make_scope(Scope *parent);
+AstFunc *scope_get_func(Scope *scope, const char *name);
+ScopeVar *scope_get_var(Scope *scope, const char *name);
+void scope_add_func(Scope *scope, const char *name, AstFunc *func);
+void scope_add_var(Scope *scope, AstExprIdent *name);
 
 enum AstNodeType : u32
 {

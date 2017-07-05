@@ -1,7 +1,10 @@
 #include "interp.h"
 #include "ast.h"
 
-static void add_instr_(Interp *interp, Opcode op, Register r0, Register r1, Register r2)
+static const i64 RSP = 4;
+static const i64 RBP = 5;
+
+static void add_instr_(Interp *interp, Opcode op, i64 r0, i64 r1, i64 r2)
 {
     Instr *instr = interp->instrs.next();
     instr->op = op;
@@ -9,7 +12,7 @@ static void add_instr_(Interp *interp, Opcode op, Register r0, Register r1, Regi
     instr->r1 = r1;
     instr->r2 = r2;
 }
-#define add_instr(op, r0, r1, r2) add_instr_(interp, op, Register(r0), Register(r1), Register(r2))
+#define add_instr(op, r0, r1, r2) add_instr_(interp, op, r0, r1, r2)
 
 static i64 get_int_size(LitInt int_)
 {
@@ -53,28 +56,30 @@ static i64 alloc_register(Interp *interp)
     return interp->register_count++;
 }
 
-static i64 PUSH_(Interp *interp, i64 val)
+static i64 PUSH_(Interp *interp, i64 size)
 {
-    i64 ri = alloc_register();
+    // TODO: address relative to RBP
+    i64 ri = alloc_register(interp);
+    add_instr(OP_MOV, ri, RSP, -1);
 
-    add_instr(OP_PUSH, val, -1, -1);
-    sp += 8; // Assume 64-bit value.
+    add_instr(OP_IADD, RSP, RSP, size);
 
-    printf("PUSH(%ld)\n", val);
-
-    return sp;
+    return ri;
 }
-#define PUSH(val) PUSH_(interp, val)
+#define PUSH(size) PUSH_(interp, size)
 
 static i64 ADD_(Interp *interp, i64 dest, i64 lhs, i64 rhs)
 {
     add_instr(OP_IADD, dest, lhs, rhs);
-
-    printf("ADD(%ld, %ld, %ld)\n", dest, lhs, rhs);
-
     return dest;
 }
 #define ADD(dest, lhs, rhs) ADD_(interp, dest, lhs, rhs)
+
+static void MOV_(Interp *interp, i64 dest, i64 val)
+{
+    add_instr(OP_MOV, dest, val, -1);
+}
+#define MOV(dest, val) MOV_(interp, dest, val)
 
 static void gen_stmt(Interp *interp, AstStmt *stmt);
 
@@ -84,9 +89,12 @@ static i64 gen_expr(Interp *interp, AstExpr *expr)
     {
         case AST_EXPR_IDENT:
         {
-            // FIXME
-            assert(false);
-            break;
+            auto ident = static_cast<AstExprIdent *>(expr);
+
+            ScopeVar *var = scope_get_var(ident->scope, ident->str);
+            assert(var->register_index != -1);
+
+            return var->register_index;
         }
         case AST_EXPR_LIT:
         {
@@ -95,9 +103,12 @@ static i64 gen_expr(Interp *interp, AstExpr *expr)
             {
                 case LIT_INT:
                 {
-//                    i64 size = get_int_size(lit->value_int);
-                    // TODO: how should the value be passed?
-                    return PUSH((i64)lit->value_int.value);
+                    // TODO: handle unsigned?
+                    i64 ri = alloc_register(interp);
+                    i64 val = (i64)lit->value_int.value;
+                    MOV(ri, val);
+
+                    return ri;
                 }
                 case LIT_FLOAT:
                 {
@@ -128,10 +139,10 @@ static i64 gen_expr(Interp *interp, AstExpr *expr)
             i64 rhs = gen_expr(interp, bin->rhs);
 
             i64 size = bin->lhs->type_defn->size;
-            i64 dest = PUSH(-1);
+            i64 dest = alloc_register(interp);
             ADD(dest, lhs, rhs);
 
-            break;
+            return dest;
         }
         case AST_EXPR_UN:
         {
@@ -165,9 +176,13 @@ static i64 gen_expr(Interp *interp, AstExpr *expr)
         }
         case AST_EXPR_ASSIGN:
         {
-            // FIXME
-            assert(false);
-            break;
+            auto assign = static_cast<AstExprAssign *>(expr);
+            i64 lri = gen_expr(interp, assign->lhs);
+            i64 rri = gen_expr(interp, assign->rhs);
+
+            MOV(lri, rri);
+
+            return lri;
         }
         case AST_EXPR_IF:
         {
@@ -179,12 +194,18 @@ static i64 gen_expr(Interp *interp, AstExpr *expr)
         {
             auto block = static_cast<AstExprBlock *>(expr);
 
-            PUSH(interp->fp);
+            i64 ri = PUSH(8);
+            MOV(ri, RBP);
+            MOV(RBP, RSP);
 
             foreach(block->stmts)
                 gen_stmt(interp, it);
 
-            break;
+            i64 ret = -1;
+            if (block->expr)
+                ret = gen_expr(interp, block->expr);
+
+            return ret;
         }
         case AST_EXPR_FIELD:
         {
@@ -235,6 +256,7 @@ static i64 gen_expr(Interp *interp, AstExpr *expr)
         }
     }
 
+    assert(false);
     return -1;
 }
 
@@ -244,7 +266,6 @@ static void gen_stmt(Interp *interp, AstStmt *stmt)
     {
         case AST_STMT_EXPR:
         {
-            // FIXME
             assert(false);
             break;
         }
@@ -258,9 +279,17 @@ static void gen_stmt(Interp *interp, AstStmt *stmt)
         case AST_STMT_DECL:
         {
             auto decl = static_cast<AstStmtDecl *>(stmt);
-            decl->bind
-            // FIXME
-            assert(false);
+
+            // TODO: patterns, multiple decls, etc
+            assert(decl->bind->type == AST_EXPR_IDENT);
+            auto name = static_cast<AstExprIdent *>(decl->bind);
+
+            ScopeVar *var = scope_get_var(decl->scope, name->str);
+            assert(var->register_index == -1);
+
+            i64 ri = PUSH(decl->bind->type_defn->size);
+            var->register_index = ri;
+
             break;
         }
         default:
@@ -271,11 +300,28 @@ static void gen_stmt(Interp *interp, AstStmt *stmt)
     }
 }
 
+static void dump_ir(Interp *interp)
+{
+    foreach(interp->instrs)
+    {
+        fprintf(stderr, "%s", opcode_strings[it.op]);
+
+        if (it.r0 != -1)
+            fprintf(stderr, " %ld", it.r0);
+        if (it.r1 != -1)
+            fprintf(stderr, " %ld", it.r1);
+        if (it.r2 != -1)
+            fprintf(stderr, " %ld", it.r2);
+
+        fprintf(stderr, "\n");
+    }
+}
+
 Interp gen_ir(AstRoot *ast)
 {
     Interp interp;
-    interp.sp = 0;
-    interp.fp = 0;
+    interp.register_count = 8; // NOTE: registers 4, 5 are reserved
+    interp.ip = 0;
 
     foreach(ast->funcs)
     {
@@ -284,6 +330,8 @@ Interp gen_ir(AstRoot *ast)
 
         gen_expr(&interp, it->block);
     }
+
+    dump_ir(&interp);
 
     return interp;
 }

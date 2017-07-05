@@ -13,6 +13,8 @@ enum Opcode : u32
     OP_FMUL,
     OP_FDIV,
 
+    OP_MOV,
+
     OP_PUSH,
     OP_POP,
 
@@ -20,19 +22,12 @@ enum Opcode : u32
 
     OP_ERR,
 };
-
-union Register
-{
-    i64 _i64 = -1;
-    float _f32;
-
-    Register(i64 val) : _i64(val) {}
-};
+extern const char *opcode_strings[];
 
 struct Instr
 {
     Opcode op = OP_ERR;
-    Register r0;
-    Register r1;
-    Register r2;
+    i64 r0;
+    i64 r1;
+    i64 r2;
 };
