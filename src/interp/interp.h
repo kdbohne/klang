@@ -7,8 +7,9 @@ struct AstRoot;
 
 struct Interp
 {
-    i64 sp = -1;
     Array<Instr> instrs;
+    i64 register_count;
 };
 
 Interp gen_ir(AstRoot *ast);
+void run_ir(Interp *interp);

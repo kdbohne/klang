@@ -48,18 +48,35 @@ static i64 get_type_size(AstExpr *expr)
     return 0;//expr->type_defn;
 }
 
-static i64 PUSH_(Interp *interp, i64 size)
+static i64 alloc_register(Interp *interp)
 {
-    i64 sp = interp->sp;
+    return interp->register_count++;
+}
 
-    add_instr(OP_PUSH, size, -1, -1);
-    sp += size;
+static i64 PUSH_(Interp *interp, i64 val)
+{
+    i64 ri = alloc_register();
 
-    printf("PUSH(%ld)\n", size);
+    add_instr(OP_PUSH, val, -1, -1);
+    sp += 8; // Assume 64-bit value.
+
+    printf("PUSH(%ld)\n", val);
 
     return sp;
 }
-#define PUSH(size) PUSH_(interp, size)
+#define PUSH(val) PUSH_(interp, val)
+
+static i64 ADD_(Interp *interp, i64 dest, i64 lhs, i64 rhs)
+{
+    add_instr(OP_IADD, dest, lhs, rhs);
+
+    printf("ADD(%ld, %ld, %ld)\n", dest, lhs, rhs);
+
+    return dest;
+}
+#define ADD(dest, lhs, rhs) ADD_(interp, dest, lhs, rhs)
+
+static void gen_stmt(Interp *interp, AstStmt *stmt);
 
 static i64 gen_expr(Interp *interp, AstExpr *expr)
 {
@@ -78,8 +95,9 @@ static i64 gen_expr(Interp *interp, AstExpr *expr)
             {
                 case LIT_INT:
                 {
-                    i64 size = get_int_size(lit->value_int);
-                    return PUSH(size);
+//                    i64 size = get_int_size(lit->value_int);
+                    // TODO: how should the value be passed?
+                    return PUSH((i64)lit->value_int.value);
                 }
                 case LIT_FLOAT:
                 {
@@ -109,7 +127,9 @@ static i64 gen_expr(Interp *interp, AstExpr *expr)
             i64 lhs = gen_expr(interp, bin->lhs);
             i64 rhs = gen_expr(interp, bin->rhs);
 
-//            ADD(lhs, rhs);
+            i64 size = bin->lhs->type_defn->size;
+            i64 dest = PUSH(-1);
+            ADD(dest, lhs, rhs);
 
             break;
         }
@@ -157,8 +177,13 @@ static i64 gen_expr(Interp *interp, AstExpr *expr)
         }
         case AST_EXPR_BLOCK:
         {
-            // FIXME
-            assert(false);
+            auto block = static_cast<AstExprBlock *>(expr);
+
+            PUSH(interp->fp);
+
+            foreach(block->stmts)
+                gen_stmt(interp, it);
+
             break;
         }
         case AST_EXPR_FIELD:
@@ -232,6 +257,8 @@ static void gen_stmt(Interp *interp, AstStmt *stmt)
         }
         case AST_STMT_DECL:
         {
+            auto decl = static_cast<AstStmtDecl *>(stmt);
+            decl->bind
             // FIXME
             assert(false);
             break;
@@ -244,23 +271,23 @@ static void gen_stmt(Interp *interp, AstStmt *stmt)
     }
 }
 
-static void gen_block(Interp *interp, AstExprBlock *block)
-{
-    foreach(block->stmts)
-        gen_stmt(interp, it);
-}
-
 Interp gen_ir(AstRoot *ast)
 {
     Interp interp;
+    interp.sp = 0;
+    interp.fp = 0;
 
     foreach(ast->funcs)
     {
         if (it->flags & FUNC_EXTERN)
             continue;
 
-        gen_block(&interp, it->block);
+        gen_expr(&interp, it->block);
     }
 
     return interp;
+}
+
+void run_ir(Interp *interp)
+{
 }
