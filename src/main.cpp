@@ -75,7 +75,8 @@ int main(int argc, char *argv[])
 
 //    c_gen_ir(root);
 //    llvm_gen_ir(root);
-    gen_ir(root);
+    Interp interp = gen_ir(root);
+    run_ir(&interp);
 
     return 0;
 }

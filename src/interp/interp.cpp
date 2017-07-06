@@ -1,18 +1,99 @@
-#include "interp.h"
+#include "interp/interp.h"
 #include "ast.h"
 
 static const i64 RSP = 4;
 static const i64 RBP = 5;
+static const i64 REG_SIZE = 8;
 
-static void add_instr_(Interp *interp, Opcode op, i64 r0, i64 r1, i64 r2)
+const char *opcode_strings[] =
+{
+    "iadd",
+    "isub",
+    "imul",
+    "idiv",
+    "fadd",
+    "fsub",
+    "fmul",
+    "fdiv",
+
+    "mov",
+
+    "push",
+    "pop",
+
+    "exit",
+
+    "err",
+};
+
+Value make_value_null()
+{
+    Value v;
+    v.type = VALUE_NULL;
+    v.register_index = -1;
+
+    return v;
+}
+
+Value make_register_index(i64 i)
+{
+    Value v;
+    v.type = VALUE_REGISTER_INDEX;
+    v.register_index = i;
+
+    return v;
+}
+
+Value make_value_i64(i64 val)
+{
+    Value v;
+    v.type = VALUE_I64;
+    v.i64_ = val;
+
+    return v;
+}
+
+Value make_value_f32(float val)
+{
+    Value v;
+    v.type = VALUE_F32;
+    v.f32_ = val;
+
+    return v;
+}
+
+i64 unbox_i64(Register *r, Value v)
+{
+    if (v.type == VALUE_REGISTER_INDEX)
+        return r[v.register_index].i64_;
+    if (v.type == VALUE_I64)
+        return v.i64_;
+
+    assert(false);
+    return -1;
+}
+
+float unbox_f32(Register *r, Value v)
+{
+    if (v.type == VALUE_REGISTER_INDEX)
+        return r[v.register_index].f32_;
+    if (v.type == VALUE_F32)
+        return v.f32_;
+
+    assert(false);
+    return -1.0f;
+}
+
+static void add_instr_(Interp *interp, Opcode op, Value v0, Value v1, Value v2)
 {
     Instr *instr = interp->instrs.next();
     instr->op = op;
-    instr->r0 = r0;
-    instr->r1 = r1;
-    instr->r2 = r2;
+
+    instr->v0 = v0;
+    instr->v1 = v1;
+    instr->v2 = v2;
 }
-#define add_instr(op, r0, r1, r2) add_instr_(interp, op, r0, r1, r2)
+#define add_instr(op, v0, v1, v2) add_instr_(interp, op, v0, v1, v2)
 
 static i64 get_int_size(LitInt int_)
 {
@@ -56,34 +137,37 @@ static i64 alloc_register(Interp *interp)
     return interp->register_count++;
 }
 
-static i64 PUSH_(Interp *interp, i64 size)
+static Value PUSH_(Interp *interp, i64 size)
 {
     // TODO: address relative to RBP
-    i64 ri = alloc_register(interp);
-    add_instr(OP_MOV, ri, RSP, -1);
+    i64 r = alloc_register(interp);
+    add_instr(OP_MOV, make_register_index(r), make_register_index(RSP), make_value_null());
 
-    add_instr(OP_IADD, RSP, RSP, size);
+    add_instr(OP_IADD, make_register_index(RSP), make_register_index(RSP), make_value_i64(size));
 
-    return ri;
+    Value rv = make_register_index(r);
+    return rv;
 }
 #define PUSH(size) PUSH_(interp, size)
 
-static i64 ADD_(Interp *interp, i64 dest, i64 lhs, i64 rhs)
+static Value ADD_(Interp *interp, Value dest, Value lhs, Value rhs)
 {
+    assert(dest.type == VALUE_REGISTER_INDEX);
+
     add_instr(OP_IADD, dest, lhs, rhs);
     return dest;
 }
 #define ADD(dest, lhs, rhs) ADD_(interp, dest, lhs, rhs)
 
-static void MOV_(Interp *interp, i64 dest, i64 val)
+static void MOV_(Interp *interp, Value dest, Value src)
 {
-    add_instr(OP_MOV, dest, val, -1);
+    add_instr(OP_MOV, dest, src, make_value_null());
 }
-#define MOV(dest, val) MOV_(interp, dest, val)
+#define MOV(dest, src) MOV_(interp, dest, src)
 
 static void gen_stmt(Interp *interp, AstStmt *stmt);
 
-static i64 gen_expr(Interp *interp, AstExpr *expr)
+static Value gen_expr(Interp *interp, AstExpr *expr)
 {
     switch (expr->type)
     {
@@ -94,7 +178,7 @@ static i64 gen_expr(Interp *interp, AstExpr *expr)
             ScopeVar *var = scope_get_var(ident->scope, ident->str);
             assert(var->register_index != -1);
 
-            return var->register_index;
+            return make_register_index(var->register_index);
         }
         case AST_EXPR_LIT:
         {
@@ -104,11 +188,8 @@ static i64 gen_expr(Interp *interp, AstExpr *expr)
                 case LIT_INT:
                 {
                     // TODO: handle unsigned?
-                    i64 ri = alloc_register(interp);
                     i64 val = (i64)lit->value_int.value;
-                    MOV(ri, val);
-
-                    return ri;
+                    return make_value_i64(val);
                 }
                 case LIT_FLOAT:
                 {
@@ -135,11 +216,12 @@ static i64 gen_expr(Interp *interp, AstExpr *expr)
         {
             auto bin = static_cast<AstExprBin *>(expr);
 
-            i64 lhs = gen_expr(interp, bin->lhs);
-            i64 rhs = gen_expr(interp, bin->rhs);
+            Value lhs = gen_expr(interp, bin->lhs);
+            Value rhs = gen_expr(interp, bin->rhs);
 
-            i64 size = bin->lhs->type_defn->size;
-            i64 dest = alloc_register(interp);
+//            i64 size = bin->lhs->type_defn->size;
+            i64 dest_index = alloc_register(interp);
+            Value dest = make_register_index(dest_index);
             ADD(dest, lhs, rhs);
 
             return dest;
@@ -177,12 +259,12 @@ static i64 gen_expr(Interp *interp, AstExpr *expr)
         case AST_EXPR_ASSIGN:
         {
             auto assign = static_cast<AstExprAssign *>(expr);
-            i64 lri = gen_expr(interp, assign->lhs);
-            i64 rri = gen_expr(interp, assign->rhs);
+            Value lhs = gen_expr(interp, assign->lhs);
+            Value rhs = gen_expr(interp, assign->rhs);
 
-            MOV(lri, rri);
+            MOV(lhs, rhs);
 
-            return lri;
+            return lhs;
         }
         case AST_EXPR_IF:
         {
@@ -194,14 +276,14 @@ static i64 gen_expr(Interp *interp, AstExpr *expr)
         {
             auto block = static_cast<AstExprBlock *>(expr);
 
-            i64 ri = PUSH(8);
-            MOV(ri, RBP);
-            MOV(RBP, RSP);
+            Value r = PUSH(REG_SIZE);
+            MOV(r, make_register_index(RBP));
+            MOV(make_register_index(RBP), make_register_index(RSP));
 
             foreach(block->stmts)
                 gen_stmt(interp, it);
 
-            i64 ret = -1;
+            Value ret = make_value_null();
             if (block->expr)
                 ret = gen_expr(interp, block->expr);
 
@@ -257,7 +339,7 @@ static i64 gen_expr(Interp *interp, AstExpr *expr)
     }
 
     assert(false);
-    return -1;
+    return make_value_null();
 }
 
 static void gen_stmt(Interp *interp, AstStmt *stmt)
@@ -287,8 +369,8 @@ static void gen_stmt(Interp *interp, AstStmt *stmt)
             ScopeVar *var = scope_get_var(decl->scope, name->str);
             assert(var->register_index == -1);
 
-            i64 ri = PUSH(decl->bind->type_defn->size);
-            var->register_index = ri;
+            Value v = PUSH(decl->bind->type_defn->size);
+            var->register_index = v.register_index;
 
             break;
         }
@@ -300,34 +382,77 @@ static void gen_stmt(Interp *interp, AstStmt *stmt)
     }
 }
 
-static void dump_register(i64 r)
+static void dump_registers(Interp *interp)
 {
-    if (r == RSP)
-        fprintf(stderr, " rsp");
-    else if (r == RBP)
-        fprintf(stderr, " rbp");
-    else
-        fprintf(stderr, " r%ld", r);
+    for (i64 i = 0; i < interp->register_count; ++i)
+    {
+        Register r = interp->registers[i];
+
+        if (i == RSP)
+            fprintf(stderr, "r%ld (rsp)", i);
+        else if (i == RBP)
+            fprintf(stderr, "r%ld (rbp)", i);
+        else
+            fprintf(stderr, "r%-7ld", i);
+
+        fprintf(stderr, " i64=%-10ld    f32=%-10f\n", r.i64_, r.f32_);
+    }
 }
 
-static void dump_instr(Instr instr)
+static void print_value(Value v)
+{
+    fprintf(stderr, " ");
+
+    switch (v.type)
+    {
+        case VALUE_REGISTER_INDEX:
+        {
+            i64 r = v.register_index;
+            if (r == RSP)
+                fprintf(stderr, "rsp");
+            else if (r == RBP)
+                fprintf(stderr, "rbp");
+            else
+                fprintf(stderr, "r%ld", r);
+
+            break;
+        }
+        case VALUE_I64:
+        {
+            fprintf(stderr, "%ld", v.i64_);
+            break;
+        }
+        case VALUE_F32:
+        {
+            fprintf(stderr, "%ld", v.i64_);
+            break;
+        }
+        default:
+        {
+            assert(false);
+            break;
+        }
+    }
+}
+
+static void print_instr(Instr instr)
 {
     fprintf(stderr, "%-4s", opcode_strings[instr.op]);
 
-    if (instr.r0 != -1)
-        dump_register(instr.r0);
-    if (instr.r1 != -1)
-        dump_register(instr.r1);
-    if (instr.r2 != -1)
-        dump_register(instr.r2);
+    if (instr.v0.type != VALUE_NULL)
+        print_value(instr.v0);
+    if (instr.v1.type != VALUE_NULL)
+        print_value(instr.v1);
+    if (instr.v2.type != VALUE_NULL)
+        print_value(instr.v2);
 
     fprintf(stderr, "\n");
 }
 
-static void dump_ir(Interp *interp)
+static void print_ir(Interp *interp)
 {
     foreach(interp->instrs)
-        dump_instr(it);
+        print_instr(it);
 }
 
 Interp gen_ir(AstRoot *ast)
@@ -344,11 +469,122 @@ Interp gen_ir(AstRoot *ast)
         gen_expr(&interp, it->block);
     }
 
-    dump_ir(&interp);
+    // NOTE: manually adding an exit for now.
+    add_instr_(&interp, OP_EXIT, make_value_null(), make_value_null(), make_value_null());
+
+    print_ir(&interp);
 
     return interp;
 }
 
 void run_ir(Interp *interp)
 {
+    interp->registers = (Register *)malloc(interp->register_count * sizeof(Register));
+    interp->sp = 0;
+    interp->bp = 0;
+
+    auto r = interp->registers;
+
+    // Clear registers to zero.
+    for (i64 i = 0; i < interp->register_count; ++i)
+        r[i].i64_ = 0;
+
+    bool running = true;
+    while (running)
+    {
+        Instr i = interp->instrs[interp->ip];
+        switch (i.op)
+        {
+            case OP_IADD:
+            {
+                assert(i.v0.type == VALUE_REGISTER_INDEX);
+                r[i.v0.register_index].i64_ = unbox_i64(r, i.v1) + unbox_i64(r, i.v2);
+
+                break;
+            }
+            case OP_ISUB:
+            {
+                assert(i.v0.type == VALUE_REGISTER_INDEX);
+                r[i.v0.register_index].i64_ = unbox_i64(r, i.v1) - unbox_i64(r, i.v2);
+
+                break;
+            }
+            case OP_IMUL:
+            {
+                assert(i.v0.type == VALUE_REGISTER_INDEX);
+                r[i.v0.register_index].i64_ = unbox_i64(r, i.v1) * unbox_i64(r, i.v2);
+
+                break;
+            }
+            case OP_IDIV:
+            {
+                assert(i.v0.type == VALUE_REGISTER_INDEX);
+                r[i.v0.register_index].i64_ = unbox_i64(r, i.v1) / unbox_i64(r, i.v2);
+
+                break;
+            }
+            case OP_FADD:
+            {
+                assert(i.v0.type == VALUE_REGISTER_INDEX);
+                r[i.v0.register_index].f32_ = unbox_f32(r, i.v1) + unbox_f32(r, i.v2);
+
+                break;
+            }
+            case OP_FSUB:
+            {
+                assert(i.v0.type == VALUE_REGISTER_INDEX);
+                r[i.v0.register_index].f32_ = unbox_f32(r, i.v1) - unbox_f32(r, i.v2);
+
+                break;
+            }
+            case OP_FMUL:
+            {
+                assert(i.v0.type == VALUE_REGISTER_INDEX);
+                r[i.v0.register_index].f32_ = unbox_f32(r, i.v1) * unbox_f32(r, i.v2);
+
+                break;
+            }
+            case OP_FDIV:
+            {
+                assert(i.v0.type == VALUE_REGISTER_INDEX);
+                r[i.v0.register_index].f32_ = unbox_f32(r, i.v1) / unbox_f32(r, i.v2);
+
+                break;
+            }
+            case OP_MOV:
+            {
+                // TODO: IMOV / FMOV?
+                r[i.v0.register_index].i64_ = unbox_i64(r, i.v1);
+                break;
+            }
+            case OP_PUSH:
+            {
+                assert(i.v0.type == VALUE_I64);
+                interp->sp += unbox_i64(r, i.v0);
+                break;
+            }
+            case OP_POP:
+            {
+                assert(i.v0.type == VALUE_I64);
+                interp->sp -= unbox_i64(r, i.v0);
+                break;
+            }
+            case OP_EXIT:
+            {
+                running = false;
+                break;
+            }
+            case OP_ERR:
+            default:
+            {
+                fprintf(stderr, "Internal error: unknown opcode %u.\n", i.op);
+                assert(false);
+                break;
+            }
+        }
+
+        ++interp->ip;
+    }
+
+    dump_registers(interp);
 }
