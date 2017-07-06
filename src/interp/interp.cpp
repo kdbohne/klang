@@ -300,21 +300,34 @@ static void gen_stmt(Interp *interp, AstStmt *stmt)
     }
 }
 
+static void dump_register(i64 r)
+{
+    if (r == RSP)
+        fprintf(stderr, " rsp");
+    else if (r == RBP)
+        fprintf(stderr, " rbp");
+    else
+        fprintf(stderr, " r%ld", r);
+}
+
+static void dump_instr(Instr instr)
+{
+    fprintf(stderr, "%-4s", opcode_strings[instr.op]);
+
+    if (instr.r0 != -1)
+        dump_register(instr.r0);
+    if (instr.r1 != -1)
+        dump_register(instr.r1);
+    if (instr.r2 != -1)
+        dump_register(instr.r2);
+
+    fprintf(stderr, "\n");
+}
+
 static void dump_ir(Interp *interp)
 {
     foreach(interp->instrs)
-    {
-        fprintf(stderr, "%s", opcode_strings[it.op]);
-
-        if (it.r0 != -1)
-            fprintf(stderr, " %ld", it.r0);
-        if (it.r1 != -1)
-            fprintf(stderr, " %ld", it.r1);
-        if (it.r2 != -1)
-            fprintf(stderr, " %ld", it.r2);
-
-        fprintf(stderr, "\n");
-    }
+        dump_instr(it);
 }
 
 Interp gen_ir(AstRoot *ast)

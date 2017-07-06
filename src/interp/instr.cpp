@@ -2,21 +2,21 @@
 
 const char *opcode_strings[] =
 {
-    "OP_IADD",
-    "OP_ISUB",
-    "OP_IMUL",
-    "OP_IDIV",
-    "OP_FADD",
-    "OP_FSUB",
-    "OP_FMUL",
-    "OP_FDIV",
+    "iadd",
+    "isub",
+    "imul",
+    "idiv",
+    "fadd",
+    "fsub",
+    "fmul",
+    "fdiv",
 
-    "OP_MOV",
+    "mov",
 
-    "OP_PUSH",
-    "OP_POP",
+    "push",
+    "pop",
 
-    "OP_EXIT",
+    "exit",
 
-    "OP_ERR",
+    "err",
 };
