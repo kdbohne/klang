@@ -106,7 +106,7 @@ i64 get_value_size(Value v)
     }
 }
 
-static void add_instr_(Interp *interp, Opcode op, Value v0, Value v1, Value v2)
+static Instr *add_instr_(Interp *interp, Opcode op, Value v0, Value v1, Value v2)
 {
     Instr *instr = interp->instrs.next();
     instr->op = op;
@@ -114,6 +114,10 @@ static void add_instr_(Interp *interp, Opcode op, Value v0, Value v1, Value v2)
     instr->v0 = v0;
     instr->v1 = v1;
     instr->v2 = v2;
+
+    instr->comment = NULL;
+
+    return instr;
 }
 #define add_instr(op, v0, v1, v2) add_instr_(interp, op, v0, v1, v2)
 
@@ -159,13 +163,13 @@ static i64 alloc_register(Interp *interp)
 #define ADD(dest, lhs, rhs) ADD_(interp, dest, lhs, rhs)
 #define SUB(dest, lhs, rhs) SUB_(interp, dest, lhs, rhs)
 #define MOV(dest, src) MOV_(interp, dest, src)
-#define CALL(addr) CALL_(interp, addr)
+#define CALL(addr, label) CALL_(interp, addr, label)
 static void PUSH_(Interp *interp, Value v);
 static void POP_(Interp *interp, Value dest);
 static Value ADD_(Interp *interp, Value dest, Value lhs, Value rhs);
 static Value SUB_(Interp *interp, Value dest, Value lhs, Value rhs);
 static void MOV_(Interp *interp, Value dest, Value src);
-static void CALL_(Interp *interp, i64 addr);
+static Value CALL_(Interp *interp, i64 addr, char *label);
 
 static void PUSH_(Interp *interp, Value val)
 {
@@ -205,8 +209,14 @@ static void MOV_(Interp *interp, Value dest, Value src)
     add_instr(OP_MOV, dest, src, make_value_null());
 }
 
-static void CALL_(Interp *interp, i64 addr)
+static Value CALL_(Interp *interp, i64 addr, char *label)
 {
+    Instr *call = add_instr(OP_CALL, make_register_index(addr), make_value_null(), make_value_null());
+    call->comment = label;
+//    call->comment = string_duplicate(label);
+
+    // TODO: check if function returns a value
+    return make_register_index(RAX);
 }
 
 static void dump_registers(Interp *interp)
@@ -276,6 +286,9 @@ static void print_instr(Instr instr)
         print_value(instr.v1);
     if (instr.v2.type != VALUE_NULL)
         print_value(instr.v2);
+
+    if (instr.comment)
+        fprintf(stderr, " // %s", instr.comment);
 
     fprintf(stderr, "\n");
 }
@@ -382,7 +395,7 @@ static Value gen_expr(Interp *interp, AstExpr *expr)
             i64 *addr = func_addresses.get(call->name->str);
             assert(addr);
 
-            CALL(*addr);
+            CALL(*addr, call->name->str);
 
             SUB(make_register_index(RSP), make_register_index(RSP), make_value_i64(arg_size));
             POP(make_register_index(RBP));

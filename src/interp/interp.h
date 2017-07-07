@@ -73,6 +73,8 @@ struct Instr
     Value v0;
     Value v1;
     Value v2;
+
+    char *comment = NULL;
 };
 
 union Register
