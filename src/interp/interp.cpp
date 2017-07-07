@@ -1,10 +1,11 @@
 #include "interp/interp.h"
 #include "ast.h"
 
-// NOTE: the first eight registers are reserved.
+// NOTE: the first sixteen registers are reserved.
 static const i64 RAX = 0;
 static const i64 RSP = 4;
 static const i64 RBP = 5;
+static const i64 RIP = 8;
 static const i64 REG_SIZE = 8;
 
 const char *opcode_strings[] =
@@ -162,14 +163,17 @@ static i64 alloc_register(Interp *interp)
 #define POP(dest) POP_(interp, dest)
 #define ADD(dest, lhs, rhs) ADD_(interp, dest, lhs, rhs)
 #define SUB(dest, lhs, rhs) SUB_(interp, dest, lhs, rhs)
-#define MOV(dest, src) MOV_(interp, dest, src)
+#define MOV(dest, ...) MOV_(interp, dest, __VA_ARGS__)
 #define CALL(addr, label) CALL_(interp, addr, label)
+#define RET() RET_(interp)
 static void PUSH_(Interp *interp, Value v);
 static void POP_(Interp *interp, Value dest);
 static Value ADD_(Interp *interp, Value dest, Value lhs, Value rhs);
 static Value SUB_(Interp *interp, Value dest, Value lhs, Value rhs);
 static void MOV_(Interp *interp, Value dest, Value src);
+static void MOV_(Interp *interp, Value dest, Value src, Value offset);
 static Value CALL_(Interp *interp, i64 addr, char *label);
+static void RET_(Interp *interp);
 
 static void PUSH_(Interp *interp, Value val)
 {
@@ -209,14 +213,26 @@ static void MOV_(Interp *interp, Value dest, Value src)
     add_instr(OP_MOV, dest, src, make_value_null());
 }
 
+static void MOV_(Interp *interp, Value dest, Value src, Value offset)
+{
+    assert(dest.type == VALUE_REGISTER_INDEX);
+
+    add_instr(OP_MOV, dest, src, offset);
+}
+
 static Value CALL_(Interp *interp, i64 addr, char *label)
 {
-    Instr *call = add_instr(OP_CALL, make_register_index(addr), make_value_null(), make_value_null());
+    Instr *call = add_instr(OP_CALL, make_value_i64(addr), make_value_null(), make_value_null());
     call->comment = label;
 //    call->comment = string_duplicate(label);
 
     // TODO: check if function returns a value
     return make_register_index(RAX);
+}
+
+static void RET_(Interp *interp)
+{
+    add_instr(OP_RET, make_value_null(), make_value_null(), make_value_null());
 }
 
 static void dump_registers(Interp *interp)
@@ -231,6 +247,8 @@ static void dump_registers(Interp *interp)
             fprintf(stderr, "r%ld (rsp)", i);
         else if (i == RBP)
             fprintf(stderr, "r%ld (rbp)", i);
+        else if (i == RIP)
+            fprintf(stderr, "r%ld (rip)", i);
         else
             fprintf(stderr, "r%-7ld", i);
 
@@ -253,6 +271,8 @@ static void print_value(Value v)
                 fprintf(stderr, "rsp");
             else if (r == RBP)
                 fprintf(stderr, "rbp");
+            else if (r == RIP)
+                fprintf(stderr, "rip");
             else
                 fprintf(stderr, "r%ld", r);
 
@@ -379,12 +399,9 @@ static Value gen_expr(Interp *interp, AstExpr *expr)
         {
             auto call = static_cast<AstExprCall *>(expr);
 
-            // Set up the new frame.
-            PUSH(make_register_index(RBP));
-            MOV(make_register_index(RBP), make_register_index(RSP));
-
             // TODO: is it possible to pass existing registers directly if the
             // expression has already been generated?
+            // Push arguments to the stack frame.
             i64 arg_size = 0;
             foreach(call->args)
             {
@@ -397,8 +414,8 @@ static Value gen_expr(Interp *interp, AstExpr *expr)
 
             CALL(*addr, call->name->str);
 
+            // Remove arguments from the stack frame.
             SUB(make_register_index(RSP), make_register_index(RSP), make_value_i64(arg_size));
-            POP(make_register_index(RBP));
 
             // TODO: check if function actually returns a value
             return make_register_index(RAX);
@@ -411,6 +428,7 @@ static Value gen_expr(Interp *interp, AstExpr *expr)
         }
         case AST_EXPR_PARAM:
         {
+#if 0
             auto param = static_cast<AstExprParam *>(expr);
 
             // TODO: this is just copy-pasted from AST_STMT_DECL case in gen_stmt()
@@ -422,6 +440,9 @@ static Value gen_expr(Interp *interp, AstExpr *expr)
 
             // Nothing needs to be returned here.
             return make_value_null();
+#endif
+            assert(false);
+            break;
         }
         case AST_EXPR_CAST:
         {
@@ -553,20 +574,55 @@ static void gen_stmt(Interp *interp, AstStmt *stmt)
 
 static void gen_func(Interp *interp, AstFunc *func)
 {
-    i64 addr = interp->instrs.count;
-    func_addresses.insert(func->name->str, addr);
+    i64 func_addr = interp->instrs.count;
+    func_addresses.insert(func->name->str, func_addr);
 
+    // Set up the new frame.
+    PUSH(make_register_index(RBP));
+    MOV(make_register_index(RBP), make_register_index(RSP));
+
+    i64 param_size = 0;
     foreach(func->params)
-        gen_expr(interp, it);
+        param_size += it->name->type_defn->size;
+
+    i64 offset = -param_size;
+    foreach(func->params)
+    {
+        ScopeVar *var = scope_get_var(it->name->scope, it->name->str);
+        assert(var->register_index == -1);
+
+        // TODO: optimize! this is copying the stack arguments into duplicate
+        // registers... how to bind new registers to existing stack registers?
+        i64 r = alloc_register(interp);
+        MOV(make_register_index(r), make_register_index(RSP), make_value_i64(offset));
+
+        var->register_index = r;
+
+        interp->instrs[interp->instrs.count - 1].comment = it->name->str;
+
+        // TODO: handle alignment?
+        offset += it->name->type_defn->size;
+    }
 
     gen_expr(interp, func->block);
+
+    // Restore the old frame.
+    POP(make_register_index(RBP));
+
+    // HACK: manually insert an EXIT if this is main()
+    if (strings_match(func->name->str, "main"))
+        add_instr(OP_EXIT, make_value_null(), make_value_null(), make_value_null());
+    else
+        RET();
+
+    // Tag the first instruction of the function block with its name.
+    interp->instrs[func_addr].comment = func->name->str;
 }
 
 Interp gen_ir(AstRoot *ast)
 {
-    Interp interp;
-    interp.register_count = 8; // NOTE: registers 4, 5 are reserved
-    interp.ip = 0;
+    Interp interp = {};
+    interp.register_count = 16; // NOTE: the first sixteen register are reserved.
 
     foreach(ast->funcs)
     {
@@ -576,10 +632,11 @@ Interp gen_ir(AstRoot *ast)
         gen_func(&interp, it);
     }
 
-    // NOTE: manually adding an exit for now.
-    add_instr_(&interp, OP_EXIT, make_value_null(), make_value_null(), make_value_null());
-
     print_ir(&interp);
+
+    i64 *entry_point = func_addresses.get("main");
+    assert(entry_point);
+    interp.entry_point = *entry_point;
 
     return interp;
 }
@@ -590,8 +647,6 @@ void run_ir(Interp *interp)
     i64 *stack = (i64 *)malloc(stack_capacity);
 
     interp->registers = (Register *)malloc(interp->register_count * sizeof(Register));
-    interp->sp = 0;
-    interp->bp = 0;
 
     auto r = interp->registers;
 
@@ -599,10 +654,22 @@ void run_ir(Interp *interp)
     for (i64 i = 0; i < interp->register_count; ++i)
         r[i].i64_ = 0;
 
+    r[RIP].i64_ = interp->entry_point;
+    r[RBP].i64_ = 0;
+    r[RSP].i64_ = 0;
+    r[RAX].i64_ = 0;
+
+    fprintf(stderr, "\n");
+
     bool running = true;
     while (running)
     {
-        Instr i = interp->instrs[interp->ip];
+//        dump_registers(interp);
+
+        i64 ip = r[RIP].i64_;
+        Instr i = interp->instrs[ip];
+//        print_instr(i);
+
         switch (i.op)
         {
             case OP_IADD:
@@ -610,6 +677,7 @@ void run_ir(Interp *interp)
                 assert(i.v0.type == VALUE_REGISTER_INDEX);
                 r[i.v0.register_index].i64_ = unbox_i64(r, i.v1) + unbox_i64(r, i.v2);
 
+                ++r[RIP].i64_;
                 break;
             }
             case OP_ISUB:
@@ -617,6 +685,7 @@ void run_ir(Interp *interp)
                 assert(i.v0.type == VALUE_REGISTER_INDEX);
                 r[i.v0.register_index].i64_ = unbox_i64(r, i.v1) - unbox_i64(r, i.v2);
 
+                ++r[RIP].i64_;
                 break;
             }
             case OP_IMUL:
@@ -624,6 +693,7 @@ void run_ir(Interp *interp)
                 assert(i.v0.type == VALUE_REGISTER_INDEX);
                 r[i.v0.register_index].i64_ = unbox_i64(r, i.v1) * unbox_i64(r, i.v2);
 
+                ++r[RIP].i64_;
                 break;
             }
             case OP_IDIV:
@@ -631,6 +701,7 @@ void run_ir(Interp *interp)
                 assert(i.v0.type == VALUE_REGISTER_INDEX);
                 r[i.v0.register_index].i64_ = unbox_i64(r, i.v1) / unbox_i64(r, i.v2);
 
+                ++r[RIP].i64_;
                 break;
             }
             case OP_FADD:
@@ -638,6 +709,7 @@ void run_ir(Interp *interp)
                 assert(i.v0.type == VALUE_REGISTER_INDEX);
                 r[i.v0.register_index].f32_ = unbox_f32(r, i.v1) + unbox_f32(r, i.v2);
 
+                ++r[RIP].i64_;
                 break;
             }
             case OP_FSUB:
@@ -645,6 +717,7 @@ void run_ir(Interp *interp)
                 assert(i.v0.type == VALUE_REGISTER_INDEX);
                 r[i.v0.register_index].f32_ = unbox_f32(r, i.v1) - unbox_f32(r, i.v2);
 
+                ++r[RIP].i64_;
                 break;
             }
             case OP_FMUL:
@@ -652,6 +725,7 @@ void run_ir(Interp *interp)
                 assert(i.v0.type == VALUE_REGISTER_INDEX);
                 r[i.v0.register_index].f32_ = unbox_f32(r, i.v1) * unbox_f32(r, i.v2);
 
+                ++r[RIP].i64_;
                 break;
             }
             case OP_FDIV:
@@ -659,25 +733,39 @@ void run_ir(Interp *interp)
                 assert(i.v0.type == VALUE_REGISTER_INDEX);
                 r[i.v0.register_index].f32_ = unbox_f32(r, i.v1) / unbox_f32(r, i.v2);
 
+                ++r[RIP].i64_;
                 break;
             }
             case OP_MOV:
             {
-                // TODO: IMOV / FMOV?
-                r[i.v0.register_index].i64_ = unbox_i64(r, i.v1);
+                if (i.v2.type != VALUE_NULL)
+                {
+                    i64 addr = unbox_i64(r, i.v1) + unbox_i64(r, i.v2);
+                    assert(addr < r[RSP].i64_);
+
+                    r[i.v0.register_index].i64_ = stack[addr];
+                }
+                else
+                {
+                    r[i.v0.register_index].i64_ = unbox_i64(r, i.v1);
+                }
+
+                ++r[RIP].i64_;
                 break;
             }
             case OP_PUSH:
             {
-                stack[interp->sp] = unbox_i64(r, i.v0); // HACK: assuming only i64s are pushed
+                i64 *sp = &r[RSP].i64_;
+                stack[*sp] = unbox_i64(r, i.v0); // HACK: assuming only i64s are pushed
 
-                interp->sp += 8; // HACK: assuming only 64-bit values are pushed
-                if (interp->sp >= stack_capacity)
+                *sp += 8; // HACK: assuming only 64-bit values are pushed
+                if (*sp >= stack_capacity)
                 {
                     fprintf(stderr, "Error: stack overflow.\n");
                     assert(false);
                 }
 
+                ++r[RIP].i64_;
                 break;
             }
             case OP_POP:
@@ -685,14 +773,49 @@ void run_ir(Interp *interp)
                 assert(i.v0.type == VALUE_REGISTER_INDEX);
 
                 // TODO: catch underflow prior to accessing
-                i64 val = stack[interp->sp - 8];
+                i64 *sp = &r[RSP].i64_;
+                i64 val = stack[*sp - 8];
 
-                interp->sp -= 8; // HACK: assuming only 64-bit values are popped
-                if (interp->sp < 0)
+                *sp -= 8; // HACK: assuming only 64-bit values are popped
+                if (*sp < 0)
                 {
                     fprintf(stderr, "Error: stack underflow.\n");
                     assert(false);
                 }
+
+                ++r[RIP].i64_;
+                break;
+            }
+            case OP_CALL:
+            {
+                assert(i.v0.type == VALUE_I64);
+
+                // TODO: catch overflow
+                // TODO: this is sort of duplicated from OP_PUSH
+                // Push instruction pointer onto the stack.
+                i64 *sp = &r[RSP].i64_;
+                stack[*sp] = r[RIP].i64_ + 1;
+                *sp += 8;
+
+                r[RIP].i64_ = unbox_i64(r, i.v0);
+
+                break;
+            }
+            case OP_RET:
+            {
+                // TODO: this is sort of duplicated from OP_POP
+                // Pop instruction pointer from the stack.
+                i64 *sp = &r[RSP].i64_;
+                i64 addr = stack[*sp - 8];
+
+                *sp -= 8;
+                if (*sp < 0)
+                {
+                    fprintf(stderr, "Error: stack underflow in RET.\n");
+                    assert(false);
+                }
+
+                r[RIP].i64_ = addr;
 
                 break;
             }
@@ -709,8 +832,6 @@ void run_ir(Interp *interp)
                 break;
             }
         }
-
-        ++interp->ip;
     }
 
     dump_registers(interp);

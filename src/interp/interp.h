@@ -90,9 +90,7 @@ struct Interp
     Register *registers;
     i64 register_count;
 
-    i64 ip;
-    i64 sp;
-    i64 bp;
+    i64 entry_point;
 };
 
 Interp gen_ir(AstRoot *ast);
