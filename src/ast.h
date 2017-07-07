@@ -357,7 +357,7 @@ struct AstStmtDecl : AstStmt
 
 enum AstFuncFlags
 {
-    FUNC_EXTERN = 0x1,
+    FUNC_IS_EXTERN = 0x1,
 };
 
 struct AstFunc : AstNode

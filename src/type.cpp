@@ -1033,7 +1033,7 @@ bool type_check(AstRoot *root)
 
     foreach(root->funcs)
     {
-        if (it->flags & FUNC_EXTERN)
+        if (it->flags & FUNC_IS_EXTERN)
             continue;
 
         type_check_func(it);

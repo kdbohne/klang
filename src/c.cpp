@@ -471,7 +471,7 @@ void c_gen_ir(AstRoot *ast)
 
     foreach(ast->funcs)
     {
-        if (it->flags & FUNC_EXTERN)
+        if (it->flags & FUNC_IS_EXTERN)
             continue;
 
         gen_func_sig(it);
