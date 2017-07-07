@@ -9,7 +9,7 @@
 #include "parse.h"
 #include "llvm.h"
 #include "c.h"
-#include "interp/interp.h"
+#include "interp.h"
 
 static File read_file(char *path)
 {

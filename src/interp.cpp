@@ -1,4 +1,4 @@
-#include "interp/interp.h"
+#include "interp.h"
 #include "ast.h"
 
 // NOTE: the first sixteen registers are reserved.
