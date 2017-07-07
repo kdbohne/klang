@@ -21,6 +21,9 @@ enum Opcode : u32
     OP_PUSH,
     OP_POP,
 
+    OP_CALL,
+    OP_RET,
+
     OP_EXIT,
 
     OP_ERR,

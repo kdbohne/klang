@@ -1,6 +1,8 @@
 #include "interp/interp.h"
 #include "ast.h"
 
+// NOTE: the first eight registers are reserved.
+static const i64 RAX = 0;
 static const i64 RSP = 4;
 static const i64 RBP = 5;
 static const i64 REG_SIZE = 8;
@@ -21,10 +23,16 @@ const char *opcode_strings[] =
     "push",
     "pop",
 
+    "call",
+    "ret",
+
     "exit",
 
     "err",
 };
+
+// Maps the name of each function to its 'address' (instruction pointer).
+static HashMap<i64> func_addresses;
 
 Value make_value_null()
 {
@@ -84,6 +92,20 @@ float unbox_f32(Register *r, Value v)
     return -1.0f;
 }
 
+i64 get_value_size(Value v)
+{
+    switch (v.type)
+    {
+        case VALUE_I64: { return 8; }
+        case VALUE_F32: { return 4; }
+        default:
+        {
+            assert(false);
+            return -1;
+        }
+    }
+}
+
 static void add_instr_(Interp *interp, Opcode op, Value v0, Value v1, Value v2)
 {
     Instr *instr = interp->instrs.next();
@@ -127,28 +149,38 @@ static i64 get_int_size(LitInt int_)
     }
 }
 
-static i64 get_type_size(AstExpr *expr)
-{
-    return 0;//expr->type_defn;
-}
-
 static i64 alloc_register(Interp *interp)
 {
     return interp->register_count++;
 }
 
-static Value PUSH_(Interp *interp, i64 size)
-{
-    // TODO: address relative to RBP
-    i64 r = alloc_register(interp);
-    add_instr(OP_MOV, make_register_index(r), make_register_index(RSP), make_value_null());
-
-    add_instr(OP_IADD, make_register_index(RSP), make_register_index(RSP), make_value_i64(size));
-
-    Value rv = make_register_index(r);
-    return rv;
-}
 #define PUSH(size) PUSH_(interp, size)
+#define POP(dest) POP_(interp, dest)
+#define ADD(dest, lhs, rhs) ADD_(interp, dest, lhs, rhs)
+#define SUB(dest, lhs, rhs) SUB_(interp, dest, lhs, rhs)
+#define MOV(dest, src) MOV_(interp, dest, src)
+#define CALL(addr) CALL_(interp, addr)
+static void PUSH_(Interp *interp, Value v);
+static void POP_(Interp *interp, Value dest);
+static Value ADD_(Interp *interp, Value dest, Value lhs, Value rhs);
+static Value SUB_(Interp *interp, Value dest, Value lhs, Value rhs);
+static void MOV_(Interp *interp, Value dest, Value src);
+static void CALL_(Interp *interp, i64 addr);
+
+static void PUSH_(Interp *interp, Value val)
+{
+    // TODO: use size
+//    i64 size = get_value_size(val);
+
+    add_instr(OP_PUSH, val, make_value_null(), make_value_null());
+}
+
+static void POP_(Interp *interp, Value dest)
+{
+    assert(dest.type == VALUE_REGISTER_INDEX);
+
+    add_instr(OP_POP, dest, make_value_null(), make_value_null());
+}
 
 static Value ADD_(Interp *interp, Value dest, Value lhs, Value rhs)
 {
@@ -157,13 +189,111 @@ static Value ADD_(Interp *interp, Value dest, Value lhs, Value rhs)
     add_instr(OP_IADD, dest, lhs, rhs);
     return dest;
 }
-#define ADD(dest, lhs, rhs) ADD_(interp, dest, lhs, rhs)
+
+static Value SUB_(Interp *interp, Value dest, Value lhs, Value rhs)
+{
+    assert(dest.type == VALUE_REGISTER_INDEX);
+
+    add_instr(OP_ISUB, dest, lhs, rhs);
+    return dest;
+}
 
 static void MOV_(Interp *interp, Value dest, Value src)
 {
+    assert(dest.type == VALUE_REGISTER_INDEX);
+
     add_instr(OP_MOV, dest, src, make_value_null());
 }
-#define MOV(dest, src) MOV_(interp, dest, src)
+
+static void CALL_(Interp *interp, i64 addr)
+{
+}
+
+static void dump_registers(Interp *interp)
+{
+    for (i64 i = 0; i < interp->register_count; ++i)
+    {
+        Register r = interp->registers[i];
+
+        if (i == RAX)
+            fprintf(stderr, "r%ld (rax)", i);
+        else if (i == RSP)
+            fprintf(stderr, "r%ld (rsp)", i);
+        else if (i == RBP)
+            fprintf(stderr, "r%ld (rbp)", i);
+        else
+            fprintf(stderr, "r%-7ld", i);
+
+        fprintf(stderr, " i64=%-10ld    f32=%-10f\n", r.i64_, r.f32_);
+    }
+}
+
+static void print_value(Value v)
+{
+    fprintf(stderr, " ");
+
+    switch (v.type)
+    {
+        case VALUE_REGISTER_INDEX:
+        {
+            i64 r = v.register_index;
+            if (r == RAX)
+                fprintf(stderr, "rax");
+            else if (r == RSP)
+                fprintf(stderr, "rsp");
+            else if (r == RBP)
+                fprintf(stderr, "rbp");
+            else
+                fprintf(stderr, "r%ld", r);
+
+            break;
+        }
+        case VALUE_I64:
+        {
+            fprintf(stderr, "%ld", v.i64_);
+            break;
+        }
+        case VALUE_F32:
+        {
+            fprintf(stderr, "%ld", v.i64_);
+            break;
+        }
+        default:
+        {
+            assert(false);
+            break;
+        }
+    }
+}
+
+static void print_instr(Instr instr)
+{
+    fprintf(stderr, "%-4s", opcode_strings[instr.op]);
+
+    if (instr.v0.type != VALUE_NULL)
+        print_value(instr.v0);
+    if (instr.v1.type != VALUE_NULL)
+        print_value(instr.v1);
+    if (instr.v2.type != VALUE_NULL)
+        print_value(instr.v2);
+
+    fprintf(stderr, "\n");
+}
+
+static void print_ir(Interp *interp)
+{
+    foreach(interp->instrs)
+        print_instr(it);
+}
+
+static i64 reserve_stack_space(Interp *interp, i64 size)
+{
+    i64 r = alloc_register(interp);
+    MOV(make_register_index(r), make_register_index(RSP));
+    ADD(make_register_index(RSP), make_register_index(RSP), make_value_i64(size));
+
+    return r;
+}
 
 static void gen_stmt(Interp *interp, AstStmt *stmt);
 
@@ -234,9 +364,31 @@ static Value gen_expr(Interp *interp, AstExpr *expr)
         }
         case AST_EXPR_CALL:
         {
-            // FIXME
-            assert(false);
-            break;
+            auto call = static_cast<AstExprCall *>(expr);
+
+            // Set up the new frame.
+            PUSH(make_register_index(RBP));
+            MOV(make_register_index(RBP), make_register_index(RSP));
+
+            // TODO: is it possible to pass existing registers directly if the
+            // expression has already been generated?
+            i64 arg_size = 0;
+            foreach(call->args)
+            {
+                Value arg = gen_expr(interp, it);
+                arg_size += 8; // HACK HACK HACK: assuming all arguments are 64 bits
+            }
+
+            i64 *addr = func_addresses.get(call->name->str);
+            assert(addr);
+
+            CALL(*addr);
+
+            SUB(make_register_index(RSP), make_register_index(RSP), make_value_i64(arg_size));
+            POP(make_register_index(RBP));
+
+            // TODO: check if function actually returns a value
+            return make_register_index(RAX);
         }
         case AST_EXPR_TYPE:
         {
@@ -246,9 +398,17 @@ static Value gen_expr(Interp *interp, AstExpr *expr)
         }
         case AST_EXPR_PARAM:
         {
-            // FIXME
-            assert(false);
-            break;
+            auto param = static_cast<AstExprParam *>(expr);
+
+            // TODO: this is just copy-pasted from AST_STMT_DECL case in gen_stmt()
+            ScopeVar *var = scope_get_var(param->name->scope, param->name->str);
+            assert(var->register_index == -1);
+
+            i64 size = param->name->type_defn->size;
+            var->register_index = reserve_stack_space(interp, size);
+
+            // Nothing needs to be returned here.
+            return make_value_null();
         }
         case AST_EXPR_CAST:
         {
@@ -275,10 +435,6 @@ static Value gen_expr(Interp *interp, AstExpr *expr)
         case AST_EXPR_BLOCK:
         {
             auto block = static_cast<AstExprBlock *>(expr);
-
-            Value r = PUSH(REG_SIZE);
-            MOV(r, make_register_index(RBP));
-            MOV(make_register_index(RBP), make_register_index(RSP));
 
             foreach(block->stmts)
                 gen_stmt(interp, it);
@@ -369,8 +525,8 @@ static void gen_stmt(Interp *interp, AstStmt *stmt)
             ScopeVar *var = scope_get_var(decl->scope, name->str);
             assert(var->register_index == -1);
 
-            Value v = PUSH(decl->bind->type_defn->size);
-            var->register_index = v.register_index;
+            i64 size = decl->bind->type_defn->size;
+            var->register_index = reserve_stack_space(interp, size);
 
             break;
         }
@@ -382,77 +538,15 @@ static void gen_stmt(Interp *interp, AstStmt *stmt)
     }
 }
 
-static void dump_registers(Interp *interp)
+static void gen_func(Interp *interp, AstFunc *func)
 {
-    for (i64 i = 0; i < interp->register_count; ++i)
-    {
-        Register r = interp->registers[i];
+    i64 addr = interp->instrs.count;
+    func_addresses.insert(func->name->str, addr);
 
-        if (i == RSP)
-            fprintf(stderr, "r%ld (rsp)", i);
-        else if (i == RBP)
-            fprintf(stderr, "r%ld (rbp)", i);
-        else
-            fprintf(stderr, "r%-7ld", i);
+    foreach(func->params)
+        gen_expr(interp, it);
 
-        fprintf(stderr, " i64=%-10ld    f32=%-10f\n", r.i64_, r.f32_);
-    }
-}
-
-static void print_value(Value v)
-{
-    fprintf(stderr, " ");
-
-    switch (v.type)
-    {
-        case VALUE_REGISTER_INDEX:
-        {
-            i64 r = v.register_index;
-            if (r == RSP)
-                fprintf(stderr, "rsp");
-            else if (r == RBP)
-                fprintf(stderr, "rbp");
-            else
-                fprintf(stderr, "r%ld", r);
-
-            break;
-        }
-        case VALUE_I64:
-        {
-            fprintf(stderr, "%ld", v.i64_);
-            break;
-        }
-        case VALUE_F32:
-        {
-            fprintf(stderr, "%ld", v.i64_);
-            break;
-        }
-        default:
-        {
-            assert(false);
-            break;
-        }
-    }
-}
-
-static void print_instr(Instr instr)
-{
-    fprintf(stderr, "%-4s", opcode_strings[instr.op]);
-
-    if (instr.v0.type != VALUE_NULL)
-        print_value(instr.v0);
-    if (instr.v1.type != VALUE_NULL)
-        print_value(instr.v1);
-    if (instr.v2.type != VALUE_NULL)
-        print_value(instr.v2);
-
-    fprintf(stderr, "\n");
-}
-
-static void print_ir(Interp *interp)
-{
-    foreach(interp->instrs)
-        print_instr(it);
+    gen_expr(interp, func->block);
 }
 
 Interp gen_ir(AstRoot *ast)
@@ -466,7 +560,7 @@ Interp gen_ir(AstRoot *ast)
         if (it->flags & FUNC_IS_EXTERN)
             continue;
 
-        gen_expr(&interp, it->block);
+        gen_func(&interp, it);
     }
 
     // NOTE: manually adding an exit for now.
@@ -479,6 +573,9 @@ Interp gen_ir(AstRoot *ast)
 
 void run_ir(Interp *interp)
 {
+    i64 stack_capacity = 1024;
+    i64 *stack = (i64 *)malloc(stack_capacity);
+
     interp->registers = (Register *)malloc(interp->register_count * sizeof(Register));
     interp->sp = 0;
     interp->bp = 0;
@@ -559,14 +656,31 @@ void run_ir(Interp *interp)
             }
             case OP_PUSH:
             {
-                assert(i.v0.type == VALUE_I64);
-                interp->sp += unbox_i64(r, i.v0);
+                stack[interp->sp] = unbox_i64(r, i.v0); // HACK: assuming only i64s are pushed
+
+                interp->sp += 8; // HACK: assuming only 64-bit values are pushed
+                if (interp->sp >= stack_capacity)
+                {
+                    fprintf(stderr, "Error: stack overflow.\n");
+                    assert(false);
+                }
+
                 break;
             }
             case OP_POP:
             {
-                assert(i.v0.type == VALUE_I64);
-                interp->sp -= unbox_i64(r, i.v0);
+                assert(i.v0.type == VALUE_REGISTER_INDEX);
+
+                // TODO: catch underflow prior to accessing
+                i64 val = stack[interp->sp - 8];
+
+                interp->sp -= 8; // HACK: assuming only 64-bit values are popped
+                if (interp->sp < 0)
+                {
+                    fprintf(stderr, "Error: stack underflow.\n");
+                    assert(false);
+                }
+
                 break;
             }
             case OP_EXIT:
