@@ -17,9 +17,9 @@ extern "C"
 template<typename T>
 struct Array
 {
-    T *data;
-    i32 count;
-    i32 capacity;
+    T *data = NULL;
+    i32 count = 0;
+    i32 capacity = 0;
 
     Array() : data(NULL), count(0), capacity(0)
     {

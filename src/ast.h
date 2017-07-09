@@ -16,6 +16,8 @@ struct AstStructField;
 struct ScopeVar
 {
     AstExprIdent *name = NULL;
+    TypeDefn *type_defn = NULL;
+
     i64 register_index = -1;
 };
 

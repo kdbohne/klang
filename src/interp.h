@@ -1,9 +1,27 @@
 #pragma once
 
+#include "core/common.h"
 #include "core/array.h"
 
 struct AstRoot;
-union Register;
+
+union Register
+{
+    i8* ptr_;
+
+    i8  i8_;
+    i16 i16_;
+    i32 i32_;
+    i64 i64_;
+
+    u8  u8_;
+    u16 u16_;
+    u32 u32_;
+    u64 u64_;
+
+    f32 f32_;
+    f64 f64_;
+};
 
 enum Opcode : u32
 {
@@ -22,7 +40,10 @@ enum Opcode : u32
     OP_POP,
 
     OP_CALL,
+    OP_CALL_EXT,
     OP_RET,
+
+    OP_CAST_TO_PTR,
 
     OP_EXIT,
 
@@ -32,10 +53,20 @@ extern const char *opcode_strings[];
 
 enum ValueType : u32
 {
-    VALUE_REGISTER_INDEX,
+    VALUE_PTR,
 
+    VALUE_I8,
+    VALUE_I16,
+    VALUE_I32,
     VALUE_I64,
+
+    VALUE_U8,
+    VALUE_U16,
+    VALUE_U32,
+    VALUE_U64,
+
     VALUE_F32,
+    VALUE_F64,
 
     VALUE_NULL,
 
@@ -43,29 +74,26 @@ enum ValueType : u32
 };
 
 // TODO: better name?
-// TODO: the immediate values are a duplicate of the Register type; use Register instead?
 // Values are boxed operands that contain either a register index
 // or an immediate value.
 struct Value
 {
-    ValueType type = VALUE_ERR;
-    union
-    {
-        // Not immediate; just a normal register.
-        i64 register_index = -1;
+    // Immediate values have a register index of -1. If non-zero, this Value is
+    // just a proxy that contains the index of the register with the actual value.
+    i64 register_index = -1;
 
-        // Immediate values.
-        i64   i64_;
-        float f32_;
-    };
+    ValueType type = VALUE_ERR;
+    Register r;
 };
 
 Value make_value_null();
-Value make_register_index(i64 i);
+Value make_register_index(i64 i, ValueType type);
 Value make_value_i64(i64 val);
-Value make_value_f32(float val);
+Value make_value_f32(f32 val);
+Value make_value_str(char *str);
 i64 unbox_i64(Register *r, Value v);
-float unbox_f32(Register *r, Value v);
+u8 unbox_u8(Register *r, Value v);
+f32 unbox_f32(Register *r, Value v);
 
 struct Instr
 {
@@ -77,10 +105,10 @@ struct Instr
     char *comment = NULL;
 };
 
-union Register
+struct Ffi
 {
-    i64   i64_ = -1;
-    float f32_;
+    char *name = NULL;
+    Array<ValueType> params;
 };
 
 struct Interp
@@ -91,6 +119,8 @@ struct Interp
     i64 register_count;
 
     i64 entry_point;
+
+    Array<Ffi> extern_funcs;
 };
 
 Interp gen_ir(AstRoot *ast);
