@@ -81,6 +81,7 @@ struct Array
 
     T &operator[](i32 i)
     {
+        // TODO: bounds checking?
         return data[i];
     }
 };
