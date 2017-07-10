@@ -2,6 +2,7 @@
 
 #include "core/common.h"
 #include "core/array.h"
+#include "core/hash_map.h"
 
 struct AstRoot;
 struct AstFunc;
@@ -77,7 +78,12 @@ struct Interp
     i64 entry_point;
 
     Array<AstFunc *> extern_funcs;
-    Array<char *> string_table;
+
+    HashMap<i64> global_strings;
+
+    u8 *memory;
+    i64 memory_size;
+    i64 memory_capacity;
 };
 
 Interp gen_ir(AstRoot *ast);

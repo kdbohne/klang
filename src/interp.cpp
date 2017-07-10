@@ -6,10 +6,10 @@
 
 // NOTE: the first sixteen registers are reserved.
 static const i64 RAX = 0;
+static const i64 RDX = 3;
 static const i64 RSP = 4;
 static const i64 RBP = 5;
 static const i64 RIP = 8;
-static const i64 REG_SIZE = 8;
 
 // Maps the name of each function to its 'address' (instruction pointer).
 static HashMap<i64> func_addresses;
@@ -219,21 +219,50 @@ static void CALL_(Interp *interp, i64 addr, char *label)
     comment(interp, label);
 }
 
+static i64 reserve_stack_space(Interp *interp, i64 size)
+{
+    i64 r = alloc_register(interp);
+    MOV(r, RSP);
+    ADD_CONST(RSP, RSP, size);
+
+    return r;
+}
+
+// TODO: more overloads
+static i64 push_data_segment(Interp *interp, char *str)
+{
+    i64 alignment = 8;
+
+    i64 base = interp->memory_size;
+    assert(base % alignment == 0);
+
+    while (*str)
+    {
+        assert(interp->memory_size < interp->memory_capacity);
+        interp->memory[interp->memory_size++] = *str++;
+    }
+
+    assert(interp->memory_size < interp->memory_capacity);
+    interp->memory[interp->memory_size++] = '\0';
+
+    interp->memory_size += alignment - (interp->memory_size % alignment);
+
+    return base;
+}
+
 static i64 get_global_string(Interp *interp, char *str)
 {
-    // TODO: SLOW SLOW SLOW! Optimize me!
-    for (i64 i = 0; i < interp->string_table.count; ++i)
-    {
-        if (strings_match(interp->string_table[i], str))
-            return i;
-    }
+    i64 *offset_ptr = interp->global_strings.get(str);
+    if (offset_ptr)
+        return *offset_ptr;
 
     // TODO: does the string need to be duplicated?
 //    char *dup = string_duplicate(str);
-//    interp->string_table.add(dup);
-    interp->string_table.add(str);
+//    interp->global_strings.insert(dup);
+    i64 offset = push_data_segment(interp, str);
+    interp->global_strings.insert(str, offset);
 
-    return interp->string_table.count - 1;
+    return offset;
 }
 
 static void CALL_EXT_(Interp *interp, char *name)
@@ -255,6 +284,8 @@ static void dump_registers(Interp *interp)
 
         if (i == RAX)
             fprintf(stderr, "r%ld (rax)", i);
+        else if (i == RDX)
+            fprintf(stderr, "r%ld (rdx)", i);
         else if (i == RSP)
             fprintf(stderr, "r%ld (rsp)", i);
         else if (i == RBP)
@@ -276,6 +307,8 @@ static void print_register_name(i64 r, u64 mask, i64 index)
     {
         if (r == RAX)
             fprintf(stderr, "rax");
+        else if (r == RDX)
+            fprintf(stderr, "rdx");
         else if (r == RSP)
             fprintf(stderr, "rsp");
         else if (r == RBP)
@@ -312,17 +345,11 @@ static void print_instr(Instr instr)
 
 static void print_ir(Interp *interp)
 {
-    foreach(interp->instrs)
-        print_instr(it);
-}
-
-static i64 reserve_stack_space(Interp *interp, i64 size)
-{
-    i64 r = alloc_register(interp);
-    MOV(r, RSP);
-    ADD_CONST(RSP, RSP, size);
-
-    return r;
+    for (i64 i = 0; i < interp->instrs.count; ++i)
+    {
+        fprintf(stderr, "%3ld  ", i);
+        print_instr(interp->instrs[i]);
+    }
 }
 
 static void gen_stmt(Interp *interp, AstStmt *stmt);
@@ -366,22 +393,9 @@ static i64 gen_expr(Interp *interp, AstExpr *expr)
                     i64 str = get_global_string(interp, lit->value_str);
                     i64 r = alloc_register(interp);
 
-                    MOV_CONST(r, str);
+                    MOV_OFFSET(r, RDX, str);
 
                     return r;
-
-                    /*
-                      i64 r = get_global_string(interp, lit->value_str);
-                      return r;
-                    */
-
-                    /*
-                    for (int i = 0; i < string_length(lit->value_str); ++i)
-                        PUSH(make_value_i8(lit->value_str[i]));
-
-                    // TODO: no null-termination?
-                    PUSH(make_value_i8(0));
-                    */
                 }
                 default:
                 {
@@ -479,13 +493,17 @@ static i64 gen_expr(Interp *interp, AstExpr *expr)
         {
             auto cast = static_cast<AstExprCast *>(expr);
 
+            // FIXME
             i64 src = gen_expr(interp, cast->expr);
             if (cast->type_defn->ptr)
             {
+                /*
                 i64 dest = alloc_register(interp);
                 add_instr(interp, OP_CAST_TO_PTR, dest, src, -1);
 
                 return dest;
+                */
+                return src;
             }
             else
             {
@@ -641,7 +659,7 @@ static void gen_func(Interp *interp, AstFunc *func)
         // TODO: optimize! this is copying the stack arguments into duplicate
         // registers... how to bind new registers to existing stack registers?
         i64 r = alloc_register(interp);
-        MOV_OFFSET(r, RSP, offset);
+        MOV_OFFSET(r, RBP, offset);
         comment(interp, it->name->str);
 
         var->register_index = r;
@@ -680,6 +698,10 @@ Interp gen_ir(AstRoot *ast)
     Interp interp = {};
     interp.register_count = 16; // NOTE: the first sixteen registers are reserved.
 
+    interp.memory_capacity = 4096; // TODO: size?
+    interp.memory_size = 0;
+    interp.memory = (u8 *)malloc(interp.memory_capacity);
+
     foreach(ast->funcs)
     {
         if (it->flags & FUNC_IS_EXTERN)
@@ -694,26 +716,29 @@ Interp gen_ir(AstRoot *ast)
     assert(entry_point);
     interp.entry_point = *entry_point;
 
+    fprintf(stderr, "\n");
+    fprintf(stderr, "Data segment: %ld bytes\n", interp.memory_size);
+
     return interp;
 }
 
 void run_ir(Interp *interp)
 {
-    i64 stack_capacity = 1024;
-    u8 *stack = (u8 *)malloc(stack_capacity);
-
     interp->registers = (Register *)malloc(interp->register_count * sizeof(Register));
-
     auto r = interp->registers;
+
+    // TODO: alignment
+    i64 stack_base = interp->memory_size;
 
     // Clear registers to zero.
     for (i64 i = 0; i < interp->register_count; ++i)
         r[i].i64_ = 0;
 
     r[RIP].i64_ = interp->entry_point;
-    r[RBP].i64_ = 0;
-    r[RSP].i64_ = 0;
+    r[RBP].i64_ = stack_base;
+    r[RSP].i64_ = stack_base;
     r[RAX].i64_ = 0;
+    r[RDX].i64_ = 0;
 
     fprintf(stderr, "\n");
 
@@ -814,10 +839,11 @@ void run_ir(Interp *interp)
             }
             case OP_MOV_OFFSET:
             {
+                // TODO: separate instructions for stack vs data segment access?
                 i64 addr = r[i.r1].i64_ + i.r2;
-                assert(addr < r[RSP].i64_);
+                assert(addr < interp->memory_capacity);
 
-                r[i.r0].i64_ = stack[addr];
+                r[i.r0].i64_ = interp->memory[addr];
 
                 ++r[RIP].i64_;
                 break;
@@ -825,19 +851,16 @@ void run_ir(Interp *interp)
             case OP_PUSH:
             {
                 i64 *sp = &r[RSP].i64_;
-//                i64 size = get_value_type_size(i.v0.type);
 
                 // FIXME: only handling i64 for now
-//                stack[*sp] = r[i.r0].i64_;
-                i64 *s = (i64 *)&stack[*sp];
+                i64 *s = (i64 *)&interp->memory[*sp];
                 *s = i.r0;
 
-                // FIXME
-//                *sp += size;
+                // FIXME: arbitrary sizes?
                 *sp += 8;
-                if (*sp >= stack_capacity)
+                if (*sp >= interp->memory_capacity)
                 {
-                    fprintf(stderr, "Error: stack overflow.\n");
+                    fprintf(stderr, "Error: stack overflow in PUSH.\n");
                     assert(false);
                 }
 
@@ -848,14 +871,15 @@ void run_ir(Interp *interp)
             {
                 i64 *sp = &r[RSP].i64_;
 
-                *sp -= 8; // HACK: assuming only 64-bit values are popped
-                if (*sp < 0)
+                // FIXME: only handling i64 for now
+                *sp -= 8;
+                if (*sp < stack_base)
                 {
-                    fprintf(stderr, "Error: stack underflow.\n");
+                    fprintf(stderr, "Error: stack underflow in POP.\n");
                     assert(false);
                 }
 
-                i64 *s = (i64 *)&stack[*sp];
+                i64 *s = (i64 *)&interp->memory[*sp];
                 i64 ri = *s;
 
                 // FIXME: only handling i64 for now
@@ -866,21 +890,28 @@ void run_ir(Interp *interp)
             }
             case OP_CALL:
             {
-                // TODO: catch overflow
                 // TODO: this is sort of duplicated from OP_PUSH
                 // Push instruction pointer onto the stack.
                 i64 *sp = &r[RSP].i64_;
-                stack[*sp] = r[RIP].i64_ + 1;
-                *sp += 8;
+                i64 *s = (i64 *)&interp->memory[*sp];
+                *s = r[RIP].i64_ + 1;
 
+                *sp += 8;
+                if (*sp >= interp->memory_capacity)
+                {
+                    fprintf(stderr, "Error: stack overflow in CALL.\n");
+                    assert(false);
+                }
+
+                // Jump to the function address.
                 r[RIP].i64_ = r[i.r0].i64_;
 
                 break;
             }
             case OP_CALL_EXT:
             {
-                i64 name_index = r[i.r0].i64_;
-                char *name = interp->string_table[name_index];
+                i64 name_offset = r[i.r0].i64_;
+                char *name = (char *)&interp->memory[name_offset];
 
                 AstFunc *func = NULL;
                 foreach(interp->extern_funcs)
@@ -915,13 +946,15 @@ void run_ir(Interp *interp)
                     // TODO: nicer way of doing this?
                     if (defn->ptr)
                     {
-                        i64 *s = (i64 *)&stack[sp + offset];
-                        dcArgPointer(vm, (DCpointer)(*s));
+                        i64 *ptr = (i64 *)&interp->memory[sp + offset];
+                        fprintf(stderr, "memory[%ld + %ld]: memory_offset: %ld\n", sp, offset, *ptr);
+
+                        dcArgPointer(vm, (DCpointer)ptr);
                         offset += 8;
                     }
                     else if (strings_match(defn->name, "i64"))
                     {
-                        i64 *s = (i64 *)&stack[sp + offset];
+                        i64 *s = (i64 *)&interp->memory[sp + offset];
                         dcArgLongLong(vm, *s);
                         offset += 8;
                     }
@@ -954,14 +987,16 @@ void run_ir(Interp *interp)
                 // TODO: this is sort of duplicated from OP_POP
                 // Pop instruction pointer from the stack.
                 i64 *sp = &r[RSP].i64_;
-                i64 addr = stack[*sp - 8];
 
                 *sp -= 8;
-                if (*sp < 0)
+                if (*sp < stack_base)
                 {
                     fprintf(stderr, "Error: stack underflow in RET.\n");
                     assert(false);
                 }
+
+                i64 *addr_ptr = (i64 *)&interp->memory[*sp];
+                i64 addr = *addr_ptr;
 
                 r[RIP].i64_ = addr;
 
