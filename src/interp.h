@@ -40,6 +40,7 @@ enum Opcode : u32
 
     OP_MOV,
     OP_MOV_CONST,
+    OP_MOV_DATA_ADDR,
 
     OP_LOAD,
     OP_STORE,
@@ -52,7 +53,7 @@ enum Opcode : u32
     OP_RET,
 
     // TODO: specialize
-    OP_CAST_TO_PTR,
+    OP_CAST_INT_TO_PTR,
 
     OP_EXIT,
 
@@ -70,6 +71,12 @@ struct Instr
     char *comment = NULL;
 };
 
+struct GlobalString
+{
+    char *str = NULL;
+    i64 offset = 0;
+};
+
 struct Interp
 {
     Array<Instr> instrs;
@@ -85,7 +92,7 @@ struct Interp
 
     Array<AstFunc *> extern_funcs;
 
-    HashMap<i64> global_strings;
+    Array<GlobalString> global_strings;
 };
 
 Interp gen_ir(AstRoot *ast);

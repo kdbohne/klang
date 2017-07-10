@@ -1,23 +1,3 @@
-/*
-fn add(a i64, b i64) -> i64 {
-    a + b
-}
-
-fn thirty_seven() -> i64 {
-    37
-}
-
-fn main() {
-    let i = 14;
-    let j = 15;
-    let k = 16;
-    let x = add(4, 5);
-    let y = thirty_seven();
-
-    let m = add(add(y, x), add(x, add(20, add(5, i))));
-}
-*/
-
 extern fn syscall5(num *i64, arg1 *i64, arg2 *i64, arg3 *i64, arg4 *i64, arg5 *i64) -> i64;
 
 fn add(a i64, b i64) -> i64 {
@@ -57,13 +37,18 @@ fn foo(ptr *i64) {
 }
 */
 
+fn thirteen() -> i64 {
+    13
+}
+
 fn main() {
 //    let x = 3 + 4;
 //    let y = x + 14;
 //    let z = add(x, y);
 
-//    print_string_literal("test string!\n");
-    write("test string!\n", 13);
+    write("test string?\n", add(5, 8));
+    write("test string?\n", 5 + 8);
+    write("test string?\n", thirteen());
 
 /*
     let x = 0;

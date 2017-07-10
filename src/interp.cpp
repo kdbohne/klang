@@ -29,6 +29,7 @@ const char *opcode_strings[] =
 
     "mov",
     "movconst",
+    "movdataaddr",
 
     "load",
     "store",
@@ -62,6 +63,7 @@ static u64 debug_instr_register_masks[] =
 
     0x1 | 0x2,       // OP_MOV
     0x1 | 0x0,       // OP_MOV_CONST,
+    0x1 | 0x0,       // OP_MOV_DATA_ADDR
 
     0x1 | 0x2,       // OP_LOAD
     0x1 | 0x2,       // OP_STORE
@@ -282,25 +284,56 @@ static i64 push_data_segment(Interp *interp, char *str)
     return base;
 }
 
-static i64 get_global_string(Interp *interp, char *str)
+static GlobalString *get_or_add_global_string(Interp *interp, char *str)
 {
-    i64 *offset_ptr = interp->global_strings.get(str);
-    if (offset_ptr)
-        return *offset_ptr;
+    // Check to see if the string already exists.
+    foreach(interp->global_strings)
+    {
+        if (strings_match(it.str, str))
+            return &it;
+    }
+
+    i64 offset = push_data_segment(interp, str);
 
     // TODO: does the string need to be duplicated?
-//    char *dup = string_duplicate(str);
-//    interp->global_strings.insert(dup);
-    i64 offset = push_data_segment(interp, str);
-    interp->global_strings.insert(str, offset);
+    // The string didn't exist, so add it to the global string table.
+    GlobalString *gs = interp->global_strings.next();
+    gs->str = str;
+    gs->offset = offset;
 
-    return offset;
+    return gs;
+}
+
+static GlobalString *get_global_string_by_name(Interp *interp, char *name)
+{
+    foreach(interp->global_strings)
+    {
+        if (strings_match(it.str, name))
+            return &it;
+    }
+
+    fprintf(stderr, "Internal error: get_global_string_by_name() failed for \"%s\".\n", name);
+    assert(false);
+    return NULL;
+}
+
+static GlobalString *get_global_string_by_offset(Interp *interp, i64 offset)
+{
+    foreach(interp->global_strings)
+    {
+        if (it.offset == offset)
+            return &it;
+    }
+
+    fprintf(stderr, "Internal error: get_global_string_by_offset() failed for offset %ld.\n", offset);
+    assert(false);
+    return NULL;
 }
 
 static void CALL_EXT_(Interp *interp, char *name)
 {
-    i64 str = get_global_string(interp, name);
-    add_instr(interp, OP_CALL_EXT, str, -1, -1);
+    GlobalString *gs = get_or_add_global_string(interp, name);
+    add_instr(interp, OP_CALL_EXT, gs->offset, -1, -1);
 }
 
 static void RET_(Interp *interp)
@@ -424,26 +457,15 @@ static i64 gen_expr(Interp *interp, AstExpr *expr)
                 }
                 case LIT_STR:
                 {
-                    i64 str = get_global_string(interp, lit->value_str);
-                    i64 rp = alloc_register(interp);
+                    GlobalString *gs = get_or_add_global_string(interp, lit->value_str);
 
                     i64 offset = alloc_register(interp);
-                    ADD_CONST(offset, RDX, str);
+                    ADD_CONST(offset, RDX, gs->offset);
 
-                    // FIXME FIXME FIXME FIXME FIXME FIXME FIXME
-                    return offset;
-                    /*
                     i64 r = alloc_register(interp);
-                    add_instr(interp, OP_LOAD, r, offset, 1);
+                    add_instr(interp, OP_MOV_DATA_ADDR, r, offset, -1);
 
                     return r;
-                    */
-                    /*
-                    i64 r = alloc_register(interp);
-                    LOAD(r, offset);
-
-                    return r;
-                    */
                 }
                 default:
                 {
@@ -533,23 +555,27 @@ static i64 gen_expr(Interp *interp, AstExpr *expr)
         {
             auto cast = static_cast<AstExprCast *>(expr);
 
-            // FIXME
+            // FIXME: handle all cases
             i64 src = gen_expr(interp, cast->expr);
-            if (cast->type_defn->ptr)
+
+            auto st = cast->expr->type_defn;
+            auto dt = cast->type_defn;
+
+            // Pointer-to-pointer. Do nothing.
+            if (st->ptr && dt->ptr)
+                return src;
+
+            // Int-to-pointer.
+            if (is_int_type(st) && dt->ptr)
             {
-                /*
                 i64 dest = alloc_register(interp);
-                add_instr(interp, OP_CAST_TO_PTR, dest, src, -1);
+                add_instr(interp, OP_CAST_INT_TO_PTR, dest, src, -1);
 
                 return dest;
-                */
-                return src;
             }
-            else
-            {
-                // FIXME: numeric casts
-                assert(false);
-            }
+
+            // FIXME: numeric casts
+            assert(false);
 
             break;
         }
@@ -776,6 +802,7 @@ Interp gen_ir(AstRoot *ast)
 
     fprintf(stderr, "\n");
     fprintf(stderr, "Data segment: %ld bytes\n", interp.memory_size);
+    fprintf(stderr, "Memory: %ld base, %ld bytes\n", (i64)interp.memory, interp.memory_capacity);
 
     return interp;
 }
@@ -895,6 +922,16 @@ void run_ir(Interp *interp)
                 ++r[RIP].i64_;
                 break;
             }
+            case OP_MOV_DATA_ADDR:
+            {
+                i64 offset = r[i.r1].i64_;
+                u8 *addr = interp->memory + offset;
+
+                r[i.r0].ptr_ = addr;
+
+                ++r[RIP].i64_;
+                break;
+            }
             case OP_LOAD:
             {
                 // FIXME: only handling i64 for now
@@ -977,8 +1014,11 @@ void run_ir(Interp *interp)
             }
             case OP_CALL_EXT:
             {
-                i64 name_offset = r[i.r0].i64_;
-                char *name = (char *)&interp->memory[name_offset];
+                i64 name_offset = i.r0;
+                GlobalString *name_gs = get_global_string_by_offset(interp, name_offset);
+                char *name = name_gs->str;
+
+//                fprintf(stderr, "Calling external function: %s\n", name);
 
                 AstFunc *func = NULL;
                 foreach(interp->extern_funcs)
@@ -1013,23 +1053,8 @@ void run_ir(Interp *interp)
                     // TODO: nicer way of doing this?
                     if (defn->ptr)
                     {
-                        i64 *ptr = (i64 *)&interp->memory[sp + offset];
-                        fprintf(stderr, "ptr: %ld\n", *ptr);
-
-                        // FIXME FIXME FIXME FIXME FIXME FIXME FIXME
-                        // HACK HACK HACK HACK HACK HACK HACK HACK HACK
-                        // HACK HACK HACK HACK HACK HACK HACK HACK HACK
-                        // HACK HACK HACK HACK HACK HACK HACK HACK HACK
-                        if (*ptr == 16)
-                        {
-                            u8 *p = interp->memory + *ptr;
-                            fprintf(stderr, "\"%s\"\n", p);
-                            dcArgPointer(vm, (DCpointer)p);
-                        }
-                        else
-                        {
-                            dcArgPointer(vm, (DCpointer)*ptr);
-                        }
+                        i64 ptr = *(i64 *)&interp->memory[sp + offset];
+                        dcArgPointer(vm, (DCpointer)ptr);
                     }
                     else if (strings_match(defn->name, "i64"))
                     {
@@ -1044,15 +1069,6 @@ void run_ir(Interp *interp)
 
                     offset += it->name->type_defn->size;
                 }
-
-                /*
-                dcArgPointer(vm, (DCpointer)(1));
-                dcArgPointer(vm, (DCpointer)(1));
-                dcArgPointer(vm, (DCpointer)("test string!\n"));
-                dcArgPointer(vm, (DCpointer)(13));
-                dcArgPointer(vm, (DCpointer)(0));
-                dcArgPointer(vm, (DCpointer)(0));
-                */
 
                 dcCallLongLong(vm, (DCpointer)sym);
                 dcFree(vm);
@@ -1082,11 +1098,9 @@ void run_ir(Interp *interp)
 
                 break;
             }
-            case OP_CAST_TO_PTR:
+            case OP_CAST_INT_TO_PTR:
             {
-                // cast: dest, src
-                // FIXME: handle all cases
-                // TODO: does it matter what the dest type is?
+                // FIXME: handle different sizes?
                 r[i.r0].ptr_ = (u8 *)r[i.r1].i64_;
 
                 ++r[RIP].i64_;
