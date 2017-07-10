@@ -430,10 +430,20 @@ static i64 gen_expr(Interp *interp, AstExpr *expr)
                     i64 offset = alloc_register(interp);
                     ADD_CONST(offset, RDX, str);
 
+                    // FIXME FIXME FIXME FIXME FIXME FIXME FIXME
+                    return offset;
+                    /*
+                    i64 r = alloc_register(interp);
+                    add_instr(interp, OP_LOAD, r, offset, 1);
+
+                    return r;
+                    */
+                    /*
                     i64 r = alloc_register(interp);
                     LOAD(r, offset);
 
                     return r;
+                    */
                 }
                 default:
                 {
@@ -1004,22 +1014,35 @@ void run_ir(Interp *interp)
                     if (defn->ptr)
                     {
                         i64 *ptr = (i64 *)&interp->memory[sp + offset];
-                        fprintf(stderr, "memory[%ld + %ld] = %ld\n", sp, offset, *ptr);
+                        fprintf(stderr, "ptr: %ld\n", *ptr);
 
-                        dcArgPointer(vm, (DCpointer)ptr);
-                        offset += 8;
+                        // FIXME FIXME FIXME FIXME FIXME FIXME FIXME
+                        // HACK HACK HACK HACK HACK HACK HACK HACK HACK
+                        // HACK HACK HACK HACK HACK HACK HACK HACK HACK
+                        // HACK HACK HACK HACK HACK HACK HACK HACK HACK
+                        if (*ptr == 16)
+                        {
+                            u8 *p = interp->memory + *ptr;
+                            fprintf(stderr, "\"%s\"\n", p);
+                            dcArgPointer(vm, (DCpointer)p);
+                        }
+                        else
+                        {
+                            dcArgPointer(vm, (DCpointer)*ptr);
+                        }
                     }
                     else if (strings_match(defn->name, "i64"))
                     {
                         i64 *s = (i64 *)&interp->memory[sp + offset];
                         dcArgLongLong(vm, *s);
-                        offset += 8;
                     }
                     else
                     {
                         assert(false);
                         break;
                     }
+
+                    offset += it->name->type_defn->size;
                 }
 
                 /*

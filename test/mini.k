@@ -1,3 +1,4 @@
+/*
 fn add(a i64, b i64) -> i64 {
     a + b
 }
@@ -15,15 +16,13 @@ fn main() {
 
     let m = add(add(y, x), add(x, add(20, add(5, i))));
 }
+*/
 
-/*
 extern fn syscall5(num *i64, arg1 *i64, arg2 *i64, arg3 *i64, arg4 *i64, arg5 *i64) -> i64;
 
-/*
 fn add(a i64, b i64) -> i64 {
     a + b
 }
-*/
 
 fn write(data *u8, len i64) {
     syscall5(cast(*i64) 1, cast(*i64) 1, cast(*i64) data, cast(*i64) len, cast(*i64) 0, cast(*i64) 0);
@@ -52,6 +51,12 @@ fn print_string_literal(str *u8) {
 }
 */
 
+/*
+fn foo(ptr *i64) {
+    *ptr = 42;
+}
+*/
+
 fn main() {
 //    let x = 3 + 4;
 //    let y = x + 14;
@@ -59,5 +64,9 @@ fn main() {
 
 //    print_string_literal("test string!\n");
     write("test string!\n", 13);
-}
+
+/*
+    let x = 0;
+    foo(&x);
 */
+}
