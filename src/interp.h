@@ -40,7 +40,9 @@ enum Opcode : u32
 
     OP_MOV,
     OP_MOV_CONST,
-    OP_MOV_OFFSET,
+
+    OP_LOAD,
+    OP_STORE,
 
     OP_PUSH,
     OP_POP,
@@ -72,18 +74,18 @@ struct Interp
 {
     Array<Instr> instrs;
 
-    Register *registers;
-    i64 register_count;
-
     i64 entry_point;
 
-    Array<AstFunc *> extern_funcs;
-
-    HashMap<i64> global_strings;
+    Register *registers;
+    i64 register_count;
 
     u8 *memory;
     i64 memory_size;
     i64 memory_capacity;
+
+    Array<AstFunc *> extern_funcs;
+
+    HashMap<i64> global_strings;
 };
 
 Interp gen_ir(AstRoot *ast);
