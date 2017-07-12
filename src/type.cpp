@@ -587,7 +587,7 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
             {
                 // TODO: dependency issue
                 report_error("Calling undeclared function \"%s\".\n",
-                             call,
+                             call->name,
                              call->name->str);
                 assert(false);
             }
