@@ -18,6 +18,8 @@ do { \
     exit(1); \
 } while (0)
 
+#define report_error_no_arg(str__, tok__) report_error(str__"%s", tok__, "")
+
 static AstExprBlock *parse_block(Parser *parser);
 
 static Token peek(Parser *parser)
@@ -223,6 +225,9 @@ static AstExpr *parse_expr(Parser *parser, bool is_unary = false)
 
             expect(parser, TOK_OPEN_BRACE);
             loop->block = parse_block(parser);
+
+            if (loop->block->stmts.count == 0)
+                report_error_no_arg("Empty loop block.", tok);
 
             lhs = loop;
 

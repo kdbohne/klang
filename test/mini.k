@@ -21,7 +21,6 @@ fn string_len(str *u8) -> i64 {
         len = len + 1;
         p = p + 1;
     */
-        write("loop\n", 5);
     };
 
     len
