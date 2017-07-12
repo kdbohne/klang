@@ -41,6 +41,8 @@ const char *opcode_strings[] =
     "callext",
     "ret",
 
+    "jump",
+
     "casttoptr",
 
     "exit",
@@ -74,6 +76,8 @@ static u64 debug_instr_register_masks[] =
     0x0,             // OP_CALL
     0x0,             // OP_CALL_EXT
     0x0,             // OP_RET
+
+    0x0,             // OP_JUMP
 
     0x1 | 0x2,       // OP_CAST_TO_PTR
 
@@ -124,6 +128,7 @@ static i64 alloc_register(Interp *interp)
 #define CALL(addr, label) CALL_(interp, addr, label)
 #define CALL_EXT(name) CALL_EXT_(interp, name)
 #define RET() RET_(interp)
+#define JUMP(addr) JUMP_(interp, addr)
 static i64 ADD_(Interp *interp, i64 dest, i64 lhs, i64 rhs);
 static i64 ADD_CONST_(Interp *interp, i64 dest, i64 lhs, i64 c);
 static i64 SUB_(Interp *interp, i64 dest, i64 lhs, i64 rhs);
@@ -139,6 +144,7 @@ static void POP_(Interp *interp, i64 dest);
 static void CALL_(Interp *interp, i64 addr, char *label);
 static void CALL_EXT_(Interp *interp, char *name);
 static void RET_(Interp *interp);
+static void JUMP_(Interp *interp, i64 addr);
 
 static i64 ADD_(Interp *interp, i64 dest, i64 lhs, i64 rhs)
 {
@@ -339,6 +345,11 @@ static void CALL_EXT_(Interp *interp, char *name)
 static void RET_(Interp *interp)
 {
     add_instr(interp, OP_RET, -1, -1, -1);
+}
+
+static void JUMP_(Interp *interp, i64 addr)
+{
+    add_instr(interp, OP_JUMP, addr, -1, -1);
 }
 
 static void dump_registers(Interp *interp)
@@ -621,9 +632,16 @@ static i64 gen_expr(Interp *interp, AstExpr *expr)
         }
         case AST_EXPR_LOOP:
         {
-            // FIXME
-            assert(false);
-            break;
+            auto loop = static_cast<AstExprLoop *>(expr);
+
+            // TODO: empty loop checking?
+            i64 addr = interp->instrs.count;
+
+            gen_expr(interp, loop->block);
+            JUMP(addr);
+
+            // NOTE: loops cannot return an expression. Should they be able to?
+            return -1;
         }
         case AST_EXPR_BREAK:
         {
@@ -924,6 +942,7 @@ void run_ir(Interp *interp)
             }
             case OP_MOV_DATA_ADDR:
             {
+                // TODO: use RDX and change this opcode's name to MOV_PTR?
                 i64 offset = r[i.r1].i64_;
                 u8 *addr = interp->memory + offset;
 
@@ -1094,6 +1113,13 @@ void run_ir(Interp *interp)
                 i64 *addr_ptr = (i64 *)&interp->memory[*sp];
                 i64 addr = *addr_ptr;
 
+                r[RIP].i64_ = addr;
+
+                break;
+            }
+            case OP_JUMP:
+            {
+                i64 addr = i.r0;
                 r[RIP].i64_ = addr;
 
                 break;

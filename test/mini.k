@@ -8,18 +8,20 @@ fn write(data *u8, len i64) {
     syscall5(cast(*i64) 1, cast(*i64) 1, cast(*i64) data, cast(*i64) len, cast(*i64) 0, cast(*i64) 0);
 }
 
-/*
 fn string_len(str *u8) -> i64 {
     let len = 0;
 
     let p = str;
     loop {
+    /*
         if *p == 0 {
             break;
         };
 
         len = len + 1;
         p = p + 1;
+    */
+        write("loop\n", 5);
     };
 
     len
@@ -29,7 +31,6 @@ fn print_string_literal(str *u8) {
     let len = string_len(str);
     write(str, len);
 }
-*/
 
 /*
 fn foo(ptr *i64) {
@@ -37,18 +38,8 @@ fn foo(ptr *i64) {
 }
 */
 
-fn thirteen() -> i64 {
-    13
-}
-
 fn main() {
-//    let x = 3 + 4;
-//    let y = x + 14;
-//    let z = add(x, y);
-
-    write("test string?\n", add(5, 8));
-    write("test string?\n", 5 + 8);
-    write("test string?\n", thirteen());
+    print_string_literal("this is a test string!\n");
 
 /*
     let x = 0;

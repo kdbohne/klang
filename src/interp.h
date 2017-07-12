@@ -52,6 +52,8 @@ enum Opcode : u32
     OP_CALL_EXT,
     OP_RET,
 
+    OP_JUMP,
+
     // TODO: specialize
     OP_CAST_INT_TO_PTR,
 
