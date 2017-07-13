@@ -675,30 +675,36 @@ static i64 gen_expr(Interp *interp, AstExpr *expr)
                     break;
                 }
             }
+            comment(interp, "false");
             i64 jump_false_index = interp->instrs.count - 1;
 
             i64 if_ret = gen_expr(interp, if_->block);
+            if ((if_ret != -1) && (if_ret != RAX))
+                MOV(RAX, if_ret);
 
             if (if_->else_expr)
             {
                 JMP(-1);
-                i64 jump_cont_index = interp->instrs.count - 1;
+                i64 jump_merge_index = interp->instrs.count - 1;
+                comment(interp, "merge");
 
                 i64 else_addr = interp->instrs.count;
                 i64 else_ret = gen_expr(interp, if_->else_expr);
+                if ((else_ret != -1) && (else_ret != RAX))
+                    MOV(RAX, else_ret);
 
-                i64 cont_addr = interp->instrs.count;
-                interp->instrs[jump_cont_index].r0 = cont_addr;
+                i64 merge_addr = interp->instrs.count;
+                interp->instrs[jump_merge_index].r0 = merge_addr;
                 interp->instrs[jump_false_index].r0 = else_addr;
             }
             else
             {
-                i64 cont_addr = interp->instrs.count;
-                interp->instrs[jump_false_index].r0 = cont_addr;
+                i64 merge_addr = interp->instrs.count;
+                interp->instrs[jump_false_index].r0 = merge_addr;
             }
 
             // TODO: phi node?
-            return if_ret;
+            return RAX;
         }
         case AST_EXPR_BLOCK:
         {
