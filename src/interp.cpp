@@ -1267,7 +1267,12 @@ void run_ir(Interp *interp)
             case OP_ERR:
             default:
             {
-                fprintf(stderr, "Internal error: unknown opcode %u.\n", i.op);
+                fprintf(stderr, "Internal error: ");
+                if (i.op < sizeof(opcode_strings) / sizeof(opcode_strings[0]))
+                    fprintf(stderr, "unhandled opcode \"%s\"\n", opcode_strings[i.op]);
+                else
+                    fprintf(stderr, "unknown opcode %d\n", i.op);
+
                 assert(false);
                 break;
             }
