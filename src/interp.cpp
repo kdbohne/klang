@@ -940,6 +940,9 @@ void run_ir(Interp *interp)
 //        dump_registers(interp);
 
         i64 ip = r[RIP].i64_;
+        assert(ip >= 0);
+        assert(ip < interp->instrs.count);
+
         Instr i = interp->instrs[ip];
 //        print_instr(i);
 
