@@ -52,7 +52,11 @@ enum Opcode : u32
     OP_CALL_EXT,
     OP_RET,
 
-    OP_JUMP,
+    OP_CMP,
+
+    OP_JMP,
+    OP_JMP_EQ,
+    OP_JMP_NE,
 
     // TODO: specialize
     OP_CAST_INT_TO_PTR,
@@ -88,12 +92,13 @@ struct Interp
     Register *registers;
     i64 register_count;
 
+    i64 cmp;
+
     u8 *memory;
     i64 memory_size;
     i64 memory_capacity;
 
     Array<AstFunc *> extern_funcs;
-
     Array<GlobalString> global_strings;
 };
 

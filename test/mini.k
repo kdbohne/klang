@@ -1,3 +1,4 @@
+/*
 extern fn syscall5(num *i64, arg1 *i64, arg2 *i64, arg3 *i64, arg4 *i64, arg5 *i64) -> i64;
 
 fn add(a i64, b i64) -> i64 {
@@ -8,6 +9,7 @@ fn write(data *u8, len i64) {
     syscall5(cast(*i64) 1, cast(*i64) 1, cast(*i64) data, cast(*i64) len, cast(*i64) 0, cast(*i64) 0);
 }
 
+/*
 fn string_len(str *u8) -> i64 {
     let len = 0;
 
@@ -25,11 +27,13 @@ fn string_len(str *u8) -> i64 {
 
     len
 }
+*/
 
 fn print_string_literal(str *u8) {
     let len = string_len(str);
     write(str, len);
 }
+*/
 
 /*
 fn foo(ptr *i64) {
@@ -38,7 +42,27 @@ fn foo(ptr *i64) {
 */
 
 fn main() {
-    print_string_literal("this is a test string!\n");
+//    print_string_literal("this is a test string!\n");
+    let x = 0;
+    let y = 0;
+
+    if x {
+        y = 3;
+    } else {
+        y = 4;
+    };
+
+    if x == 0 {
+        x = 1;
+    } else {
+        x = 2;
+    };
+
+    let z = if x == 2 {
+        6
+    } else {
+        7
+    };
 
 /*
     let x = 0;

@@ -41,7 +41,11 @@ const char *opcode_strings[] =
     "callext",
     "ret",
 
-    "jump",
+    "cmp",
+
+    "jmp",
+    "jmpeq",
+    "jmpne",
 
     "casttoptr",
 
@@ -77,7 +81,11 @@ static u64 debug_instr_register_masks[] =
     0x0,             // OP_CALL_EXT
     0x0,             // OP_RET
 
-    0x0,             // OP_JUMP
+    0x1 | 0x2 | 0x4, // OP_CMP
+
+    0x0,             // OP_JMP
+    0x0,             // OP_JMP_EQ
+    0x0,             // OP_JMP_NE
 
     0x1 | 0x2,       // OP_CAST_TO_PTR
 
@@ -128,7 +136,10 @@ static i64 alloc_register(Interp *interp)
 #define CALL(addr, label) CALL_(interp, addr, label)
 #define CALL_EXT(name) CALL_EXT_(interp, name)
 #define RET() RET_(interp)
-#define JUMP(addr) JUMP_(interp, addr)
+#define CMP(dest, lhs, rhs) CMP_(interp, dest, lhs, rhs)
+#define JMP(addr) JMP_(interp, addr)
+#define JMP_EQ(addr) JMP_EQ_(interp, addr)
+#define JMP_NE(addr) JMP_NE_(interp, addr)
 static i64 ADD_(Interp *interp, i64 dest, i64 lhs, i64 rhs);
 static i64 ADD_CONST_(Interp *interp, i64 dest, i64 lhs, i64 c);
 static i64 SUB_(Interp *interp, i64 dest, i64 lhs, i64 rhs);
@@ -144,7 +155,10 @@ static void POP_(Interp *interp, i64 dest);
 static void CALL_(Interp *interp, i64 addr, char *label);
 static void CALL_EXT_(Interp *interp, char *name);
 static void RET_(Interp *interp);
-static void JUMP_(Interp *interp, i64 addr);
+static void CMP_(Interp *interp, i64 lhs, i64 rhs);
+static void JMP_(Interp *interp, i64 addr);
+static void JMP_EQ_(Interp *interp, i64 addr);
+static void JMP_NE_(Interp *interp, i64 addr);
 
 static i64 ADD_(Interp *interp, i64 dest, i64 lhs, i64 rhs)
 {
@@ -347,9 +361,24 @@ static void RET_(Interp *interp)
     add_instr(interp, OP_RET, -1, -1, -1);
 }
 
-static void JUMP_(Interp *interp, i64 addr)
+static void CMP_(Interp *interp, i64 dest, i64 lhs, i64 rhs)
 {
-    add_instr(interp, OP_JUMP, addr, -1, -1);
+    add_instr(interp, OP_CMP, dest, lhs, rhs);
+}
+
+static void JMP_(Interp *interp, i64 addr)
+{
+    add_instr(interp, OP_JMP, addr, -1, -1);
+}
+
+static void JMP_EQ_(Interp *interp, i64 addr)
+{
+    add_instr(interp, OP_JMP_EQ, addr, -1, -1);
+}
+
+static void JMP_NE_(Interp *interp, i64 addr)
+{
+    add_instr(interp, OP_JMP_NE, addr, -1, -1);
 }
 
 static void dump_registers(Interp *interp)
@@ -502,6 +531,16 @@ static i64 gen_expr(Interp *interp, AstExpr *expr)
                 case BIN_SUB: { SUB(dest, lhs, rhs); break; }
                 case BIN_MUL: { MUL(dest, lhs, rhs); break; }
                 case BIN_DIV: { DIV(dest, lhs, rhs); break; }
+                case BIN_EQ:
+                case BIN_NE:
+                case BIN_LT:
+                case BIN_LE:
+                case BIN_GT:
+                case BIN_GE:
+                {
+                    CMP(dest, lhs, rhs);
+                    break;
+                }
                 default:
                 {
                     assert(false);
@@ -607,9 +646,56 @@ static i64 gen_expr(Interp *interp, AstExpr *expr)
         }
         case AST_EXPR_IF:
         {
-            // FIXME
-            assert(false);
-            break;
+            auto if_ = static_cast<AstExprIf *>(expr);
+
+            // Generate the comparison.
+            gen_expr(interp, if_->cond);
+
+            // Handle the result of the comparison.
+            switch (if_->cond->op)
+            {
+                // FIXME: handle all comparisons
+                case BIN_EQ:
+                {
+                    JMP_NE(-1);
+                    break;
+                }
+                case BIN_NE:
+                {
+                    JMP_EQ(-1);
+                    break;
+                }
+                default:
+                {
+                    fprintf(stderr, "Internal error: unhandled binary operator %u in conditional.\n", if_->cond->op);
+                    assert(false);
+                    break;
+                }
+            }
+            i64 jump_false_index = interp->instrs.count - 1;
+
+            i64 if_ret = gen_expr(interp, if_->block);
+
+            if (if_->else_expr)
+            {
+                JMP(-1);
+                i64 jump_cont_index = interp->instrs.count - 1;
+
+                i64 else_addr = interp->instrs.count;
+                i64 else_ret = gen_expr(interp, if_->else_expr);
+
+                i64 cont_addr = interp->instrs.count;
+                interp->instrs[jump_cont_index].r0 = cont_addr;
+                interp->instrs[jump_false_index].r0 = else_addr;
+            }
+            else
+            {
+                i64 cont_addr = interp->instrs.count;
+                interp->instrs[jump_false_index].r0 = cont_addr;
+            }
+
+            // TODO: phi node?
+            return if_ret;
         }
         case AST_EXPR_BLOCK:
         {
@@ -634,11 +720,10 @@ static i64 gen_expr(Interp *interp, AstExpr *expr)
         {
             auto loop = static_cast<AstExprLoop *>(expr);
 
-            // TODO: empty loop checking?
             i64 addr = interp->instrs.count;
 
             gen_expr(interp, loop->block);
-            JUMP(addr);
+            JMP(addr);
 
             // NOTE: loops cannot return an expression. Should they be able to?
             return -1;
@@ -1121,10 +1206,45 @@ void run_ir(Interp *interp)
 
                 break;
             }
-            case OP_JUMP:
+            case OP_CMP:
+            {
+                interp->cmp = r[i.r0].i64_ - r[i.r1].i64_;
+
+                ++r[RIP].i64_;
+                break;
+            }
+            case OP_JMP:
             {
                 i64 addr = i.r0;
                 r[RIP].i64_ = addr;
+
+                break;
+            }
+            case OP_JMP_EQ:
+            {
+                if (interp->cmp == 0)
+                {
+                    i64 addr = i.r0;
+                    r[RIP].i64_ = addr;
+                }
+                else
+                {
+                    ++r[RIP].i64_;
+                }
+
+                break;
+            }
+            case OP_JMP_NE:
+            {
+                if (interp->cmp != 0)
+                {
+                    i64 addr = i.r0;
+                    r[RIP].i64_ = addr;
+                }
+                else
+                {
+                    ++r[RIP].i64_;
+                }
 
                 break;
             }
