@@ -207,7 +207,33 @@ static AstExpr *parse_expr(Parser *parser, bool is_unary = false)
         case TOK_KEY_IF:
         {
             AstExprIf *if_expr = ast_alloc(AstExprIf);
-            if_expr->cond = parse_expr(parser);
+
+            // If the condition is a single expression, make an implicit
+            // comparison: != 0.
+            AstExpr *cond = parse_expr(parser);
+            if (cond->type != AST_EXPR_BIN)
+            {
+                AstExprLit *zero = ast_alloc(AstExprLit);
+                zero->scope = cond->scope;
+                zero->lit_type = LIT_INT;
+                zero->value_int.type = INT_I64;
+                zero->value_int.value = 0;
+                zero->value_int.flags = 0;
+
+                AstExprBin *bin_cond = ast_alloc(AstExprBin);
+                bin_cond->scope = cond->scope;
+                bin_cond->lhs = cond;
+                bin_cond->rhs = zero;
+                bin_cond->op = BIN_NE;
+
+                copy_loc(bin_cond, tok);
+                if_expr->cond = bin_cond;
+            }
+            else
+            {
+                AstExprBin *bin_cond = static_cast<AstExprBin *>(cond);
+                if_expr->cond = bin_cond;
+            }
 
             expect(parser, TOK_OPEN_BRACE);
             if_expr->block = parse_block(parser);

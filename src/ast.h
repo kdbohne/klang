@@ -254,7 +254,7 @@ struct AstExprIf : AstExpr
 {
     AstExprIf() : AstExpr(AST_EXPR_IF) {}
 
-    AstExpr *cond = NULL;
+    AstExprBin *cond = NULL;
     AstExprBlock *block = NULL;
     AstExpr *else_expr = NULL;
 };
