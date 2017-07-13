@@ -827,6 +827,10 @@ Interp gen_ir(AstRoot *ast)
 
 void run_ir(Interp *interp)
 {
+    // Debug checking to make sure these opcode-dependent tables stay in sync.
+    assert((OP_ERR + 1) == (sizeof(opcode_strings) / sizeof(opcode_strings[0])));
+    assert((OP_ERR + 1) == (sizeof(debug_instr_register_masks) / sizeof(debug_instr_register_masks[0])));
+
     interp->registers = (Register *)malloc(interp->register_count * sizeof(Register));
     auto r = interp->registers;
 
