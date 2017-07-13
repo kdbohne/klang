@@ -29,7 +29,7 @@ const char *opcode_strings[] =
 
     "mov",
     "movconst",
-    "movdataaddr",
+    "movptr",
 
     "load",
     "store",
@@ -69,7 +69,7 @@ static u64 debug_instr_register_masks[] =
 
     0x1 | 0x2,       // OP_MOV
     0x1 | 0x0,       // OP_MOV_CONST,
-    0x1 | 0x0,       // OP_MOV_DATA_ADDR
+    0x1 | 0x2 | 0x0, // OP_MOV_PTR
 
     0x1 | 0x2,       // OP_LOAD
     0x1 | 0x2,       // OP_STORE
@@ -499,11 +499,8 @@ static i64 gen_expr(Interp *interp, AstExpr *expr)
                 {
                     GlobalString *gs = get_or_add_global_string(interp, lit->value_str);
 
-                    i64 offset = alloc_register(interp);
-                    ADD_CONST(offset, RDX, gs->offset);
-
                     i64 r = alloc_register(interp);
-                    add_instr(interp, OP_MOV_DATA_ADDR, r, offset, -1);
+                    add_instr(interp, OP_MOV_PTR, r, RDX, gs->offset);
 
                     return r;
                 }
@@ -939,7 +936,7 @@ void run_ir(Interp *interp)
     r[RBP].i64_ = stack_base;
     r[RSP].i64_ = stack_base;
     r[RAX].i64_ = 0;
-    r[RDX].i64_ = 0;
+    r[RDX].ptr_ = interp->memory;
 
     fprintf(stderr, "\n");
 
@@ -1041,12 +1038,12 @@ void run_ir(Interp *interp)
                 ++r[RIP].i64_;
                 break;
             }
-            case OP_MOV_DATA_ADDR:
+            case OP_MOV_PTR:
             {
-                // TODO: use RDX and change this opcode's name to MOV_PTR?
-                i64 offset = r[i.r1].i64_;
-                u8 *addr = interp->memory + offset;
+                u8 *base = r[i.r1].ptr_;
+                i64 offset = i.r2;
 
+                u8 *addr = base + offset;
                 r[i.r0].ptr_ = addr;
 
                 ++r[RIP].i64_;

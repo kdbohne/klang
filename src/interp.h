@@ -40,7 +40,7 @@ enum Opcode : u32
 
     OP_MOV,
     OP_MOV_CONST,
-    OP_MOV_DATA_ADDR,
+    OP_MOV_PTR,
 
     OP_LOAD,
     OP_STORE,

@@ -1,4 +1,3 @@
-/*
 extern fn syscall5(num *i64, arg1 *i64, arg2 *i64, arg3 *i64, arg4 *i64, arg5 *i64) -> i64;
 
 fn add(a i64, b i64) -> i64 {
@@ -27,7 +26,6 @@ fn string_len(str *u8) -> i64 {
 
     len
 }
-*/
 
 fn print_string_literal(str *u8) {
     let len = string_len(str);
@@ -45,6 +43,8 @@ fn main() {
 //    print_string_literal("this is a test string!\n");
     let x = 0;
     let y = 0;
+
+    write("test string!\n", 13);
 
     if x {
         y = 3;
