@@ -640,7 +640,10 @@ static i64 gen_expr(Interp *interp, AstExpr *expr)
             // TODO: patterns, multiple decls, etc
             assert(assign->lhs->type == AST_EXPR_IDENT);
             auto name = static_cast<AstExprIdent *>(assign->lhs);
-            comment(interp, name->str);
+
+            char buf[128];
+            snprintf(buf, sizeof(buf), "assign %s", name->str);
+            comment(interp, buf);
 
             return lhs;
         }
