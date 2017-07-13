@@ -1211,7 +1211,7 @@ void run_ir(Interp *interp)
             }
             case OP_CMP:
             {
-                interp->cmp = r[i.r0].i64_ - r[i.r1].i64_;
+                interp->cmp = r[i.r1].i64_ - r[i.r2].i64_;
 
                 ++r[RIP].i64_;
                 break;
