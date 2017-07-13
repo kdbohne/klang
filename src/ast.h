@@ -170,14 +170,14 @@ enum BinOp : u32
     BIN_DIV,
     BIN_MOD,
 
+    // TODO: rename to BIN_EQ_EQ to be consistent with token name?
+    BIN_EQ,
+    BIN_NE,
+
     BIN_LT,
     BIN_LE,
     BIN_GT,
     BIN_GE,
-
-    // TODO: rename to BIN_EQ_EQ to be consistent with token name?
-    BIN_EQ,
-    BIN_NE,
 
     BIN_ERR,
 };

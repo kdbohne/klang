@@ -110,13 +110,13 @@ const char *bin_op_strings[] =
     "/",  // BIN_DIV
     "%",  // BIN_MOD
 
+    "==", // BIN_EQ
+    "!=", // BIN_NE
+
     "<",  // BIN_LT
     "<=", // BIN_LE
     ">",  // BIN_GT
     ">=", // BIN_GE
-
-    "==", // BIN_EQ
-    "!=", // BIN_EQ
 
     "?",  // BIN_ERR
 };
