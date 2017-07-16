@@ -756,11 +756,10 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
                 if (strings_match(it->name->str, field->name->str))
                 {
                     type = it->type;
-                    field->index = it->index;
-
                     break;
                 }
             }
+            assert(type);
 
             field->type_defn = get_type_defn(type);
             field->expr->type_defn = lhs_type;
@@ -978,6 +977,7 @@ static TypeDefn *register_type_defn(const char *name, int size)
     TypeDefn *defn = &global_type_defns[global_type_defns_count++];
     defn->name = string_duplicate(name);
     defn->size = size;
+    defn->alignment = defn->size;
     defn->struct_ = NULL;
     defn->ptr = NULL;
 
@@ -986,18 +986,48 @@ static TypeDefn *register_type_defn(const char *name, int size)
 
 static TypeDefn *register_struct(AstStruct *struct_)
 {
-    int size = 0;
+    // TODO: allow reordering of fields based on size and alignment
+
+    // Determine field offsets and alignment, then use that to determine
+    // the struct's size and alignmentt.
+    i64 size = 0;
+    i64 alignment = 0;
     foreach(struct_->fields)
     {
         it->type_defn = get_type_defn(it->type);
-
         assert(it->type_defn->size > 0);
-        size += it->type_defn->size;
+        assert(it->type_defn->alignment > 0);
+
+        it->offset = size;
+
+        // Pad the field to satisfy its own alignment.
+        if (size % it->type_defn->alignment > 0)
+            it->offset += it->type_defn->alignment - (it->offset % it->type_defn->alignment);
+
+        size = it->offset + it->type_defn->size;
+
+        // The struct's alignment is the maximum alignment of its fields.
+        if (it->type_defn->alignment > alignment)
+            alignment = it->type_defn->alignment;
     }
 
+    size += size % alignment;
+
     TypeDefn *defn = register_type_defn(struct_->name->str, size);
+    defn->size = size;
+    defn->alignment = alignment;
     defn->struct_ = struct_;
     defn->ptr = NULL;
+
+#if 0
+    fprintf(stderr, "Registered struct %s: size=%ld, alignment=%ld:\n", defn->name, defn->size, defn->alignment);
+    foreach(struct_->fields)
+    {
+        fprintf(stderr, "    %s: size=%ld, alignment=%ld, offset=%ld\n",
+                it->name->str, it->type_defn->size, it->type_defn->alignment, it->offset);
+    }
+    fprintf(stderr, "\n");
+#endif
 
     return defn;
 }

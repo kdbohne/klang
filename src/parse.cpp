@@ -582,7 +582,6 @@ AstStruct *parse_struct(Parser *parser)
             break;
 
         AstStructField *field = parse_field(parser);
-        field->index = struct_->fields.count;
         struct_->fields.add(field);
 
         expect(parser, TOK_SEMI);

@@ -11,6 +11,7 @@ struct TypeDefn
     char *name = NULL;
 
     i64 size = -1;
+    i64 alignment = -1;
 
     AstStruct *struct_ = NULL;
     TypeDefn *ptr = NULL;

@@ -390,8 +390,7 @@ struct AstStructField : AstNode
     AstExprIdent *name = NULL;
     AstExprType *type = NULL;
 
-    // TODO: storing this feels wrong. Use LLVM API to look it up somehow?
-    i32 index = -1;
+    i64 offset = 0;
 };
 
 // TODO: this is really bad; use a pool allocator (one for each type?)
