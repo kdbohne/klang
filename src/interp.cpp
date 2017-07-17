@@ -292,6 +292,9 @@ static void LOAD_(Interp *interp, i64 dest, i64 addr, __ImmParam offset)
 
 static void STORE_(Interp *interp, i64 src, i64 addr)
 {
+    // FIXME
+    assert(false);
+
     assert(src != -1);
     assert(addr >= 0);
     assert(addr < interp->memory_capacity);
@@ -530,6 +533,7 @@ static i64 gen_expr(Interp *interp, AstExpr *expr)
                     i64 val = (i64)lit->value_int.value;
                     i64 r = alloc_register(interp);
 
+                    // TODO: optimize, return immediate directly
                     MOV(r, IMM(val));
 
                     return r;
@@ -1171,6 +1175,9 @@ void run_ir(Interp *interp)
             }
             case OP_STORE:
             {
+                // FIXME FIXME FIXME FIXME
+                assert(false);
+
                 // FIXME: only handling i64 for now
                 i64 addr = r[i.r1].i64_;
                 i64 *ptr = (i64 *)&interp->memory[addr];
@@ -1269,7 +1276,7 @@ void run_ir(Interp *interp)
                 dcMode(vm, DC_CALL_C_DEFAULT);
                 dcReset(vm);
 
-                i64 sp = r[RSP].i64_;
+                u8 *sp = r[RSP].ptr_;
                 i64 offset = -param_size;
                 foreach(func->params)
                 {
@@ -1279,12 +1286,12 @@ void run_ir(Interp *interp)
                     // TODO: nicer way of doing this?
                     if (defn->ptr)
                     {
-                        i64 ptr = *(i64 *)&interp->memory[sp + offset];
+                        i64 ptr = *(i64 *)(sp + offset);
                         dcArgPointer(vm, (DCpointer)ptr);
                     }
                     else if (strings_match(defn->name, "i64"))
                     {
-                        i64 *s = (i64 *)&interp->memory[sp + offset];
+                        i64 *s = (i64 *)(sp + offset);
                         dcArgLongLong(vm, *s);
                     }
                     else
