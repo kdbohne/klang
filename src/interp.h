@@ -25,12 +25,51 @@ union Register
     f64 f64_;
 };
 
+enum RegisterType : u32
+{
+    REG_PTR,
+
+    REG_I8,
+    REG_I16,
+    REG_I32,
+    REG_I64,
+
+    REG_U8,
+    REG_U16,
+    REG_U32,
+    REG_U64,
+
+    REG_F32,
+    REG_F64,
+
+    REG_ERR,
+};
+
+enum RegisterFlags
+{
+    REG_IS_RSP_OFFSET = 0x1,
+};
+
+struct RegisterInfo
+{
+    RegisterType type = REG_ERR;
+    u32 flags = 0;
+};
+
 enum Opcode : u32
 {
-    OP_ADD,
-    OP_ADD_CONST,
-    OP_SUB,
-    OP_SUB_CONST,
+    // ADD
+    OP_ADD_REG_REG,
+    OP_ADD_REG_IMM,
+    OP_ADD_PTR_REG,
+    OP_ADD_PTR_IMM,
+
+    // SUB
+    OP_SUB_REG_REG,
+    OP_SUB_REG_IMM,
+    OP_SUB_PTR_REG,
+    OP_SUB_PTR_IMM,
+
     OP_MUL,
     OP_DIV,
     OP_FADD,
@@ -38,11 +77,17 @@ enum Opcode : u32
     OP_FMUL,
     OP_FDIV,
 
-    OP_MOV,
-    OP_MOV_CONST,
-    OP_MOV_PTR,
+    // MOV
+    OP_MOV_REG,
+    OP_MOV_IMM,
+    OP_MOV_PTR_REG,
+    OP_MOV_PTR_IMM,
 
+    // LOAD
     OP_LOAD,
+    OP_LOAD_REG,
+    OP_LOAD_IMM,
+
     OP_STORE,
 
     OP_PUSH,
@@ -90,6 +135,7 @@ struct Interp
     i64 entry_point;
 
     Register *registers;
+    RegisterInfo *register_info;
     i64 register_count;
 
     i64 cmp;

@@ -4,6 +4,10 @@
 #include <dyncall.h>
 #include <dynload.h>
 
+// TODO: cleanup?
+struct __ImmParam { __ImmParam(i64 imm) : imm(imm) {} i64 imm; };
+#define IMM __ImmParam
+
 // NOTE: the first sixteen registers are reserved.
 static const i64 RAX = 0;
 static const i64 RDX = 3;
@@ -16,10 +20,16 @@ static HashMap<i64> func_addresses;
 
 const char *opcode_strings[] =
 {
-    "add",
-    "addconst",
-    "sub",
-    "subconst",
+    "addrr",
+    "addri",
+    "addpr",
+    "addpi",
+
+    "subrr",
+    "subri",
+    "subpr",
+    "subpi",
+
     "mul",
     "div",
     "fadd",
@@ -27,11 +37,15 @@ const char *opcode_strings[] =
     "fmul",
     "fdiv",
 
-    "mov",
-    "movconst",
-    "movptr",
+    "movr",
+    "movi",
+    "movpi",
+    "movpi",
 
     "load",
+    "loadr",
+    "loadi",
+
     "store",
 
     "push",
@@ -56,10 +70,16 @@ const char *opcode_strings[] =
 
 static u64 debug_instr_register_masks[] =
 {
-    0x1 | 0x2 | 0x4, // OP_ADD
-    0x1 | 0x2 | 0x0, // OP_ADD_CONST
-    0x1 | 0x2 | 0x4, // OP_SUB
-    0x1 | 0x2 | 0x0, // OP_SUB_CONST
+    0x1 | 0x2 | 0x4, // OP_ADD_REG_REG
+    0x1 | 0x2 | 0x0, // OP_ADD_REG_IMM
+    0x1 | 0x2 | 0x4, // OP_ADD_PTR_REG
+    0x1 | 0x2 | 0x0, // OP_ADD_PTR_IMM
+
+    0x1 | 0x2 | 0x4, // OP_SUB_REG_REG
+    0x1 | 0x2 | 0x0, // OP_SUB_REG_IMM
+    0x1 | 0x2 | 0x4, // OP_SUB_PTR_REG
+    0x1 | 0x2 | 0x0, // OP_SUB_PTR_IMM
+
     0x1 | 0x2 | 0x4, // OP_MUL
     0x1 | 0x2 | 0x4, // OP_DIV
     0x1 | 0x2 | 0x4, // OP_FADD
@@ -67,11 +87,15 @@ static u64 debug_instr_register_masks[] =
     0x1 | 0x2 | 0x4, // OP_FMUL
     0x1 | 0x2 | 0x4, // OP_FDIV
 
-    0x1 | 0x2,       // OP_MOV
-    0x1 | 0x0,       // OP_MOV_CONST,
-    0x1 | 0x2 | 0x0, // OP_MOV_PTR
+    0x1 | 0x2,       // OP_MOV_REG
+    0x1 | 0x0,       // OP_MOV_IMM
+    0x1 | 0x2 | 0x4, // OP_MOV_PTR_REG
+    0x1 | 0x2 | 0x0, // OP_MOV_PTR_IMM
 
     0x1 | 0x2,       // OP_LOAD
+    0x1 | 0x2 | 0x4, // OP_LOAD_REG
+    0x1 | 0x2 | 0x0, // OP_LOAD_IMM
+
     0x1 | 0x2,       // OP_STORE
 
     0x1,             // OP_PUSH
@@ -122,14 +146,11 @@ static i64 alloc_register(Interp *interp)
 }
 
 #define ADD(dest, lhs, rhs) ADD_(interp, dest, lhs, rhs)
-#define ADD_CONST(dest, lhs, c) ADD_CONST_(interp, dest, lhs, c)
 #define SUB(dest, lhs, rhs) SUB_(interp, dest, lhs, rhs)
-#define SUB_CONST(dest, lhs, c) SUB_CONST_(interp, dest, lhs, c)
 #define MUL(dest, lhs, rhs) MUL_(interp, dest, lhs, rhs)
 #define DIV(dest, lhs, rhs) DIV_(interp, dest, lhs, rhs)
 #define MOV(dest, ...) MOV_(interp, dest, __VA_ARGS__)
-#define MOV_CONST(dest, c) MOV_CONST_(interp, dest, c)
-#define LOAD(dest, addr) LOAD_(interp, dest, addr)
+#define LOAD(dest, ...) LOAD_(interp, dest, __VA_ARGS__)
 #define STORE(src, addr) STORE_(interp, src, addr)
 #define PUSH(src) PUSH_(interp, src)
 #define POP(dest) POP_(interp, dest)
@@ -140,88 +161,68 @@ static i64 alloc_register(Interp *interp)
 #define JMP(addr) JMP_(interp, addr)
 #define JMP_EQ(addr) JMP_EQ_(interp, addr)
 #define JMP_NE(addr) JMP_NE_(interp, addr)
-static i64 ADD_(Interp *interp, i64 dest, i64 lhs, i64 rhs);
-static i64 ADD_CONST_(Interp *interp, i64 dest, i64 lhs, i64 c);
-static i64 SUB_(Interp *interp, i64 dest, i64 lhs, i64 rhs);
-static i64 SUB_CONST_(Interp *interp, i64 dest, i64 lhs, i64 c);
-static i64 MUL_(Interp *interp, i64 dest, i64 lhs, i64 rhs);
-static i64 DIV_(Interp *interp, i64 dest, i64 lhs, i64 rhs);
-static void MOV_(Interp *interp, i64 dest, i64 src);
-static void MOV_CONST_(Interp *interp, i64 dest, i64 c);
-static void LOAD_(Interp *interp, i64 dest, i64 addr);
-static void STORE_(Interp *interp, i64 src, i64 addr);
-static void PUSH_(Interp *interp, i64 src);
-static void POP_(Interp *interp, i64 dest);
-static void CALL_(Interp *interp, i64 addr, char *label);
-static void CALL_EXT_(Interp *interp, char *name);
-static void RET_(Interp *interp);
-static void CMP_(Interp *interp, i64 lhs, i64 rhs);
-static void JMP_(Interp *interp, i64 addr);
-static void JMP_EQ_(Interp *interp, i64 addr);
-static void JMP_NE_(Interp *interp, i64 addr);
 
-static i64 ADD_(Interp *interp, i64 dest, i64 lhs, i64 rhs)
+static void ADD_(Interp *interp, i64 dest, i64 lhs, i64 rhs)
 {
     assert(dest != -1);
     assert(lhs != -1);
     assert(rhs != -1);
 
-    add_instr(interp, OP_ADD, dest, lhs, rhs);
-
-    return dest;
+    if (interp->register_info[lhs].type == REG_PTR)
+        add_instr(interp, OP_ADD_PTR_REG, dest, lhs, rhs);
+    else
+        add_instr(interp, OP_ADD_REG_REG, dest, lhs, rhs);
 }
 
-static i64 ADD_CONST_(Interp *interp, i64 dest, i64 lhs, i64 rhs)
+static void ADD_(Interp *interp, i64 dest, i64 lhs, __ImmParam rhs)
 {
     assert(dest != -1);
     assert(lhs != -1);
 
-    add_instr(interp, OP_ADD_CONST, dest, lhs, rhs);
-
-    return dest;
+    if (interp->register_info[lhs].type == REG_PTR)
+        add_instr(interp, OP_ADD_PTR_IMM, dest, lhs, rhs.imm);
+    else
+        add_instr(interp, OP_ADD_REG_IMM, dest, lhs, rhs.imm);
 }
 
-static i64 SUB_(Interp *interp, i64 dest, i64 lhs, i64 rhs)
+static void SUB_(Interp *interp, i64 dest, i64 lhs, i64 rhs)
 {
     assert(dest != -1);
     assert(lhs != -1);
     assert(rhs != -1);
 
-    add_instr(interp, OP_SUB, dest, lhs, rhs);
-
-    return dest;
+    if (interp->register_info[lhs].type == REG_PTR)
+        add_instr(interp, OP_SUB_PTR_REG, dest, lhs, rhs);
+    else
+        add_instr(interp, OP_SUB_REG_REG, dest, lhs, rhs);
 }
 
-static i64 SUB_CONST_(Interp *interp, i64 dest, i64 lhs, i64 c)
+static void SUB_(Interp *interp, i64 dest, i64 lhs, __ImmParam rhs)
 {
     assert(dest != -1);
     assert(lhs != -1);
 
-    add_instr(interp, OP_SUB_CONST, dest, lhs, c);
-
-    return dest;
+    if (interp->register_info[lhs].type == REG_PTR)
+        add_instr(interp, OP_SUB_PTR_IMM, dest, lhs, rhs.imm);
+    else
+        add_instr(interp, OP_SUB_REG_IMM, dest, lhs, rhs.imm);
 }
 
-static i64 MUL_(Interp *interp, i64 dest, i64 lhs, i64 rhs)
+static void MUL_(Interp *interp, i64 dest, i64 lhs, i64 rhs)
 {
     assert(dest != -1);
     assert(lhs != -1);
     assert(rhs != -1);
 
     add_instr(interp, OP_MUL, dest, lhs, rhs);
-
-    return dest;
 }
 
-static i64 DIV_(Interp *interp, i64 dest, i64 lhs, i64 rhs)
+static void DIV_(Interp *interp, i64 dest, i64 lhs, i64 rhs)
 {
     assert(dest != -1);
     assert(lhs != -1);
-    assert(rhs != -1);
 
     add_instr(interp, OP_DIV, dest, lhs, rhs);
-
-    return dest;
 }
 
 static void MOV_(Interp *interp, i64 dest, i64 src)
@@ -229,23 +230,64 @@ static void MOV_(Interp *interp, i64 dest, i64 src)
     assert(dest != -1);
     assert(src != -1);
 
-    add_instr(interp, OP_MOV, dest, src, -1);
+    add_instr(interp, OP_MOV_REG, dest, src, -1);
 }
 
-static void MOV_CONST_(Interp *interp, i64 dest, i64 c)
+static void MOV_(Interp *interp, i64 dest, __ImmParam src)
 {
     assert(dest != -1);
 
-    add_instr(interp, OP_MOV_CONST, dest, c, -1);
+    add_instr(interp, OP_MOV_IMM, dest, src.imm, -1);
+}
+
+static void MOV_(Interp *interp, i64 dest, i64 ptr, i64 offset)
+{
+    assert(dest != -1);
+    assert(ptr != -1);
+    assert(offset != -1);
+
+    add_instr(interp, OP_MOV_PTR_REG, dest, ptr, offset);
+}
+
+static void MOV_(Interp *interp, i64 dest, i64 ptr, __ImmParam offset)
+{
+    assert(dest != -1);
+    assert(ptr != -1);
+
+    add_instr(interp, OP_MOV_PTR_IMM, dest, ptr, offset.imm);
+}
+
+static void check_address_range(Interp *interp, i64 r, i64 offset)
+{
+    // TODO: how to do this during generation; registers haven't been allocated yet?
+#if 0
+    assert(interp->registers[r].ptr_ + offset >= interp->memory);
+    assert(interp->registers[r].ptr_ + offset < interp->memory + interp->memory_capacity);
+#endif
 }
 
 static void LOAD_(Interp *interp, i64 dest, i64 addr)
 {
     assert(dest != -1);
-    assert(addr >= 0);
-    assert(addr < interp->memory_capacity);
+    check_address_range(interp, addr, 0);
 
     add_instr(interp, OP_LOAD, dest, addr, -1);
+}
+
+static void LOAD_(Interp *interp, i64 dest, i64 addr, i64 offset)
+{
+    assert(dest != -1);
+    check_address_range(interp, addr, offset);
+
+    add_instr(interp, OP_LOAD_REG, dest, addr, offset);
+}
+
+static void LOAD_(Interp *interp, i64 dest, i64 addr, __ImmParam offset)
+{
+    assert(dest != -1);
+    check_address_range(interp, addr, offset.imm);
+
+    add_instr(interp, OP_LOAD_IMM, dest, addr, offset.imm);
 }
 
 static void STORE_(Interp *interp, i64 src, i64 addr)
@@ -402,7 +444,7 @@ static void dump_registers(Interp *interp)
         else
             continue;
 
-        fprintf(stderr, " i64=%-10ld    f32=%-10f\n", r.i64_, r.f32_);
+        fprintf(stderr, " i64=%-10ld    f32=%-10f    ptr=%p\n", r.i64_, r.f32_, (void *)r.ptr_);
     }
 }
 
@@ -433,6 +475,9 @@ static void print_register_name(i64 r, u64 mask, i64 index)
 
 static void print_instr(Instr instr)
 {
+    assert(instr.op >= 0);
+    assert(instr.op < sizeof(opcode_strings) / sizeof(opcode_strings[0]));
+
     fprintf(stderr, "%s", opcode_strings[instr.op]);
 
     u64 mask = debug_instr_register_masks[instr.op];
@@ -485,7 +530,7 @@ static i64 gen_expr(Interp *interp, AstExpr *expr)
                     i64 val = (i64)lit->value_int.value;
                     i64 r = alloc_register(interp);
 
-                    MOV_CONST(r, val);
+                    MOV(r, IMM(val));
 
                     return r;
                 }
@@ -500,7 +545,7 @@ static i64 gen_expr(Interp *interp, AstExpr *expr)
                     GlobalString *gs = get_or_add_global_string(interp, lit->value_str);
 
                     i64 r = alloc_register(interp);
-                    add_instr(interp, OP_MOV_PTR, r, RDX, gs->offset);
+                    MOV(r, RDX, IMM(gs->offset));
 
                     return r;
                 }
@@ -581,7 +626,7 @@ static i64 gen_expr(Interp *interp, AstExpr *expr)
 
             // Pop arguments from the stack.
             if (call->args.count > 0)
-                SUB_CONST(RSP, RSP, arg_size);
+                SUB(RSP, RSP, IMM(arg_size));
 
             // TODO: check if function actually returns a value
             return RAX;
@@ -635,12 +680,14 @@ static i64 gen_expr(Interp *interp, AstExpr *expr)
             MOV(lhs, rhs);
 
             // TODO: patterns, multiple decls, etc
-            assert(assign->lhs->type == AST_EXPR_IDENT);
-            auto name = static_cast<AstExprIdent *>(assign->lhs);
+            if (assign->lhs->type == AST_EXPR_IDENT)
+            {
+                auto name = static_cast<AstExprIdent *>(assign->lhs);
 
-            char buf[128];
-            snprintf(buf, sizeof(buf), "assign %s", name->str);
-            comment(interp, buf);
+                char buf[128];
+                snprintf(buf, sizeof(buf), "assign %s", name->str);
+                comment(interp, buf);
+            }
 
             return lhs;
         }
@@ -847,11 +894,8 @@ static void gen_func(Interp *interp, AstFunc *func)
             ScopeVar *var = scope_get_var(it->name->scope, it->name->str);
             assert(var->register_index == -1);
 
-            i64 addr = alloc_register(interp);
-            ADD_CONST(addr, RBP, offset);
-
             i64 r = alloc_register(interp);
-            LOAD(r, addr);
+            LOAD(r, RBP, IMM(offset));
 
             var->register_index = r;
 
@@ -895,6 +939,17 @@ Interp gen_ir(AstRoot *ast)
     interp.memory_size = 0;
     interp.memory = (u8 *)malloc(interp.memory_capacity);
 
+    // TODO: how much to allocate?
+    i64 capacity = 4096;
+    interp.register_info = (RegisterInfo *)malloc(capacity * sizeof(RegisterInfo));
+
+    // TODO: this is ugly; calloc() and change REG_ERR to 0?
+    for (i64 i = 0; i < capacity; ++i)
+    {
+        interp.register_info[i].type = REG_ERR;
+        interp.register_info[i].flags = 0;
+    }
+
     foreach(ast->funcs)
     {
         if (it->flags & FUNC_IS_EXTERN)
@@ -923,20 +978,27 @@ void run_ir(Interp *interp)
     assert((OP_ERR + 1) == (sizeof(debug_instr_register_masks) / sizeof(debug_instr_register_masks[0])));
 
     interp->registers = (Register *)malloc(interp->register_count * sizeof(Register));
+//    interp->register_info = (RegisterInfo *)malloc(interp->register_count * sizeof(RegisterInfo));
     auto r = interp->registers;
 
     // TODO: alignment
-    i64 stack_base = interp->memory_size;
+    u8 *stack_base = interp->memory + interp->memory_size;
 
     // Clear registers to zero.
     for (i64 i = 0; i < interp->register_count; ++i)
         r[i].i64_ = 0;
 
     r[RIP].i64_ = interp->entry_point;
-    r[RBP].i64_ = stack_base;
-    r[RSP].i64_ = stack_base;
+    r[RBP].ptr_ = stack_base;
+    r[RSP].ptr_ = stack_base;
     r[RAX].i64_ = 0;
     r[RDX].ptr_ = interp->memory;
+
+    interp->register_info[RIP].type = REG_I64;
+    interp->register_info[RBP].type = REG_PTR;
+    interp->register_info[RSP].type = REG_PTR;
+    interp->register_info[RAX].type = REG_I64; // TODO: is this right?
+    interp->register_info[RDX].type = REG_PTR;
 
     fprintf(stderr, "\n");
 
@@ -954,30 +1016,58 @@ void run_ir(Interp *interp)
 
         switch (i.op)
         {
-            case OP_ADD:
+            case OP_ADD_REG_REG:
             {
                 r[i.r0].i64_ = r[i.r1].i64_ + r[i.r2].i64_;
 
                 ++r[RIP].i64_;
                 break;
             }
-            case OP_ADD_CONST:
+            case OP_ADD_REG_IMM:
             {
                 r[i.r0].i64_ = r[i.r1].i64_ + i.r2;
 
                 ++r[RIP].i64_;
                 break;
             }
-            case OP_SUB:
+            case OP_ADD_PTR_REG:
+            {
+                r[i.r0].ptr_ = r[i.r1].ptr_ + r[i.r2].i64_;
+
+                ++r[RIP].i64_;
+                break;
+            }
+            case OP_ADD_PTR_IMM:
+            {
+                r[i.r0].ptr_ = r[i.r1].ptr_ + i.r2;
+
+                ++r[RIP].i64_;
+                break;
+            }
+            case OP_SUB_REG_REG:
             {
                 r[i.r0].i64_ = r[i.r1].i64_ - r[i.r2].i64_;
 
                 ++r[RIP].i64_;
                 break;
             }
-            case OP_SUB_CONST:
+            case OP_SUB_REG_IMM:
             {
                 r[i.r0].i64_ = r[i.r1].i64_ - i.r2;
+
+                ++r[RIP].i64_;
+                break;
+            }
+            case OP_SUB_PTR_REG:
+            {
+                r[i.r0].ptr_ = r[i.r1].ptr_ - r[i.r2].i64_;
+
+                ++r[RIP].i64_;
+                break;
+            }
+            case OP_SUB_PTR_IMM:
+            {
+                r[i.r0].ptr_ = r[i.r1].ptr_ - i.r2;
 
                 ++r[RIP].i64_;
                 break;
@@ -1024,27 +1114,30 @@ void run_ir(Interp *interp)
                 ++r[RIP].i64_;
                 break;
             }
-            case OP_MOV:
+            case OP_MOV_REG:
             {
                 r[i.r0].i64_ = r[i.r1].i64_;
 
                 ++r[RIP].i64_;
                 break;
             }
-            case OP_MOV_CONST:
+            case OP_MOV_IMM:
             {
                 r[i.r0].i64_ = i.r1;
 
                 ++r[RIP].i64_;
                 break;
             }
-            case OP_MOV_PTR:
+            case OP_MOV_PTR_REG:
             {
-                u8 *base = r[i.r1].ptr_;
-                i64 offset = i.r2;
+                r[i.r0].ptr_ = r[i.r1].ptr_ + r[i.r2].i64_;
 
-                u8 *addr = base + offset;
-                r[i.r0].ptr_ = addr;
+                ++r[RIP].i64_;
+                break;
+            }
+            case OP_MOV_PTR_IMM:
+            {
+                r[i.r0].ptr_ = r[i.r1].ptr_ + i.r2;
 
                 ++r[RIP].i64_;
                 break;
@@ -1052,9 +1145,25 @@ void run_ir(Interp *interp)
             case OP_LOAD:
             {
                 // FIXME: only handling i64 for now
-                i64 addr = r[i.r1].i64_;
-                i64 *ptr = (i64 *)&interp->memory[addr];
+                i64 *ptr = (i64 *)(r[i.r1].ptr_);
+                r[i.r0].i64_ = *ptr;
 
+                ++r[RIP].i64_;
+                break;
+            }
+            case OP_LOAD_REG:
+            {
+                // FIXME: only handling i64 for now
+                i64 *ptr = (i64 *)(r[i.r1].ptr_ + r[i.r2].i64_);
+                r[i.r0].i64_ = *ptr;
+
+                ++r[RIP].i64_;
+                break;
+            }
+            case OP_LOAD_IMM:
+            {
+                // FIXME: only handling i64 for now
+                i64 *ptr = (i64 *)(r[i.r1].ptr_ + i.r2);
                 r[i.r0].i64_ = *ptr;
 
                 ++r[RIP].i64_;
@@ -1073,15 +1182,15 @@ void run_ir(Interp *interp)
             }
             case OP_PUSH:
             {
-                i64 *sp = &r[RSP].i64_;
+                u8 **sp = &r[RSP].ptr_;
 
                 // FIXME: only handling i64 for now
-                i64 *ptr = (i64 *)&interp->memory[*sp];
+                i64 *ptr = (i64 *)(*sp);
                 *ptr = r[i.r0].i64_;
 
                 // FIXME: arbitrary sizes?
                 *sp += 8;
-                if (*sp >= interp->memory_capacity)
+                if (*sp >= interp->memory + interp->memory_capacity)
                 {
                     fprintf(stderr, "Error: stack overflow in PUSH.\n");
                     assert(false);
@@ -1092,7 +1201,7 @@ void run_ir(Interp *interp)
             }
             case OP_POP:
             {
-                i64 *sp = &r[RSP].i64_;
+                u8 **sp = &r[RSP].ptr_;
 
                 // FIXME: only handling i64 for now
                 *sp -= 8;
@@ -1103,7 +1212,7 @@ void run_ir(Interp *interp)
                 }
 
                 // FIXME: only handling i64 for now
-                i64 *ptr = (i64 *)&interp->memory[*sp];
+                i64 *ptr = (i64 *)(*sp);
                 r[i.r0].i64_ = *ptr;
 
                 ++r[RIP].i64_;
@@ -1113,12 +1222,12 @@ void run_ir(Interp *interp)
             {
                 // TODO: this is sort of duplicated from OP_PUSH
                 // Push instruction pointer onto the stack.
-                i64 *sp = &r[RSP].i64_;
-                i64 *ptr = (i64 *)&interp->memory[*sp];
+                u8 **sp = &r[RSP].ptr_;
+                i64 *ptr = (i64 *)(*sp);
                 *ptr = r[RIP].i64_ + 1;
 
                 *sp += 8;
-                if (*sp >= interp->memory_capacity)
+                if (*sp >= interp->memory + interp->memory_capacity)
                 {
                     fprintf(stderr, "Error: stack overflow in CALL.\n");
                     assert(false);
@@ -1199,7 +1308,7 @@ void run_ir(Interp *interp)
             {
                 // TODO: this is sort of duplicated from OP_POP
                 // Pop instruction pointer from the stack.
-                i64 *sp = &r[RSP].i64_;
+                u8 **sp = &r[RSP].ptr_;
 
                 *sp -= 8;
                 if (*sp < stack_base)
@@ -1208,7 +1317,7 @@ void run_ir(Interp *interp)
                     assert(false);
                 }
 
-                i64 *addr_ptr = (i64 *)&interp->memory[*sp];
+                i64 *addr_ptr = (i64 *)(*sp);
                 i64 addr = *addr_ptr;
 
                 r[RIP].i64_ = addr;
