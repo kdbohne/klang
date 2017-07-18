@@ -1271,7 +1271,6 @@ void run_ir(Interp *interp)
                 i64 *ptr = (i64 *)r[i.r1].ptr_;
 
                 *ptr = r[i.r0].i64_;
-                fprintf(stderr, "stored %ld in %p\n", *ptr, (void *)ptr);
 
                 ++r[RIP].i64_;
                 break;
@@ -1282,7 +1281,6 @@ void run_ir(Interp *interp)
                 i64 *ptr = (i64 *)r[i.r1].ptr_;
 
                 *ptr = i.r0;
-                fprintf(stderr, "stored %ld in %p\n", *ptr, (void *)ptr);
 
                 ++r[RIP].i64_;
                 break;
