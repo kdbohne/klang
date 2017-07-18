@@ -1,4 +1,3 @@
-/*
 struct Vec3 {
     w u8;
     x i64;
@@ -17,17 +16,13 @@ fn main() {
     v.x = 5;
     v.y = 12;
     v.z = 13;
-}
-*/
 
-fn add(a i64, b i64) -> i64 {
-    a + b
-}
+    let a = v.x + 3;
+    let b = v.y + v.z;
 
-fn main() {
-    let x = 4;
-    let y = 16;
-    let z = add(x, y);
-
-    x = y + z;
+    let r = if v.x == 5 {
+        26
+    } else {
+        13
+    };
 }

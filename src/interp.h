@@ -25,53 +25,21 @@ union Register
     f64 f64_;
 };
 
-enum RegisterType : u32
-{
-    REG_PTR,
-
-    REG_I8,
-    REG_I16,
-    REG_I32,
-    REG_I64,
-
-    REG_U8,
-    REG_U16,
-    REG_U32,
-    REG_U64,
-
-    REG_F32,
-    REG_F64,
-
-    REG_ERR,
-};
-
-enum RegisterFlags
-{
-    REG_IS_RSP_OFFSET = 0x1,
-};
-
-struct RegisterInfo
-{
-    RegisterType type = REG_ERR;
-    u32 flags = 0;
-};
+#define BIN_OP_OPCODES(name) \
+    OP_##name##_REG_REG, \
+    OP_##name##_REG_IMM, \
+    OP_##name##_REG_ADDR, \
+    OP_##name##_ADDR_ADDR, \
+    OP_##name##_ADDR_IMM, \
+    OP_PTR_##name##_ADDR_IMM
 
 enum Opcode : u32
 {
-    // ADD
-    OP_ADD_REG_REG,
-    OP_ADD_REG_IMM,
-    OP_ADD_PTR_REG,
-    OP_ADD_PTR_IMM,
+    BIN_OP_OPCODES(ADD),
+    BIN_OP_OPCODES(SUB),
+    BIN_OP_OPCODES(MUL),
+    BIN_OP_OPCODES(DIV),
 
-    // SUB
-    OP_SUB_REG_REG,
-    OP_SUB_REG_IMM,
-    OP_SUB_PTR_REG,
-    OP_SUB_PTR_IMM,
-
-    OP_MUL,
-    OP_DIV,
     OP_FADD,
     OP_FSUB,
     OP_FMUL,
@@ -80,15 +48,17 @@ enum Opcode : u32
     // MOV
     OP_MOV_REG,
     OP_MOV_IMM,
-    OP_MOV_PTR_REG,
-    OP_MOV_PTR_IMM,
+    OP_MOV_ADDR_REG_OFFSET,
+    OP_MOV_ADDR_IMM_OFFSET,
 
     // LOAD
     OP_LOAD,
     OP_LOAD_REG,
     OP_LOAD_IMM,
 
-    OP_STORE,
+    // STORE
+    OP_STORE_REG,
+    OP_STORE_IMM,
 
     OP_PUSH,
     OP_POP,
@@ -97,7 +67,12 @@ enum Opcode : u32
     OP_CALL_EXT,
     OP_RET,
 
-    OP_CMP,
+    // CMP
+    OP_CMP_REG_REG,
+    OP_CMP_REG_IMM,
+    OP_CMP_REG_ADDR,
+    OP_CMP_ADDR_ADDR,
+    OP_CMP_ADDR_IMM,
 
     OP_JMP,
     OP_JMP_EQ,
@@ -105,6 +80,9 @@ enum Opcode : u32
 
     // TODO: specialize
     OP_CAST_INT_TO_PTR,
+
+    OP_ADDR,
+    OP_DEREF,
 
     OP_EXIT,
 
@@ -135,7 +113,6 @@ struct Interp
     i64 entry_point;
 
     Register *registers;
-    RegisterInfo *register_info;
     i64 register_count;
 
     i64 cmp;

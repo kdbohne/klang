@@ -4,34 +4,24 @@
 #include <dyncall.h>
 #include <dynload.h>
 
-// TODO: cleanup?
-struct __ImmParam { __ImmParam(i64 imm) : imm(imm) {} i64 imm; };
-#define IMM __ImmParam
-
-// NOTE: the first sixteen registers are reserved.
-static const i64 RAX = 0;
-static const i64 RDX = 3;
-static const i64 RSP = 4;
-static const i64 RBP = 5;
-static const i64 RIP = 8;
-
 // Maps the name of each function to its 'address' (instruction pointer).
 static HashMap<i64> func_addresses;
 
+#define BIN_OP_STRINGS(name) \
+    #name "rr", \
+    #name "ri", \
+    #name "ra", \
+    #name "aa", \
+    #name "ai", \
+    #name "pai"
+
 const char *opcode_strings[] =
 {
-    "addrr",
-    "addri",
-    "addpr",
-    "addpi",
+    BIN_OP_STRINGS(add),
+    BIN_OP_STRINGS(sub),
+    BIN_OP_STRINGS(mul),
+    BIN_OP_STRINGS(div),
 
-    "subrr",
-    "subri",
-    "subpr",
-    "subpi",
-
-    "mul",
-    "div",
     "fadd",
     "fsub",
     "fmul",
@@ -39,14 +29,15 @@ const char *opcode_strings[] =
 
     "movr",
     "movi",
-    "movpi",
-    "movpi",
+    "movar",
+    "movai",
 
     "load",
     "loadr",
     "loadi",
 
-    "store",
+    "storer",
+    "storei",
 
     "push",
     "pop",
@@ -55,7 +46,11 @@ const char *opcode_strings[] =
     "callext",
     "ret",
 
-    "cmp",
+    "cmprr",
+    "cmpri",
+    "cmpra",
+    "cmpaa",
+    "cmpai",
 
     "jmp",
     "jmpeq",
@@ -63,25 +58,29 @@ const char *opcode_strings[] =
 
     "casttoptr",
 
+    "addr",
+    "deref",
+
     "exit",
 
     "err",
 };
 
+#define BIN_OP_MASKS(name) \
+    0x1 | 0x2 | 0x4, \
+    0x1 | 0x2 | 0x0, \
+    0x1 | 0x2 | 0x4, \
+    0x1 | 0x2 | 0x4, \
+    0x1 | 0x2 | 0x0, \
+    0x1 | 0x2 | 0x0
+
 static u64 debug_instr_register_masks[] =
 {
-    0x1 | 0x2 | 0x4, // OP_ADD_REG_REG
-    0x1 | 0x2 | 0x0, // OP_ADD_REG_IMM
-    0x1 | 0x2 | 0x4, // OP_ADD_PTR_REG
-    0x1 | 0x2 | 0x0, // OP_ADD_PTR_IMM
+    BIN_OP_MASKS(ADD),
+    BIN_OP_MASKS(SUB),
+    BIN_OP_MASKS(MUL),
+    BIN_OP_MASKS(DIV),
 
-    0x1 | 0x2 | 0x4, // OP_SUB_REG_REG
-    0x1 | 0x2 | 0x0, // OP_SUB_REG_IMM
-    0x1 | 0x2 | 0x4, // OP_SUB_PTR_REG
-    0x1 | 0x2 | 0x0, // OP_SUB_PTR_IMM
-
-    0x1 | 0x2 | 0x4, // OP_MUL
-    0x1 | 0x2 | 0x4, // OP_DIV
     0x1 | 0x2 | 0x4, // OP_FADD
     0x1 | 0x2 | 0x4, // OP_FSUB
     0x1 | 0x2 | 0x4, // OP_FMUL
@@ -96,7 +95,8 @@ static u64 debug_instr_register_masks[] =
     0x1 | 0x2 | 0x4, // OP_LOAD_REG
     0x1 | 0x2 | 0x0, // OP_LOAD_IMM
 
-    0x1 | 0x2,       // OP_STORE
+    0x1 | 0x2,       // OP_STORE_REG
+    0x0 | 0x2,       // OP_STORE_IMM
 
     0x1,             // OP_PUSH
     0x1,             // OP_POP
@@ -105,7 +105,11 @@ static u64 debug_instr_register_masks[] =
     0x0,             // OP_CALL_EXT
     0x0,             // OP_RET
 
-    0x1 | 0x2 | 0x4, // OP_CMP
+    0x1 | 0x2 | 0x4, // OP_CMP_REG_REG
+    0x1 | 0x2 | 0x0, // OP_CMP_REG_IMM
+    0x1 | 0x2 | 0x4, // OP_CMP_REG_ADDR
+    0x1 | 0x2 | 0x4, // OP_CMP_ADDR_ADDR
+    0x1 | 0x2 | 0x0, // OP_CMP_ADDR_IMM
 
     0x0,             // OP_JMP
     0x0,             // OP_JMP_EQ
@@ -113,10 +117,71 @@ static u64 debug_instr_register_masks[] =
 
     0x1 | 0x2,       // OP_CAST_TO_PTR
 
+    0x1 | 0x2,       // OP_ADDR
+    0x1 | 0x2,       // OP_DEREF
+
     0x0,             // OP_EXIT
 
     0x0,             // OP_ERR
 };
+
+enum ValueType : u32
+{
+    VAL_PTR,
+
+    VAL_I8,
+    VAL_I16,
+    VAL_I32,
+    VAL_I64,
+
+    VAL_U8,
+    VAL_U16,
+    VAL_U32,
+    VAL_U64,
+
+    VAL_F32,
+    VAL_F64,
+
+    VAL_ERR,
+};
+
+enum ValueFlags
+{
+    VAL_IS_IMMEDIATE = 0x1,
+    VAL_IS_ADDRESS = 0x2,
+};
+
+struct Value
+{
+    i64 index;
+
+    ValueType type;
+    u32 flags;
+
+    explicit Value(i64 index, ValueType type, u32 flags) : index(index), type(type), flags(flags) {}
+    explicit Value(i64 index) : Value(index, VAL_ERR, 0) {}
+};
+
+#define IMM(val) Value(val, VAL_I64, VAL_IS_IMMEDIATE)
+
+static Value alloc_register(Interp *interp)
+{
+    i64 index = interp->register_count++;
+    return Value(index);
+}
+
+// NOTE: the first sixteen registers are reserved.
+static const i64 RAX = 0;
+static const i64 RDX = 3;
+static const i64 RSP = 4;
+static const i64 RBP = 5;
+static const i64 RIP = 8;
+
+static const Value RAX_VAL(RAX);
+static const Value RDX_VAL(RDX, VAL_PTR, VAL_IS_ADDRESS);
+static const Value RSP_VAL(RSP, VAL_PTR, VAL_IS_ADDRESS);
+static const Value RBP_VAL(RBP, VAL_PTR, VAL_IS_ADDRESS);
+static const Value RIP_VAL(RIP);
 
 static void comment(Interp *interp, const char *comment)
 {
@@ -140,11 +205,6 @@ static Instr *add_instr(Interp *interp, Opcode op, i64 r0, i64 r1, i64 r2)
     return instr;
 }
 
-static i64 alloc_register(Interp *interp)
-{
-    return interp->register_count++;
-}
-
 #define ADD(dest, lhs, rhs) ADD_(interp, dest, lhs, rhs)
 #define SUB(dest, lhs, rhs) SUB_(interp, dest, lhs, rhs)
 #define MUL(dest, lhs, rhs) MUL_(interp, dest, lhs, rhs)
@@ -162,168 +222,138 @@ static i64 alloc_register(Interp *interp)
 #define JMP_EQ(addr) JMP_EQ_(interp, addr)
 #define JMP_NE(addr) JMP_NE_(interp, addr)
 
-static void ADD_(Interp *interp, i64 dest, i64 lhs, i64 rhs)
-{
-    assert(dest != -1);
-    assert(lhs != -1);
-    assert(rhs != -1);
+#define DEFINE_BIN_OP(name) \
+static void name##_(Interp *interp, Value dest, Value lhs, Value rhs) \
+{ \
+    assert(dest.index != -1); \
+    assert(lhs.index != -1); \
+    \
+    if (lhs.type == VAL_PTR) \
+    { \
+        assert(rhs.flags & VAL_IS_IMMEDIATE); \
+        add_instr(interp, OP_PTR_##name##_ADDR_IMM, dest.index, lhs.index, rhs.index); \
+        return; \
+    } \
+    \
+    if (rhs.flags & VAL_IS_IMMEDIATE) \
+    { \
+        if (lhs.flags & VAL_IS_ADDRESS) \
+            add_instr(interp, OP_##name##_ADDR_IMM, dest.index, lhs.index, rhs.index); \
+        else \
+            add_instr(interp, OP_##name##_REG_IMM, dest.index, lhs.index, rhs.index); \
+    } \
+    else \
+    { \
+        assert(rhs.index != -1); \
+        \
+        if ((lhs.flags & VAL_IS_ADDRESS) && (rhs.flags & VAL_IS_ADDRESS)) \
+            add_instr(interp, OP_##name##_ADDR_ADDR, dest.index, lhs.index, rhs.index); \
+        else if (lhs.flags & VAL_IS_ADDRESS) \
+            add_instr(interp, OP_##name##_REG_ADDR, dest.index, rhs.index, lhs.index); \
+        else if (rhs.flags & VAL_IS_ADDRESS) \
+            add_instr(interp, OP_##name##_REG_ADDR, dest.index, lhs.index, rhs.index); \
+        else \
+            add_instr(interp, OP_##name##_REG_REG, dest.index, lhs.index, rhs.index); \
+    } \
+}
 
-    if (interp->register_info[lhs].type == REG_PTR)
-        add_instr(interp, OP_ADD_PTR_REG, dest, lhs, rhs);
+DEFINE_BIN_OP(ADD);
+DEFINE_BIN_OP(SUB);
+DEFINE_BIN_OP(MUL);
+DEFINE_BIN_OP(DIV);
+
+static void MOV_(Interp *interp, Value dest, Value src)
+{
+    assert(dest.index != -1);
+    assert(src.index != -1);
+
+    if (src.flags & VAL_IS_IMMEDIATE)
+        add_instr(interp, OP_MOV_IMM, dest.index, src.index, -1);
     else
-        add_instr(interp, OP_ADD_REG_REG, dest, lhs, rhs);
+        add_instr(interp, OP_MOV_REG, dest.index, src.index, -1);
 }
 
-static void ADD_(Interp *interp, i64 dest, i64 lhs, __ImmParam rhs)
+static void MOV_(Interp *interp, Value dest, Value src, Value offset)
 {
-    assert(dest != -1);
-    assert(lhs != -1);
+    assert(dest.index != -1);
+    assert(src.index != -1);
+    assert(offset.index != -1);
 
-    if (interp->register_info[lhs].type == REG_PTR)
-        add_instr(interp, OP_ADD_PTR_IMM, dest, lhs, rhs.imm);
+    assert(src.flags & VAL_IS_ADDRESS);
+
+    if (offset.flags & VAL_IS_IMMEDIATE)
+        add_instr(interp, OP_MOV_ADDR_IMM_OFFSET, dest.index, src.index, offset.index);
     else
-        add_instr(interp, OP_ADD_REG_IMM, dest, lhs, rhs.imm);
+        add_instr(interp, OP_MOV_ADDR_REG_OFFSET, dest.index, src.index, offset.index);
 }
 
-static void SUB_(Interp *interp, i64 dest, i64 lhs, i64 rhs)
-{
-    assert(dest != -1);
-    assert(lhs != -1);
-    assert(rhs != -1);
-
-    if (interp->register_info[lhs].type == REG_PTR)
-        add_instr(interp, OP_SUB_PTR_REG, dest, lhs, rhs);
-    else
-        add_instr(interp, OP_SUB_REG_REG, dest, lhs, rhs);
-}
-
-static void SUB_(Interp *interp, i64 dest, i64 lhs, __ImmParam rhs)
-{
-    assert(dest != -1);
-    assert(lhs != -1);
-
-    if (interp->register_info[lhs].type == REG_PTR)
-        add_instr(interp, OP_SUB_PTR_IMM, dest, lhs, rhs.imm);
-    else
-        add_instr(interp, OP_SUB_REG_IMM, dest, lhs, rhs.imm);
-}
-
-static void MUL_(Interp *interp, i64 dest, i64 lhs, i64 rhs)
-{
-    assert(dest != -1);
-    assert(lhs != -1);
-    assert(rhs != -1);
-
-    add_instr(interp, OP_MUL, dest, lhs, rhs);
-}
-
-static void DIV_(Interp *interp, i64 dest, i64 lhs, i64 rhs)
-{
-    assert(dest != -1);
-    assert(lhs != -1);
-
-    add_instr(interp, OP_DIV, dest, lhs, rhs);
-}
-
-static void MOV_(Interp *interp, i64 dest, i64 src)
-{
-    assert(dest != -1);
-    assert(src != -1);
-
-    add_instr(interp, OP_MOV_REG, dest, src, -1);
-}
-
-static void MOV_(Interp *interp, i64 dest, __ImmParam src)
-{
-    assert(dest != -1);
-
-    add_instr(interp, OP_MOV_IMM, dest, src.imm, -1);
-}
-
-static void MOV_(Interp *interp, i64 dest, i64 ptr, i64 offset)
-{
-    assert(dest != -1);
-    assert(ptr != -1);
-    assert(offset != -1);
-
-    add_instr(interp, OP_MOV_PTR_REG, dest, ptr, offset);
-}
-
-static void MOV_(Interp *interp, i64 dest, i64 ptr, __ImmParam offset)
-{
-    assert(dest != -1);
-    assert(ptr != -1);
-
-    add_instr(interp, OP_MOV_PTR_IMM, dest, ptr, offset.imm);
-}
-
-static void check_address_range(Interp *interp, i64 r, i64 offset)
+#if 0
+static void check_address_range(Interp *interp, Value r, Value offset)
 {
     // TODO: how to do this during generation; registers haven't been allocated yet?
-#if 0
     assert(interp->registers[r].ptr_ + offset >= interp->memory);
     assert(interp->registers[r].ptr_ + offset < interp->memory + interp->memory_capacity);
+}
 #endif
+
+static void LOAD_(Interp *interp, Value dest, Value addr)
+{
+    assert(dest.index != -1);
+//    check_address_range(interp, addr.index, 0);
+
+    add_instr(interp, OP_LOAD, dest.index, addr.index, -1);
 }
 
-static void LOAD_(Interp *interp, i64 dest, i64 addr)
+static void LOAD_(Interp *interp, Value dest, Value addr, Value offset)
 {
-    assert(dest != -1);
-    check_address_range(interp, addr, 0);
+    assert(dest.index != -1);
+//    check_address_range(interp, addr, offset);
 
-    add_instr(interp, OP_LOAD, dest, addr, -1);
+    add_instr(interp, OP_LOAD_REG, dest.index, addr.index, offset.index);
 }
 
-static void LOAD_(Interp *interp, i64 dest, i64 addr, i64 offset)
+static void LOAD_(Interp *interp, Value dest, Value addr, i64 offset)
 {
-    assert(dest != -1);
-    check_address_range(interp, addr, offset);
+    assert(dest.index != -1);
+//    check_address_range(interp, addr, Value(offset));
 
-    add_instr(interp, OP_LOAD_REG, dest, addr, offset);
+    add_instr(interp, OP_LOAD_IMM, dest.index, addr.index, offset);
 }
 
-static void LOAD_(Interp *interp, i64 dest, i64 addr, __ImmParam offset)
+static void STORE_(Interp *interp, Value src, Value addr)
 {
-    assert(dest != -1);
-    check_address_range(interp, addr, offset.imm);
+    assert(src.index != -1);
+    assert(addr.index != -1);
+    assert(addr.flags & VAL_IS_ADDRESS);
 
-    add_instr(interp, OP_LOAD_IMM, dest, addr, offset.imm);
+    if (src.flags & VAL_IS_IMMEDIATE)
+        add_instr(interp, OP_STORE_IMM, src.index, addr.index, -1);
+    else
+        add_instr(interp, OP_STORE_REG, src.index, addr.index, -1);
 }
 
-static void STORE_(Interp *interp, i64 src, i64 addr)
+static void PUSH_(Interp *interp, Value src)
 {
-    // FIXME
-    assert(false);
-
-    assert(src != -1);
-    assert(addr >= 0);
-    assert(addr < interp->memory_capacity);
-
-    add_instr(interp, OP_STORE, src, addr, -1);
-}
-
-static void PUSH_(Interp *interp, i64 src)
-{
-    assert(src != -1);
+    assert(src.index != -1);
 
     // TODO: use size
 //    i64 size = get_value_type_size(val.type);
 
-    add_instr(interp, OP_PUSH, src, -1, -1);
+    add_instr(interp, OP_PUSH, src.index, -1, -1);
 }
 
-static void POP_(Interp *interp, i64 dest)
+static void POP_(Interp *interp, Value dest)
 {
-    assert(dest != -1);
+    assert(dest.index != -1);
 
-    add_instr(interp, OP_POP, dest, -1, -1);
+    add_instr(interp, OP_POP, dest.index, -1, -1);
 }
 
-static void CALL_(Interp *interp, i64 addr, char *label)
+static void CALL_(Interp *interp, Value addr, char *label)
 {
-    assert(addr != -1);
+    assert(addr.index != -1);
 
-    add_instr(interp, OP_CALL, addr, -1, -1);
+    add_instr(interp, OP_CALL, addr.index, -1, -1);
     comment(interp, label);
 }
 
@@ -406,9 +436,31 @@ static void RET_(Interp *interp)
     add_instr(interp, OP_RET, -1, -1, -1);
 }
 
-static void CMP_(Interp *interp, i64 dest, i64 lhs, i64 rhs)
+static void CMP_(Interp *interp, Value dest, Value lhs, Value rhs)
 {
-    add_instr(interp, OP_CMP, dest, lhs, rhs);
+    assert(dest.index != -1);
+    assert(lhs.index != -1);
+
+    if (rhs.flags & VAL_IS_IMMEDIATE)
+    {
+        if (lhs.flags & VAL_IS_ADDRESS)
+            add_instr(interp, OP_CMP_ADDR_IMM, dest.index, lhs.index, rhs.index);
+        else
+            add_instr(interp, OP_CMP_REG_IMM, dest.index, lhs.index, rhs.index);
+    }
+    else
+    {
+        assert(rhs.index != -1);
+
+        if ((lhs.flags & VAL_IS_ADDRESS) && (rhs.flags & VAL_IS_ADDRESS))
+            add_instr(interp, OP_CMP_ADDR_ADDR, dest.index, lhs.index, rhs.index);
+        else if (lhs.flags & VAL_IS_ADDRESS)
+            add_instr(interp, OP_CMP_REG_ADDR, dest.index, rhs.index, lhs.index);
+        else if (rhs.flags & VAL_IS_ADDRESS)
+            add_instr(interp, OP_CMP_REG_ADDR, dest.index, lhs.index, rhs.index);
+        else
+            add_instr(interp, OP_CMP_REG_REG, dest.index, lhs.index, rhs.index);
+    }
 }
 
 static void JMP_(Interp *interp, i64 addr)
@@ -509,7 +561,7 @@ static void print_ir(Interp *interp)
 
 static void gen_stmt(Interp *interp, AstStmt *stmt);
 
-static i64 gen_expr(Interp *interp, AstExpr *expr)
+static Value gen_expr(Interp *interp, AstExpr *expr)
 {
     switch (expr->type)
     {
@@ -520,7 +572,7 @@ static i64 gen_expr(Interp *interp, AstExpr *expr)
             ScopeVar *var = scope_get_var(ident->scope, ident->str);
             assert(var->register_index != -1);
 
-            return var->register_index;
+            return Value(var->register_index);
         }
         case AST_EXPR_LIT:
         {
@@ -530,13 +582,9 @@ static i64 gen_expr(Interp *interp, AstExpr *expr)
                 case LIT_INT:
                 {
                     // TODO: handle unsigned?
+                    // TODO: set type?
                     i64 val = (i64)lit->value_int.value;
-                    i64 r = alloc_register(interp);
-
-                    // TODO: optimize, return immediate directly
-                    MOV(r, IMM(val));
-
-                    return r;
+                    return IMM(val);
                 }
                 case LIT_FLOAT:
                 {
@@ -548,8 +596,8 @@ static i64 gen_expr(Interp *interp, AstExpr *expr)
                 {
                     GlobalString *gs = get_or_add_global_string(interp, lit->value_str);
 
-                    i64 r = alloc_register(interp);
-                    MOV(r, RDX, IMM(gs->offset));
+                    Value r = alloc_register(interp);
+                    MOV(r, RDX_VAL, IMM(gs->offset));
 
                     return r;
                 }
@@ -566,9 +614,9 @@ static i64 gen_expr(Interp *interp, AstExpr *expr)
         {
             auto bin = static_cast<AstExprBin *>(expr);
 
-            i64 lhs = gen_expr(interp, bin->lhs);
-            i64 rhs = gen_expr(interp, bin->rhs);
-            i64 dest = alloc_register(interp);
+            Value lhs = gen_expr(interp, bin->lhs);
+            Value rhs = gen_expr(interp, bin->rhs);
+            Value dest = alloc_register(interp);
 
             switch (bin->op)
             {
@@ -598,9 +646,39 @@ static i64 gen_expr(Interp *interp, AstExpr *expr)
         }
         case AST_EXPR_UN:
         {
-            // FIXME
-            assert(false);
-            break;
+            auto un = static_cast<AstExprUn *>(expr);
+
+            Value un_expr = gen_expr(interp, un->expr);
+            Value dest = alloc_register(interp);
+
+            switch (un->op)
+            {
+                case UN_ADDR:
+                {
+                    // FIXME
+                    assert(false);
+                    break;
+                }
+                case UN_DEREF:
+                {
+                    // FIXME
+                    assert(false);
+                    break;
+                }
+                case UN_NEG:
+                {
+                    // FIXME
+                    assert(false);
+                    break;
+                }
+                default:
+                {
+                    assert(false);
+                    break;
+                }
+            }
+
+            return dest;
         }
         case AST_EXPR_CALL:
         {
@@ -612,7 +690,7 @@ static i64 gen_expr(Interp *interp, AstExpr *expr)
                 // Store arguments on the stack.
                 foreach(call->args)
                 {
-                    i64 arg = gen_expr(interp, it);
+                    Value arg = gen_expr(interp, it);
                     PUSH(arg);
 
                     arg_size += it->type_defn->size;
@@ -626,14 +704,14 @@ static i64 gen_expr(Interp *interp, AstExpr *expr)
             if (!addr)
                 CALL_EXT(call->name->str);
             else
-                CALL(*addr, call->name->str);
+                CALL(Value(*addr), call->name->str);
 
             // Pop arguments from the stack.
             if (call->args.count > 0)
-                SUB(RSP, RSP, IMM(arg_size));
+                SUB(RSP_VAL, RSP_VAL, IMM(arg_size));
 
             // TODO: check if function actually returns a value
-            return RAX;
+            return RAX_VAL;
         }
         case AST_EXPR_TYPE:
         {
@@ -652,7 +730,7 @@ static i64 gen_expr(Interp *interp, AstExpr *expr)
             auto cast = static_cast<AstExprCast *>(expr);
 
             // FIXME: handle all cases
-            i64 src = gen_expr(interp, cast->expr);
+            Value src = gen_expr(interp, cast->expr);
 
             auto st = cast->expr->type_defn;
             auto dt = cast->type_defn;
@@ -664,8 +742,8 @@ static i64 gen_expr(Interp *interp, AstExpr *expr)
             // Int-to-pointer.
             if (is_int_type(st) && dt->ptr)
             {
-                i64 dest = alloc_register(interp);
-                add_instr(interp, OP_CAST_INT_TO_PTR, dest, src, -1);
+                Value dest = alloc_register(interp);
+                add_instr(interp, OP_CAST_INT_TO_PTR, dest.index, src.index, -1);
 
                 return dest;
             }
@@ -678,10 +756,13 @@ static i64 gen_expr(Interp *interp, AstExpr *expr)
         case AST_EXPR_ASSIGN:
         {
             auto assign = static_cast<AstExprAssign *>(expr);
-            i64 lhs = gen_expr(interp, assign->lhs);
-            i64 rhs = gen_expr(interp, assign->rhs);
+            Value lhs = gen_expr(interp, assign->lhs);
+            Value rhs = gen_expr(interp, assign->rhs);
 
-            MOV(lhs, rhs);
+            if (lhs.flags & VAL_IS_ADDRESS)
+                STORE(rhs, lhs);
+            else
+                MOV(lhs, rhs);
 
             // TODO: patterns, multiple decls, etc
             if (assign->lhs->type == AST_EXPR_IDENT)
@@ -693,6 +774,7 @@ static i64 gen_expr(Interp *interp, AstExpr *expr)
                 comment(interp, buf);
             }
 
+            // FIXME: handle pointers?
             return lhs;
         }
         case AST_EXPR_IF:
@@ -726,9 +808,9 @@ static i64 gen_expr(Interp *interp, AstExpr *expr)
             comment(interp, "false");
             i64 jump_false_index = interp->instrs.count - 1;
 
-            i64 if_ret = gen_expr(interp, if_->block);
-            if ((if_ret != -1) && (if_ret != RAX))
-                MOV(RAX, if_ret);
+            Value if_ret = gen_expr(interp, if_->block);
+            if ((if_ret.index != -1) && (if_ret.index != RAX))
+                MOV(RAX_VAL, if_ret);
 
             if (if_->else_expr)
             {
@@ -737,9 +819,9 @@ static i64 gen_expr(Interp *interp, AstExpr *expr)
                 comment(interp, "merge");
 
                 i64 else_addr = interp->instrs.count;
-                i64 else_ret = gen_expr(interp, if_->else_expr);
-                if ((else_ret != -1) && (else_ret != RAX))
-                    MOV(RAX, else_ret);
+                Value else_ret = gen_expr(interp, if_->else_expr);
+                if ((else_ret.index != -1) && (else_ret.index != RAX))
+                    MOV(RAX_VAL, else_ret);
 
                 i64 merge_addr = interp->instrs.count;
                 interp->instrs[jump_merge_index].r0 = merge_addr;
@@ -752,7 +834,7 @@ static i64 gen_expr(Interp *interp, AstExpr *expr)
             }
 
             // TODO: phi node?
-            return RAX;
+            return RAX_VAL;
         }
         case AST_EXPR_BLOCK:
         {
@@ -761,7 +843,7 @@ static i64 gen_expr(Interp *interp, AstExpr *expr)
             foreach(block->stmts)
                 gen_stmt(interp, it);
 
-            i64 ret = -1;
+            Value ret = Value(-1);
             if (block->expr)
                 ret = gen_expr(interp, block->expr);
 
@@ -769,9 +851,33 @@ static i64 gen_expr(Interp *interp, AstExpr *expr)
         }
         case AST_EXPR_FIELD:
         {
-            // FIXME
-            assert(false);
-            break;
+            auto field = static_cast<AstExprField *>(expr);
+            Value lhs = gen_expr(interp, field->expr);
+
+            auto struct_ = field->expr->type_defn->struct_;
+            assert(struct_);
+
+            AstStructField *match = NULL;
+            foreach(struct_->fields)
+            {
+                if (strings_match(it->name->str, field->name->str))
+                    match = it;
+            }
+            assert(match);
+
+            Value base = lhs;
+            i64 offset = match->offset;
+
+            // HACK HACK HACK
+            base.flags |= VAL_IS_ADDRESS;
+
+            Value r = alloc_register(interp);
+            r.flags |= VAL_IS_ADDRESS;
+
+            MOV(r, base, IMM(offset));
+            comment(interp, field->name->str);
+
+            return r;
         }
         case AST_EXPR_LOOP:
         {
@@ -783,7 +889,7 @@ static i64 gen_expr(Interp *interp, AstExpr *expr)
             JMP(addr);
 
             // NOTE: loops cannot return an expression. Should they be able to?
-            return -1;
+            return Value(-1);
         }
         case AST_EXPR_BREAK:
         {
@@ -823,7 +929,7 @@ static i64 gen_expr(Interp *interp, AstExpr *expr)
     }
 
     assert(false);
-    return -1;
+    return Value(-1);
 }
 
 static void gen_stmt(Interp *interp, AstStmt *stmt)
@@ -854,7 +960,24 @@ static void gen_stmt(Interp *interp, AstStmt *stmt)
             assert(var->register_index == -1);
 
             i64 size = decl->bind->type_defn->size;
-            var->register_index = alloc_register(interp);
+            if (size > sizeof(Register))
+            {
+                Value r = alloc_register(interp);
+                r.flags |= VAL_IS_ADDRESS;
+
+                // FIXME
+                MOV(r, RSP_VAL, IMM(0));
+                ADD(RSP_VAL, RSP_VAL, IMM(size));
+
+                // TODO: store whole Value?
+                var->register_index = r.index;
+            }
+            else
+            {
+                // TODO: store whole Value?
+                Value r = alloc_register(interp);
+                var->register_index = r.index;
+            }
 
             break;
         }
@@ -872,9 +995,9 @@ static void gen_func(Interp *interp, AstFunc *func)
     func_addresses.insert(func->name->str, func_addr);
 
     // Set up the new frame.
-    PUSH(RBP);
+    PUSH(RBP_VAL);
     comment(interp, func->name->str);
-    MOV(RBP, RSP);
+    MOV(RBP_VAL, RSP_VAL);
 
     // Access arguments from the stack.
     if (func->params.count > 0)
@@ -898,21 +1021,22 @@ static void gen_func(Interp *interp, AstFunc *func)
             ScopeVar *var = scope_get_var(it->name->scope, it->name->str);
             assert(var->register_index == -1);
 
-            i64 r = alloc_register(interp);
-            LOAD(r, RBP, IMM(offset));
+            Value r = alloc_register(interp);
+            LOAD(r, RBP_VAL, offset);
 
-            var->register_index = r;
+            // TODO: store whole value?
+            var->register_index = r.index;
 
             offset += it->name->type_defn->size;
         }
     }
 
-    i64 ret = gen_expr(interp, func->block);
-    if (ret != -1)
-        MOV(RAX, ret);
+    Value ret = gen_expr(interp, func->block);
+    if (ret.index != -1)
+        MOV(RAX_VAL, ret);
 
     // Restore the old frame.
-    POP(RBP);
+    POP(RBP_VAL);
 
     // HACK: manually insert an EXIT if this is main()
     if (strings_match(func->name->str, "main"))
@@ -943,17 +1067,6 @@ Interp gen_ir(AstRoot *ast)
     interp.memory_size = 0;
     interp.memory = (u8 *)malloc(interp.memory_capacity);
 
-    // TODO: how much to allocate?
-    i64 capacity = 4096;
-    interp.register_info = (RegisterInfo *)malloc(capacity * sizeof(RegisterInfo));
-
-    // TODO: this is ugly; calloc() and change REG_ERR to 0?
-    for (i64 i = 0; i < capacity; ++i)
-    {
-        interp.register_info[i].type = REG_ERR;
-        interp.register_info[i].flags = 0;
-    }
-
     foreach(ast->funcs)
     {
         if (it->flags & FUNC_IS_EXTERN)
@@ -974,6 +1087,43 @@ Interp gen_ir(AstRoot *ast)
 
     return interp;
 }
+
+#define RUN_BIN_OP(name, op) \
+    case OP_##name##_REG_REG: \
+    { \
+        r[i.r0].i64_ = r[i.r1].i64_ op r[i.r2].i64_; \
+        \
+        ++r[RIP].i64_; \
+        break; \
+    } \
+    case OP_##name##_REG_IMM: \
+    { \
+        r[i.r0].i64_ = r[i.r1].i64_ op i.r2; \
+        \
+        ++r[RIP].i64_; \
+        break; \
+    } \
+    case OP_##name##_REG_ADDR: \
+    { \
+        r[i.r0].i64_ = r[i.r1].i64_ op *(i64 *)r[i.r2].ptr_; \
+        \
+        ++r[RIP].i64_; \
+        break; \
+    } \
+    case OP_##name##_ADDR_ADDR: \
+    { \
+        r[i.r0].i64_ = *(i64 *)r[i.r1].ptr_ op *(i64 *)r[i.r2].ptr_; \
+        \
+        ++r[RIP].i64_; \
+        break; \
+    } \
+    case OP_##name##_ADDR_IMM: \
+    { \
+        r[i.r0].i64_ = *(i64 *)r[i.r1].ptr_ op i.r2; \
+        \
+        ++r[RIP].i64_; \
+        break; \
+    }
 
 void run_ir(Interp *interp)
 {
@@ -998,12 +1148,6 @@ void run_ir(Interp *interp)
     r[RAX].i64_ = 0;
     r[RDX].ptr_ = interp->memory;
 
-    interp->register_info[RIP].type = REG_I64;
-    interp->register_info[RBP].type = REG_PTR;
-    interp->register_info[RSP].type = REG_PTR;
-    interp->register_info[RAX].type = REG_I64; // TODO: is this right?
-    interp->register_info[RDX].type = REG_PTR;
-
     fprintf(stderr, "\n");
 
     bool running = true;
@@ -1020,72 +1164,20 @@ void run_ir(Interp *interp)
 
         switch (i.op)
         {
-            case OP_ADD_REG_REG:
-            {
-                r[i.r0].i64_ = r[i.r1].i64_ + r[i.r2].i64_;
-
-                ++r[RIP].i64_;
-                break;
-            }
-            case OP_ADD_REG_IMM:
-            {
-                r[i.r0].i64_ = r[i.r1].i64_ + i.r2;
-
-                ++r[RIP].i64_;
-                break;
-            }
-            case OP_ADD_PTR_REG:
-            {
-                r[i.r0].ptr_ = r[i.r1].ptr_ + r[i.r2].i64_;
-
-                ++r[RIP].i64_;
-                break;
-            }
-            case OP_ADD_PTR_IMM:
+            RUN_BIN_OP(ADD, +)
+            RUN_BIN_OP(SUB, -)
+            RUN_BIN_OP(MUL, *)
+            RUN_BIN_OP(DIV, /)
+            case OP_PTR_ADD_ADDR_IMM:
             {
                 r[i.r0].ptr_ = r[i.r1].ptr_ + i.r2;
 
                 ++r[RIP].i64_;
                 break;
             }
-            case OP_SUB_REG_REG:
-            {
-                r[i.r0].i64_ = r[i.r1].i64_ - r[i.r2].i64_;
-
-                ++r[RIP].i64_;
-                break;
-            }
-            case OP_SUB_REG_IMM:
-            {
-                r[i.r0].i64_ = r[i.r1].i64_ - i.r2;
-
-                ++r[RIP].i64_;
-                break;
-            }
-            case OP_SUB_PTR_REG:
-            {
-                r[i.r0].ptr_ = r[i.r1].ptr_ - r[i.r2].i64_;
-
-                ++r[RIP].i64_;
-                break;
-            }
-            case OP_SUB_PTR_IMM:
+            case OP_PTR_SUB_ADDR_IMM:
             {
                 r[i.r0].ptr_ = r[i.r1].ptr_ - i.r2;
-
-                ++r[RIP].i64_;
-                break;
-            }
-            case OP_MUL:
-            {
-                r[i.r0].i64_ = r[i.r1].i64_ * r[i.r2].i64_;
-
-                ++r[RIP].i64_;
-                break;
-            }
-            case OP_DIV:
-            {
-                r[i.r0].i64_ = r[i.r1].i64_ / r[i.r2].i64_;
 
                 ++r[RIP].i64_;
                 break;
@@ -1132,14 +1224,14 @@ void run_ir(Interp *interp)
                 ++r[RIP].i64_;
                 break;
             }
-            case OP_MOV_PTR_REG:
+            case OP_MOV_ADDR_REG_OFFSET:
             {
                 r[i.r0].ptr_ = r[i.r1].ptr_ + r[i.r2].i64_;
 
                 ++r[RIP].i64_;
                 break;
             }
-            case OP_MOV_PTR_IMM:
+            case OP_MOV_ADDR_IMM_OFFSET:
             {
                 r[i.r0].ptr_ = r[i.r1].ptr_ + i.r2;
 
@@ -1173,16 +1265,24 @@ void run_ir(Interp *interp)
                 ++r[RIP].i64_;
                 break;
             }
-            case OP_STORE:
+            case OP_STORE_REG:
             {
-                // FIXME FIXME FIXME FIXME
-                assert(false);
-
                 // FIXME: only handling i64 for now
-                i64 addr = r[i.r1].i64_;
-                i64 *ptr = (i64 *)&interp->memory[addr];
+                i64 *ptr = (i64 *)r[i.r1].ptr_;
 
                 *ptr = r[i.r0].i64_;
+                fprintf(stderr, "stored %ld in %p\n", *ptr, (void *)ptr);
+
+                ++r[RIP].i64_;
+                break;
+            }
+            case OP_STORE_IMM:
+            {
+                // FIXME: only handling i64 for now
+                i64 *ptr = (i64 *)r[i.r1].ptr_;
+
+                *ptr = i.r0;
+                fprintf(stderr, "stored %ld in %p\n", *ptr, (void *)ptr);
 
                 ++r[RIP].i64_;
                 break;
@@ -1331,9 +1431,37 @@ void run_ir(Interp *interp)
 
                 break;
             }
-            case OP_CMP:
+            case OP_CMP_REG_REG:
             {
                 interp->cmp = r[i.r1].i64_ - r[i.r2].i64_;
+
+                ++r[RIP].i64_;
+                break;
+            }
+            case OP_CMP_REG_IMM:
+            {
+                interp->cmp = r[i.r1].i64_ - i.r2;
+
+                ++r[RIP].i64_;
+                break;
+            }
+            case OP_CMP_REG_ADDR:
+            {
+                interp->cmp = r[i.r1].i64_ - *(i64 *)r[i.r2].ptr_;
+
+                ++r[RIP].i64_;
+                break;
+            }
+            case OP_CMP_ADDR_ADDR:
+            {
+                interp->cmp = *(i64 *)r[i.r1].ptr_ - *(i64 *)r[i.r2].ptr_;
+
+                ++r[RIP].i64_;
+                break;
+            }
+            case OP_CMP_ADDR_IMM:
+            {
+                interp->cmp = *(i64 *)r[i.r1].ptr_ - i.r2;
 
                 ++r[RIP].i64_;
                 break;
@@ -1379,6 +1507,18 @@ void run_ir(Interp *interp)
                 r[i.r0].ptr_ = (u8 *)r[i.r1].i64_;
 
                 ++r[RIP].i64_;
+                break;
+            }
+            case OP_ADDR:
+            {
+                // FIXME
+                assert(false);
+                break;
+            }
+            case OP_DEREF:
+            {
+                // FIXME
+                assert(false);
                 break;
             }
             case OP_EXIT:
