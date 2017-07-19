@@ -138,7 +138,7 @@ enum IntFlags
 {
     INT_IS_NEGATIVE = 0x1,
     INT_IS_HEX = 0x2,
-    INT_IS_BINARY = 0x2,
+    INT_IS_BINARY = 0x4,
 };
 
 struct LitInt
