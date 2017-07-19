@@ -6,6 +6,7 @@ COMPILER=clang++
 COMPILER_FLAGS=-m64 -std=c++11 -O0 -g -DPLATFORM_LINUX \
 			   -Isrc \
 			   -fno-exceptions -fno-rtti \
+			   -fPIC \
 			   -Werror -Wall -Wpedantic -Wshadow \
 			   -Wno-missing-braces -Wno-unused-function -Wno-unused-parameter -Wno-unused-variable
 LINKER_FLAGS=-m64 -fuse-ld=gold -ldl -ldyncall_s -ldynload_s
