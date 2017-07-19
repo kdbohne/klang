@@ -90,6 +90,7 @@ TypeDefn *get_type_defn(const char *name, int pointer_depth)
         TypeDefn *defn = &global_type_defns[global_type_defns_count++];
         defn->name = string_duplicate(name);
         defn->size = 8; // 64-bit pointer size.
+        defn->alignment = defn->size;
         defn->struct_ = NULL;
         defn->ptr = parent;
 
@@ -127,6 +128,7 @@ static TypeDefn *get_pointer_to(TypeDefn *defn)
     TypeDefn *new_defn = &global_type_defns[global_type_defns_count++];
     new_defn->name = defn->name;
     new_defn->size = 8; // 64-bit pointer size.
+    new_defn->alignment = new_defn->size;
     new_defn->struct_ = defn->struct_;
     new_defn->ptr = defn;
 
@@ -170,7 +172,15 @@ static TypeDefn *get_deref(AstExpr *expr, TypeDefn *defn)
     new_defn->ptr = parent;
 
     if (depth > 0)
+    {
         new_defn->size = 8; // 64-bit pointer size.
+        new_defn->alignment = new_defn->size;
+    }
+    else
+    {
+        // FIXME: this probably shouldn't happen, right?
+        assert(false);
+    }
 
     return NULL;
 }
