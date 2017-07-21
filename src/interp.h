@@ -125,5 +125,5 @@ struct Interp
     Array<GlobalString> global_strings;
 };
 
-Interp gen_ir(AstRoot *ast);
-void run_ir(Interp *interp);
+Interp interp_gen(AstRoot *ast);
+void interp_run(Interp *interp);

@@ -216,6 +216,8 @@ struct AstExprCall : AstExpr
 
     AstExprIdent *name = NULL;
     Array<AstExpr *> args;
+
+    Array<i64> ir_tmp_indices;
 };
 
 struct AstExprType : AstExpr

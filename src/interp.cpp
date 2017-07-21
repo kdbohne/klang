@@ -148,7 +148,7 @@ enum ValueType : u32
 enum ValueFlags
 {
     VAL_IS_IMMEDIATE = 0x1,
-    VAL_IS_ADDRESS = 0x2,
+    VAL_IS_ADDRESS = 0x2, // TODO: rename address -> indirect?
 };
 
 struct Value
@@ -649,21 +649,23 @@ static Value gen_expr(Interp *interp, AstExpr *expr)
             auto un = static_cast<AstExprUn *>(expr);
 
             Value un_expr = gen_expr(interp, un->expr);
-            Value dest = alloc_register(interp);
-
             switch (un->op)
             {
                 case UN_ADDR:
                 {
-                    // FIXME
+                    if (un_expr.flags & VAL_IS_ADDRESS)
+                        return un_expr;
+
+                    // FIXME FIXME FIXME
                     assert(false);
                     break;
                 }
                 case UN_DEREF:
                 {
-                    // FIXME
-                    assert(false);
-                    break;
+                    Value dest = alloc_register(interp);
+                    LOAD(dest, un_expr);
+
+                    return dest;
                 }
                 case UN_NEG:
                 {
@@ -678,7 +680,8 @@ static Value gen_expr(Interp *interp, AstExpr *expr)
                 }
             }
 
-            return dest;
+            assert(false);
+            return Value(-1);
         }
         case AST_EXPR_CALL:
         {
@@ -1058,7 +1061,7 @@ static void register_extern_func(Interp *interp, AstFunc *func)
     interp->extern_funcs.add(func);
 }
 
-Interp gen_ir(AstRoot *ast)
+Interp interp_gen(AstRoot *ast)
 {
     Interp interp = {};
     interp.register_count = 16; // NOTE: the first sixteen registers are reserved.
@@ -1125,7 +1128,7 @@ Interp gen_ir(AstRoot *ast)
         break; \
     }
 
-void run_ir(Interp *interp)
+void interp_run(Interp *interp)
 {
     // Debug checking to make sure these opcode-dependent tables stay in sync.
     assert((OP_ERR + 1) == (sizeof(opcode_strings) / sizeof(opcode_strings[0])));
