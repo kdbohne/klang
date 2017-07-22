@@ -19,6 +19,7 @@ struct ScopeVar
     TypeDefn *type_defn = NULL;
 
     i64 register_index = -1;
+    i64 ir_tmp_index = -1;
 };
 
 struct Scope
@@ -27,6 +28,8 @@ struct Scope
     HashMap<ScopeVar> vars;
 
     Scope *parent = NULL;
+
+    i64 ir_tmp_counter = 0;
 };
 
 // TODO: move to own file?

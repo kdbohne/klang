@@ -4,8 +4,12 @@ struct Vec3 {
     z i64;
 };
 
+fn three() -> i64 {
+    3
+}
+
 fn add(a i64, b i64) -> i64 {
-    a + b
+    a + three()
 }
 
 fn main() {
