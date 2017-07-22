@@ -3,10 +3,6 @@
 
 #include <stdio.h>
 
-// TODO: size?
-static i64 tmp_counter[512];
-static i64 tmp_counter_stack = 0;
-
 static void print_type_defn(TypeDefn *defn)
 {
     int depth = get_pointer_depth(defn);
@@ -14,6 +10,25 @@ static void print_type_defn(TypeDefn *defn)
         fprintf(stderr, "*");
 
     fprintf(stderr, "%s", defn->name);
+}
+
+static i64 get_tmp_index(Scope *scope)
+{
+    // Get the block's top-level scope, i.e. the one just below global scope.
+    Scope *top_level = scope;
+    while (true)
+    {
+        if (top_level->parent && !top_level->parent->parent)
+        {
+            i64 index = top_level->ir_tmp_counter++;
+            return index;
+        }
+
+        top_level = scope->parent;
+    }
+
+    assert(false);
+    return -1;
 }
 
 static void gen_rvalue(AstExpr *expr);
@@ -73,7 +88,7 @@ static void gen_arg_tmps(AstExprCall *call)
         if (it->type == AST_EXPR_CALL)
             gen_arg_tmps(static_cast<AstExprCall *>(it));
 
-        i64 i = tmp_counter[tmp_counter_stack - 1]++;
+        i64 i = get_tmp_index(call->scope);
         call->ir_tmp_indices.add(i);
 
         fprintf(stderr, "_%ld = ", i);
@@ -236,25 +251,6 @@ static void gen_rvalue(AstExpr *expr)
     }
 }
 
-static i64 get_tmp_index(Scope *scope)
-{
-    // Get the block's top-level scope, i.e. the one just below global scope.
-    Scope *top_level = scope;
-    while (true)
-    {
-        if (top_level->parent && !top_level->parent->parent)
-        {
-            i64 index = top_level->ir_tmp_counter++;
-            return index;
-        }
-
-        top_level = scope->parent;
-    }
-
-    assert(false);
-    return -1;
-}
-
 static void gen_func(AstFunc *func)
 {
     // Reserve _0 for the return value.
@@ -321,8 +317,6 @@ static void gen_func(AstFunc *func)
     if (func->block->stmts.count > 0)
         fprintf(stderr, "\n");
 
-    ++tmp_counter_stack;
-
     foreach(func->block->stmts)
     {
         switch (it->type)
@@ -368,8 +362,6 @@ static void gen_func(AstFunc *func)
         gen_rvalue(func->block->expr);
         fprintf(stderr, ";\n");
     }
-
-    --tmp_counter_stack;
 
     fprintf(stderr, "}\n\n");
 }
