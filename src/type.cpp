@@ -938,9 +938,10 @@ static void determine_node_types(AstRoot *root)
         for (int i = 0; i < it->params.count; ++i)
         {
             auto param = it->params[i];
+            param->scope = it->scope;
 
             param->name->type_defn = get_type_defn(param->type);
-            scope_add_var(it->scope, param->name);
+            scope_add_var(param->scope, param->name);
         }
 
         if (it->ret)
