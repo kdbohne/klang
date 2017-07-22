@@ -377,9 +377,11 @@ static void gen_func(AstFunc *func)
 
             fprintf(stderr, "    let %s ", ident->str);
             print_type_defn(decl->bind->type_defn);
-            fprintf(stderr,";\n");
+            fprintf(stderr, ";\n");
         }
     }
+    if (func->block->stmts.count > 0)
+        fprintf(stderr, "\n");
 
     ++tmp_counter_stack;
 
