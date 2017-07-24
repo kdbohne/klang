@@ -293,6 +293,7 @@ static void gen_func(AstFunc *func)
     }
 
     // Declare each variable in the function block's scope.
+    i64 decl_count = 0;
     foreach(func->block->stmts)
     {
         if (it->type == AST_STMT_DECL)
@@ -311,10 +312,12 @@ static void gen_func(AstFunc *func)
 
             fprintf(stderr, "    let _%ld ", var->ir_tmp_index);
             print_type_defn(decl->bind->type_defn);
-            fprintf(stderr, ";\n");
+            fprintf(stderr, "; // %s\n", ident->str);
+
+            ++decl_count;
         }
     }
-    if (func->block->stmts.count > 0)
+    if (decl_count > 0)
         fprintf(stderr, "\n");
 
     foreach(func->block->stmts)
