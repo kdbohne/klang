@@ -31,9 +31,7 @@ static i64 get_tmp_index(Scope *scope)
     return -1;
 }
 
-static void gen_rvalue(AstExpr *expr);
-
-static void gen_lvalue(AstExpr *expr)
+static i64 gen_expr(AstExpr *expr)
 {
     switch (expr->type)
     {
@@ -45,65 +43,15 @@ static void gen_lvalue(AstExpr *expr)
             assert(var);
 
             assert(var->ir_tmp_index != -1);
-            fprintf(stderr, "_%ld", var->ir_tmp_index);
-
-            break;
+            return var->ir_tmp_index;
         }
-        case AST_EXPR_UN:
-        {
-            auto un = static_cast<AstExprUn *>(expr);
-
-            // Only dereferences can be lvalues.
-            assert(un->op == UN_DEREF);
-
-            // FIXME
-            assert(false);
-            break;
-        }
-        case AST_EXPR_FIELD:
-        {
-            // FIXME
-            assert(false);
-            break;
-        }
-        default:
-        {
-            fprintf(stderr, "Internal error: expression type %u is not a valid lvalue.\n", expr->type);
-            assert(false);
-            break;
-        }
-    }
-}
-
-static void gen_arg_tmps(AstExprCall *call)
-{
-    foreach(call->args)
-    {
-        if ((it->type == AST_EXPR_IDENT) || (it->type == AST_EXPR_LIT))
-        {
-            call->ir_tmp_indices.add(-1);
-            continue;
-        }
-
-        if (it->type == AST_EXPR_CALL)
-            gen_arg_tmps(static_cast<AstExprCall *>(it));
-
-        i64 i = get_tmp_index(call->scope);
-        call->ir_tmp_indices.add(i);
-
-        fprintf(stderr, "_%ld = ", i);
-        gen_rvalue(it);
-        fprintf(stderr, ";\n    ");
-    }
-}
-
-static void gen_rvalue(AstExpr *expr)
-{
-    switch (expr->type)
-    {
         case AST_EXPR_LIT:
         {
             auto lit = static_cast<AstExprLit *>(expr);
+
+            i64 tmp = get_tmp_index(lit->scope);
+            fprintf(stderr, "    _%ld = ", tmp);
+
             switch (lit->lit_type)
             {
                 case LIT_INT:
@@ -143,36 +91,20 @@ static void gen_rvalue(AstExpr *expr)
                     break;
                 }
             }
+            fprintf(stderr, ";\n");
 
-            break;
-        }
-        case AST_EXPR_UN:
-        {
-            auto un = static_cast<AstExprUn *>(expr);
-            switch (un->op)
-            {
-                case UN_ADDR:  { fprintf(stderr, "&"); break; }
-                case UN_NEG:   { fprintf(stderr, "-"); break; }
-                case UN_DEREF:
-                {
-                    // Do nothing; this is handled by gen_lvalue().
-                    break;
-                }
-                default:
-                {
-                    assert(false);
-                    break;
-                }
-            }
-            gen_lvalue(un->expr);
-
-            break;
+            return tmp;
         }
         case AST_EXPR_BIN:
         {
             auto bin = static_cast<AstExprBin *>(expr);
 
-            gen_rvalue(bin->lhs);
+            i64 lhs = gen_expr(bin->lhs);
+            i64 rhs = gen_expr(bin->rhs);
+
+            i64 tmp = get_tmp_index(bin->scope);
+
+            fprintf(stderr, "    _%ld = _%ld", tmp, lhs);
             switch (bin->op)
             {
                 case BIN_ADD: { fprintf(stderr, " + ");  break; }
@@ -194,59 +126,145 @@ static void gen_rvalue(AstExpr *expr)
                     break;
                 }
             }
-            gen_rvalue(bin->rhs);
+            fprintf(stderr, "_%ld;\n", rhs);
 
-            break;
+            return tmp;
+        }
+        case AST_EXPR_UN:
+        {
+            auto un = static_cast<AstExprUn *>(expr);
+
+            i64 rhs = gen_expr(un->expr);
+            i64 tmp = get_tmp_index(un->scope);
+
+            fprintf(stderr, "    _%ld = ", tmp);
+            switch (un->op)
+            {
+                case UN_ADDR:  { fprintf(stderr, "&"); break; }
+                case UN_NEG:   { fprintf(stderr, "-"); break; }
+                case UN_DEREF: { fprintf(stderr, "*"); break; }
+                default:
+                {
+                    assert(false);
+                    break;
+                }
+            }
+            fprintf(stderr, "_%ld;\n", rhs);
+
+            return tmp;
         }
         case AST_EXPR_CALL:
         {
             auto call = static_cast<AstExprCall *>(expr);
 
-            fprintf(stderr, "%s(", call->name->str);
+            Array<i64> args;
+            foreach(call->args)
+            {
+                i64 tmp = gen_expr(it);
+                args.add(tmp);
+            }
+
+            i64 tmp = get_tmp_index(call->scope);
+
+            fprintf(stderr, "    _%ld = %s(", tmp, call->name->str);
             for (i64 i = 0; i < call->args.count; ++i)
             {
-                auto arg = call->args[i];
-                if (call->ir_tmp_indices.data && (call->ir_tmp_indices[i] != -1))
-                    fprintf(stderr, "_%ld", call->ir_tmp_indices[i]);
-                else
-                    gen_rvalue(arg);
+                fprintf(stderr, "_%ld", args[i]);
 
                 if (i < call->args.count - 1)
                     fprintf(stderr, ", ");
             }
-            fprintf(stderr, ")");
+            fprintf(stderr, ");\n");
 
-            break;
+            return tmp;
+        }
+        case AST_EXPR_TYPE:
+        {
+            // FIXME
+            assert(false);
+            return -1;
+        }
+        case AST_EXPR_PARAM:
+        {
+            // FIXME
+            assert(false);
+            return -1;
         }
         case AST_EXPR_CAST:
         {
-            auto cast = static_cast<AstExprCast *>(expr);
-
-            fprintf(stderr, "cast(");
-            print_type_defn(cast->type_defn);
-            fprintf(stderr, ") ");
-
-            gen_rvalue(cast->expr);
-
-            break;
+            // FIXME
+            assert(false);
+            return -1;
         }
         case AST_EXPR_ASSIGN:
         {
             auto assign = static_cast<AstExprAssign *>(expr);
 
-            if (assign->rhs->type == AST_EXPR_CALL)
-                gen_arg_tmps(static_cast<AstExprCall *>(assign->rhs));
+            i64 lhs = gen_expr(assign->lhs);
+            i64 rhs = gen_expr(assign->rhs);
 
-            gen_lvalue(assign->lhs);
-            fprintf(stderr, " = ");
-            gen_rvalue(assign->rhs);
+            fprintf(stderr, "    _%ld = _%ld;\n", lhs, rhs);
 
-            break;
+            return lhs;
+        }
+        case AST_EXPR_IF:
+        {
+            // FIXME
+            assert(false);
+            return -1;
+        }
+        case AST_EXPR_BLOCK:
+        {
+            // FIXME
+            assert(false);
+            return -1;
+        }
+        case AST_EXPR_FIELD:
+        {
+            // FIXME
+            assert(false);
+            return -1;
+        }
+        case AST_EXPR_LOOP:
+        {
+            // FIXME
+            assert(false);
+            return -1;
+        }
+        case AST_EXPR_BREAK:
+        {
+            // FIXME
+            assert(false);
+            return -1;
+        }
+        case AST_EXPR_FOR:
+        {
+            // FIXME
+            assert(false);
+            return -1;
+        }
+        case AST_EXPR_RANGE:
+        {
+            // FIXME
+            assert(false);
+            return -1;
+        }
+        case AST_EXPR_WHILE:
+        {
+            // FIXME
+            assert(false);
+            return -1;
+        }
+        case AST_EXPR_PAREN:
+        {
+            // FIXME
+            assert(false);
+            return -1;
         }
         default:
         {
-            gen_lvalue(expr);
-            break;
+            assert(false);
+            return -1;
         }
     }
 }
@@ -332,10 +350,7 @@ static void gen_func(AstFunc *func)
             case AST_STMT_SEMI:
             {
                 auto semi = static_cast<AstStmtSemi *>(it);
-
-                fprintf(stderr, "    ");
-                gen_rvalue(semi->expr);
-                fprintf(stderr, ";\n");
+                gen_expr(semi->expr);
 
                 break;
             }
@@ -361,9 +376,8 @@ static void gen_func(AstFunc *func)
 
     if (func->block->expr)
     {
-        fprintf(stderr, "    _0 = ");
-        gen_rvalue(func->block->expr);
-        fprintf(stderr, ";\n");
+        i64 ret = gen_expr(func->block->expr);
+        fprintf(stderr, "    _0 = _%ld;\n", ret);
     }
 
     fprintf(stderr, "}\n\n");
