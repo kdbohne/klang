@@ -221,9 +221,29 @@ static i64 gen_expr(AstExpr *expr)
         }
         case AST_EXPR_FIELD:
         {
-            // FIXME
-            assert(false);
-            return -1;
+            auto field = static_cast<AstExprField *>(expr);
+
+            i64 lhs = gen_expr(field->expr);
+
+            auto struct_ = field->expr->type_defn->struct_;
+
+            // TODO: optimize, store index in field?
+            i64 index = -1;
+            for (i64 i = 0; i < struct_->fields.count; ++i)
+            {
+                auto it = struct_->fields[i];
+                if (strings_match(it->name->str, field->name->str))
+                {
+                    index = i;
+                    break;
+                }
+            }
+            assert(index != -1);
+
+            i64 tmp = get_tmp_index(field->scope);
+            fprintf(stderr, "    _%ld = _%ld.%ld;\n", tmp, lhs, index);
+
+            return tmp;
         }
         case AST_EXPR_LOOP:
         {

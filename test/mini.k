@@ -29,10 +29,17 @@ fn main() {
 
     let k = add(x, y) + add(5, z);
 
-    let v Vec3;
-
     let f = add_three(14);
     let g = three() + six();
     let hp = &f;
     let h = *hp;
+
+    let v Vec3;
+    v.x = 8;
+    v.y = 2;
+    v.z = 4;
+
+    let a = v.x * 2 + 3;
+    v.y = a - 1;
+    v.z = v.y * v.x;
 }
