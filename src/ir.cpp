@@ -39,6 +39,8 @@ static i64 get_bb_index(Scope *scope)
     return top_level->ir_bb_counter++;
 }
 
+static i64 gen_block(AstExprBlock *block, bool terminate = true);
+
 static i64 gen_expr(AstExpr *expr)
 {
     switch (expr->type)
@@ -58,7 +60,7 @@ static i64 gen_expr(AstExpr *expr)
             auto lit = static_cast<AstExprLit *>(expr);
 
             i64 tmp = get_tmp_index(lit->scope);
-            fprintf(stderr, "    _%ld = ", tmp);
+            fprintf(stderr, "        _%ld = ", tmp);
 
             switch (lit->lit_type)
             {
@@ -112,7 +114,7 @@ static i64 gen_expr(AstExpr *expr)
 
             i64 tmp = get_tmp_index(bin->scope);
 
-            fprintf(stderr, "    _%ld = _%ld", tmp, lhs);
+            fprintf(stderr, "        _%ld = _%ld", tmp, lhs);
             switch (bin->op)
             {
                 case BIN_ADD: { fprintf(stderr, " + ");  break; }
@@ -145,7 +147,7 @@ static i64 gen_expr(AstExpr *expr)
             i64 rhs = gen_expr(un->expr);
             i64 tmp = get_tmp_index(un->scope);
 
-            fprintf(stderr, "    _%ld = ", tmp);
+            fprintf(stderr, "        _%ld = ", tmp);
             switch (un->op)
             {
                 case UN_ADDR:  { fprintf(stderr, "&"); break; }
@@ -174,7 +176,7 @@ static i64 gen_expr(AstExpr *expr)
 
             i64 tmp = get_tmp_index(call->scope);
 
-            fprintf(stderr, "    _%ld = %s(", tmp, call->name->str);
+            fprintf(stderr, "        _%ld = %s(", tmp, call->name->str);
             for (i64 i = 0; i < call->args.count; ++i)
             {
                 fprintf(stderr, "_%ld", args[i]);
@@ -212,14 +214,19 @@ static i64 gen_expr(AstExpr *expr)
             i64 rhs = gen_expr(assign->rhs);
 
             // FIXME: use fields directly on lhs
-            fprintf(stderr, "    _%ld = _%ld;\n", lhs, rhs);
+            fprintf(stderr, "        _%ld = _%ld;\n", lhs, rhs);
 
             return lhs;
         }
         case AST_EXPR_IF:
         {
-            // FIXME
-            assert(false);
+            auto if_ = static_cast<AstExprIf *>(expr);
+
+            // FIXME FIXME FIXME
+            gen_expr(if_->cond);
+            gen_block(if_->block);
+            gen_expr(if_->else_expr);
+
             return -1;
         }
         case AST_EXPR_BLOCK:
@@ -250,7 +257,7 @@ static i64 gen_expr(AstExpr *expr)
             assert(index != -1);
 
             i64 tmp = get_tmp_index(field->scope);
-            fprintf(stderr, "    _%ld = _%ld.%ld;\n", tmp, lhs, index);
+            fprintf(stderr, "        _%ld = _%ld.%ld;\n", tmp, lhs, index);
 
             return tmp;
         }
@@ -298,10 +305,10 @@ static i64 gen_expr(AstExpr *expr)
     }
 }
 
-static i64 gen_block(AstExprBlock *block, bool terminate = true)
+static i64 gen_block(AstExprBlock *block, bool terminate)
 {
     i64 bb = get_bb_index(block->scope);
-    fprintf(stderr, "bb%ld: {\n", bb);
+    fprintf(stderr, "    bb%ld: {\n", bb);
 
     foreach(block->stmts)
     {
@@ -419,9 +426,9 @@ static void gen_func(AstFunc *func)
     if (func->block->expr)
     {
         i64 ret = gen_expr(func->block->expr);
-        fprintf(stderr, "    _0 = _%ld;\n", ret);
+        fprintf(stderr, "        _0 = _%ld;\n", ret);
     }
-    fprintf(stderr, "}\n");
+    fprintf(stderr, "    }\n");
 
     fprintf(stderr, "}\n\n");
 }
