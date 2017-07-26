@@ -42,4 +42,13 @@ fn main() {
     let a = v.x * 2 + 3;
     v.y = a - 1;
     v.z = v.y * v.x;
+
+/*
+    let c = 4;
+    if c == 4 {
+        c = 5;
+    } else {
+        c = 6;
+    };
+*/
 }

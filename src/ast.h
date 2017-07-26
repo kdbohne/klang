@@ -30,6 +30,7 @@ struct Scope
     Scope *parent = NULL;
 
     i64 ir_tmp_counter = 0;
+    i64 ir_bb_counter = 0;
 };
 
 // TODO: move to own file?

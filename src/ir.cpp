@@ -12,23 +12,31 @@ static void print_type_defn(TypeDefn *defn)
     fprintf(stderr, "%s", defn->name);
 }
 
-static i64 get_tmp_index(Scope *scope)
+// Get the top-level scope, i.e. the one just below global scope.
+static Scope *get_top_level_scope(Scope *scope)
 {
-    // Get the block's top-level scope, i.e. the one just below global scope.
     Scope *top_level = scope;
     while (true)
     {
         if (top_level->parent && !top_level->parent->parent)
-        {
-            i64 index = top_level->ir_tmp_counter++;
-            return index;
-        }
+            return top_level;
 
         top_level = scope->parent;
     }
 
-    assert(false);
-    return -1;
+    return NULL;
+}
+
+static i64 get_tmp_index(Scope *scope)
+{
+    Scope *top_level = get_top_level_scope(scope);
+    return top_level->ir_tmp_counter++;
+}
+
+static i64 get_bb_index(Scope *scope)
+{
+    Scope *top_level = get_top_level_scope(scope);
+    return top_level->ir_bb_counter++;
 }
 
 static i64 gen_expr(AstExpr *expr)
@@ -203,6 +211,7 @@ static i64 gen_expr(AstExpr *expr)
             i64 lhs = gen_expr(assign->lhs);
             i64 rhs = gen_expr(assign->rhs);
 
+            // FIXME: use fields directly on lhs
             fprintf(stderr, "    _%ld = _%ld;\n", lhs, rhs);
 
             return lhs;
@@ -289,6 +298,53 @@ static i64 gen_expr(AstExpr *expr)
     }
 }
 
+static i64 gen_block(AstExprBlock *block, bool terminate = true)
+{
+    i64 bb = get_bb_index(block->scope);
+    fprintf(stderr, "bb%ld: {\n", bb);
+
+    foreach(block->stmts)
+    {
+        switch (it->type)
+        {
+            case AST_STMT_EXPR:
+            {
+                assert(false);
+                break;
+            }
+            case AST_STMT_SEMI:
+            {
+                auto semi = static_cast<AstStmtSemi *>(it);
+                gen_expr(semi->expr);
+
+                break;
+            }
+            case AST_STMT_DECL:
+            {
+#if 0
+                auto decl = static_cast<AstStmtDecl *>(it);
+                if (decl->desugared_rhs)
+                {
+                }
+#endif
+                // Do nothing; the desugared RHS is already a separate
+                // assignment statement.
+                break;
+            }
+            default:
+            {
+                assert(false);
+                break;
+            }
+        }
+    }
+
+    if (terminate)
+        fprintf(stderr, "}\n");
+
+    return bb;
+}
+
 static void gen_func(AstFunc *func)
 {
     // Reserve _0 for the return value.
@@ -358,47 +414,14 @@ static void gen_func(AstFunc *func)
     if (decl_count > 0)
         fprintf(stderr, "\n");
 
-    foreach(func->block->stmts)
-    {
-        switch (it->type)
-        {
-            case AST_STMT_EXPR:
-            {
-                assert(false);
-                break;
-            }
-            case AST_STMT_SEMI:
-            {
-                auto semi = static_cast<AstStmtSemi *>(it);
-                gen_expr(semi->expr);
-
-                break;
-            }
-            case AST_STMT_DECL:
-            {
-#if 0
-                auto decl = static_cast<AstStmtDecl *>(it);
-                if (decl->desugared_rhs)
-                {
-                }
-#endif
-                // Do nothing; the desugared RHS is already a separate
-                // assignment statement.
-                break;
-            }
-            default:
-            {
-                assert(false);
-                break;
-            }
-        }
-    }
+    gen_block(func->block, false);
 
     if (func->block->expr)
     {
         i64 ret = gen_expr(func->block->expr);
         fprintf(stderr, "    _0 = _%ld;\n", ret);
     }
+    fprintf(stderr, "}\n");
 
     fprintf(stderr, "}\n\n");
 }
