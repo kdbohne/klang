@@ -21,7 +21,7 @@ static Scope *get_top_level_scope(Scope *scope)
         if (top_level->parent && !top_level->parent->parent)
             return top_level;
 
-        top_level = scope->parent;
+        top_level = top_level->parent;
     }
 
     return NULL;
