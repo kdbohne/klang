@@ -1330,6 +1330,7 @@ struct IrExprType : IrExpr
 
 enum IrInstrType : u32
 {
+    IR_INSTR_DECL,
     IR_INSTR_SEMI,
     IR_INSTR_ASSIGN,
     IR_INSTR_RETURN,
@@ -1470,7 +1471,7 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
             assert(var);
             assert(var->ir_tmp_index != -1);
 
-            IrExprVar *ir_var = new IrExprVar;
+            IrExprVar *ir_var = new IrExprVar();
             ir_var->tmp = var->ir_tmp_index;
 
             return ir_var;
@@ -1484,7 +1485,7 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
             // separate for now in case the IR or AST wants to change how a
             // literal is stored without breaking the other. -31 Jul 2017
 
-            IrExprLit *lit = new IrExprLit;
+            IrExprLit *lit = new IrExprLit();
             lit->type = ast_lit->lit_type;
             switch (ast_lit->lit_type)
             {
@@ -1504,7 +1505,7 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
         {
             auto ast_bin = static_cast<AstExprBin *>(expr);
 
-            IrExprBin *bin = new IrExprBin;
+            IrExprBin *bin = new IrExprBin();
             bin->lhs = gen_expr(ir, ast_bin->lhs);
             bin->rhs = gen_expr(ir, ast_bin->rhs);
 
@@ -1537,7 +1538,7 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
         {
             auto ast_un = static_cast<AstExprUn *>(expr);
 
-            IrExprUn *un = new IrExprUn;
+            IrExprUn *un = new IrExprUn();
             un->expr = gen_expr(ir, ast_un->expr);
 
             // NOTE: this is a straight conversion of UnOp -> IrUnOp. The two
@@ -1562,7 +1563,7 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
         {
             auto ast_call = static_cast<AstExprCall *>(expr);
 
-            IrExprCall *call = new IrExprCall;
+            IrExprCall *call = new IrExprCall();
             call->name = ast_call->name->str; // TODO: copy?
 
             foreach(ast_call->args)
@@ -1703,7 +1704,7 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
             IrExpr *lhs = gen_expr(ir, ast_field->expr);
             assert(lhs->type == IR_EXPR_VAR);
 
-            IrExprField *field = new IrExprField;
+            IrExprField *field = new IrExprField();
             field->lhs = static_cast<IrExprVar *>(lhs);
             field->index = index;
 
@@ -1750,8 +1751,6 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
 static void gen_func(Ir *ir, AstFunc *ast_func)
 {
     i64 func_index = create_func(ir);
-    set_current_func(ir, func_index);
-
     IrFunc *func = &ir->funcs[func_index];
     func->name =  ast_func->name->str; // TODO: copy?
 
@@ -1764,6 +1763,11 @@ static void gen_func(Ir *ir, AstFunc *ast_func)
     func->params.count = 0;
     func->params.capacity = 0;
     func->ret = NULL;
+
+    set_current_func(ir, func_index);
+
+    i64 func_bb = create_bb(ir);
+    set_current_bb(ir, func_bb);
 
     // TODO: move ir_tmp_counter to IrFunc?
     // Reserve _0 for the return value.
@@ -1781,32 +1785,33 @@ static void gen_func(Ir *ir, AstFunc *ast_func)
 
         IrParam *param = func->params.next();
         param->tmp = var->ir_tmp_index;
-        param->type = new IrExprType;
+        param->type = new IrExprType();
         param->type->name = it->type->name->str;
         param->type->pointer_depth = it->type->pointer_depth;
     }
 
+    // Declare the function block's return value and type.
     if (ast_func->ret)
     {
-        IrExprType *ret = new IrExprType;
-        ret->name = ast_func->ret->name->str;
-        ret->pointer_depth = ast_func->ret->pointer_depth;
+        // Fill out the return type.
+        func->ret = new IrExprType();
+        func->ret->name = ast_func->ret->name->str;
+        func->ret->pointer_depth = ast_func->ret->pointer_depth;
 
-        func->ret = ret;
+        // Make a decl instruction.
+        IrExprVar *var = new IrExprVar();
+        var->tmp = 0; // 0 is always reserved for the return value.
+
+        IrInstr instr;
+        instr.type = IR_INSTR_DECL;
+        instr.args[0] = var;
+        instr.args[1] = func->ret;
+        instr.arg_count = 2;
+
+        add_instr(ir, instr);
     }
 
-    /*
-    // Declare the function block's return value.
-    if (func->block->expr)
-    {
-        fprintf(stderr, "    let _0 ");
-        print_type_defn(func->block->expr->type_defn);
-        fprintf(stderr, ";\n");
-    }
-    */
-
-    // Declare each variable in the function block's scope.
-    i64 decl_count = 0;
+    // Assign temporaries to each variable in the function block's scope.
     foreach(ast_func->block->stmts)
     {
         if (it->type == AST_STMT_DECL)
@@ -1817,31 +1822,31 @@ static void gen_func(Ir *ir, AstFunc *ast_func)
             assert(decl->bind->type == AST_EXPR_IDENT);
             auto ident = static_cast<AstExprIdent *>(decl->bind);
 
-            ScopeVar *var = scope_get_var(ident->scope, ident->str);
-            assert(var);
+            ScopeVar *scope_var = scope_get_var(ident->scope, ident->str);
+            assert(scope_var);
 
-            assert(var->ir_tmp_index == -1);
-            var->ir_tmp_index = alloc_tmp(ident->scope);
+            assert(scope_var->ir_tmp_index == -1);
+            scope_var->ir_tmp_index = alloc_tmp(ident->scope);
 
-            /*
-            fprintf(stderr, "    let _%ld ", var->ir_tmp_index);
-            print_type_defn(decl->bind->type_defn);
-            fprintf(stderr, "; // %s\n", ident->str);
-            */
+            // Make a decl instruction.
+            IrExprVar *var = new IrExprVar();
+            var->tmp = scope_var->ir_tmp_index;
 
-            ++decl_count;
+            IrExprType *type = new IrExprType();
+            type->name = decl->bind->type_defn->name;
+            type->pointer_depth = get_pointer_depth(decl->bind->type_defn);
+
+            IrInstr instr;
+            instr.type = IR_INSTR_DECL;
+            instr.args[0] = var;
+            instr.args[1] = type;
+            instr.arg_count = 2;
+
+            add_instr(ir, instr);
         }
     }
-    /*
-    if (decl_count > 0)
-        fprintf(stderr, "\n");
-    */
 
-    i64 func_bb = create_bb(ir);
-    func->current_bb = func_bb;
     gen_expr(ir, ast_func->block);
-
-//    fprintf(stderr, "}\n\n");
 }
 
 static void dump_expr(IrExpr *expr)
@@ -2040,6 +2045,17 @@ static void dump_ir(Ir *ir)
                 fprintf(stderr, "        ");
                 switch (it.type)
                 {
+                    case IR_INSTR_DECL:
+                    {
+                        assert(it.arg_count == 2);
+
+                        fprintf(stderr, "let ");
+                        dump_expr(it.args[0]);
+                        fprintf(stderr, " ");
+                        dump_expr(it.args[1]);
+
+                        break;
+                    }
                     case IR_INSTR_SEMI:
                     {
                         // FIXME
