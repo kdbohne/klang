@@ -1847,6 +1847,25 @@ static void gen_func(Ir *ir, AstFunc *ast_func)
     }
 
     gen_expr(ir, ast_func->block);
+
+    // Assign the return value to its reserved binding.
+    if (ast_func->block->expr)
+    {
+        IrExpr *ret_expr = gen_expr(ir, ast_func->block->expr);
+
+        // TODO: this is already allocated for _0's decl; reuse it
+        // instead of reallocating it.
+        IrExprVar *ret_var = new IrExprVar();
+        ret_var->tmp = 0; // 0 is always reserved for the return value.
+
+        IrInstr instr;
+        instr.type = IR_INSTR_ASSIGN;
+        instr.args[0] = ret_var;
+        instr.args[1] = ret_expr;
+        instr.arg_count = 2;
+
+        add_instr(ir, instr);
+    }
 }
 
 static void dump_expr(IrExpr *expr)
