@@ -44,11 +44,34 @@ fn main() {
     v.z = v.y * v.x;
 
 /*
+    if x == 1 {
+        x = x + 5;
+    };
+
+    if x == 6 {
+        x = x + 1;
+        if x == 7 {
+            x = 8;
+        };
+
+        if x == 8 {
+            x = 9;
+        } else {
+            x = 10;
+        };
+    };
+
     let c = 4;
     if c == 4 {
         c = 5;
     } else {
         c = 6;
+    };
+
+    let d = if c == 5 {
+        1
+    } else {
+        2
     };
 */
 }

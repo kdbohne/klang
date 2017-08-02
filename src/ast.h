@@ -77,6 +77,14 @@ enum AstNodeType : u32
     AST_ERR,
 };
 
+struct Bb
+{
+    i64 index = -1;
+
+    Bb *true_ = NULL;
+    Bb *false_ = NULL;
+};
+
 struct AstNode
 {
     AstNode(AstNodeType type_) : type(type_) {}
@@ -85,6 +93,8 @@ struct AstNode
 
     TypeDefn *type_defn = NULL;
     Scope *scope = NULL;
+
+    Bb *bb = NULL;
 
     // Location info for error reporting.
     File file;
@@ -265,14 +275,19 @@ struct AstExprIf : AstExpr
     AstExpr *else_expr = NULL;
 };
 
+enum AstBlockFlags
+{
+    BLOCK_IS_FUNC_BLOCK = 0x1,
+};
+
 struct AstExprBlock : AstExpr
 {
     AstExprBlock() : AstExpr(AST_EXPR_BLOCK) {}
 
+    u32 flags = 0;
+
     Array<AstStmt *> stmts;
     AstExpr *expr = NULL;
-
-    char *codegen_expr_temp_binding = NULL;
 };
 
 struct AstExprField : AstExpr

@@ -551,7 +551,9 @@ static AstFunc *parse_func(Parser *parser)
     }
 
     expect(parser, TOK_OPEN_BRACE);
+
     func->block = parse_block(parser);
+    func->block->flags |= BLOCK_IS_FUNC_BLOCK;
 
     return func;
 }
