@@ -1177,6 +1177,8 @@ static void print_type_defn(TypeDefn *defn)
 
 static void gen_struct(AstStruct *struct_)
 {
+    // FIXME
+    /*
     fprintf(stderr, "type %s { ", struct_->name->str);
     for (i64 i = 0; i < struct_->fields.count; ++i)
     {
@@ -1189,6 +1191,7 @@ static void gen_struct(AstStruct *struct_)
         fprintf(stderr, " ");
     }
     fprintf(stderr, "};\n");
+    */
 }
 
 static Scope *get_top_level_scope(Scope *scope)
@@ -1416,7 +1419,7 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
 
             IrExprLit *lit = new IrExprLit;
             lit->type = ast_lit->lit_type;
-            switch (ast_lit->type)
+            switch (ast_lit->lit_type)
             {
                 case LIT_INT:   { lit->value_int = ast_lit->value_int;     break; }
                 case LIT_FLOAT: { lit->value_float = ast_lit->value_float; break; }
@@ -1677,14 +1680,14 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
     }
 }
 
-static void gen_func(AstFunc *func)
+static void gen_func(Ir *ir, AstFunc *func)
 {
     // Reserve _0 for the return value.
     if (func->block->expr)
         ++func->scope->ir_tmp_counter;
 
     // Function signature.
-    fprintf(stderr, "fn %s(", func->name->str);
+//    fprintf(stderr, "fn %s(", func->name->str);
     for (i64 i = 0; i < func->params.count; ++i)
     {
         auto it = func->params[i];
@@ -1694,14 +1697,17 @@ static void gen_func(AstFunc *func)
 
         var->ir_tmp_index = alloc_tmp(it->scope);
 
+        /*
         fprintf(stderr, "_%ld ", var->ir_tmp_index);
         print_type_defn(it->name->type_defn);
 
         if (i < func->params.count - 1)
             fprintf(stderr, ", ");
+        */
     }
-    fprintf(stderr, ")");
+//    fprintf(stderr, ")");
 
+    /*
     // Return type.
     if (func->ret)
     {
@@ -1717,6 +1723,7 @@ static void gen_func(AstFunc *func)
         print_type_defn(func->block->expr->type_defn);
         fprintf(stderr, ";\n");
     }
+    */
 
     // Declare each variable in the function block's scope.
     i64 decl_count = 0;
@@ -1736,29 +1743,247 @@ static void gen_func(AstFunc *func)
             assert(var->ir_tmp_index == -1);
             var->ir_tmp_index = alloc_tmp(ident->scope);
 
+            /*
             fprintf(stderr, "    let _%ld ", var->ir_tmp_index);
             print_type_defn(decl->bind->type_defn);
             fprintf(stderr, "; // %s\n", ident->str);
+            */
 
             ++decl_count;
         }
     }
+    /*
     if (decl_count > 0)
         fprintf(stderr, "\n");
+    */
 
-    Ir ir;
-    i64 func_bb = create_bb(&ir);
-    ir.current_bb = func_bb;
-    gen_expr(&ir, func->block);
+    i64 func_bb = create_bb(ir);
+    ir->current_bb = func_bb;
+    gen_expr(ir, func->block);
 
-    fprintf(stderr, "}\n\n");
+//    fprintf(stderr, "}\n\n");
+}
+
+static void dump_expr(IrExpr *expr)
+{
+    // FIXME
+    switch (expr->type)
+    {
+        case IR_EXPR_VAR:
+        {
+            auto var = static_cast<IrExprVar *>(expr);
+            fprintf(stderr, "_%ld", var->tmp);
+
+            break;
+        }
+        case IR_EXPR_LIT:
+        {
+            auto lit = static_cast<IrExprLit *>(expr);
+            switch (lit->type)
+            {
+                case LIT_INT:
+                {
+                    // TODO: explicit type suffix
+                    LitInt v = lit->value_int;
+                    if (v.flags & INT_IS_NEGATIVE)
+                        fprintf(stderr, "-");
+
+                    /*
+                    if (v.flags & INT_IS_HEX)
+                        fprintf(stderr, "0x");
+                    if (v.flags & INT_IS_BINARY)
+                        fprintf(stderr, "0b");
+                    */
+
+                    fprintf(stderr, "%lu", v.value);
+
+                    // TODO: explicit integer size suffix?
+
+                    break;
+                }
+                case LIT_FLOAT:
+                {
+                    // FIXME
+                    assert(false);
+                    break;
+                }
+                case LIT_STR:
+                {
+                    // FIXME
+                    assert(false);
+                    break;
+                }
+                default:
+                {
+                    assert(false);
+                    break;
+                }
+            }
+
+            break;
+        }
+        case IR_EXPR_CALL:
+        {
+            auto call = static_cast<IrExprCall *>(expr);
+
+            fprintf(stderr, "%s(", call->name);
+            for (i64 i = 0; i < call->args.count; ++i)
+            {
+                dump_expr(call->args[i]);
+
+                if (i < call->args.count - 1)
+                    fprintf(stderr, ", ");
+            }
+            fprintf(stderr, ")");
+
+            break;
+        }
+        case IR_EXPR_BIN:
+        {
+            auto bin = static_cast<IrExprBin *>(expr);
+
+            dump_expr(bin->lhs);
+            switch (bin->op)
+            {
+                case BIN_ADD: { fprintf(stderr, " + ");  break; }
+                case BIN_SUB: { fprintf(stderr, " - ");  break; }
+                case BIN_MUL: { fprintf(stderr, " * ");  break; }
+                case BIN_DIV: { fprintf(stderr, " / ");  break; }
+                case BIN_MOD: { fprintf(stderr, " %% "); break; }
+
+                case BIN_EQ:  { fprintf(stderr, " == "); break; }
+                case BIN_NE:  { fprintf(stderr, " != "); break; }
+
+                case BIN_LT:  { fprintf(stderr, " < ");  break; }
+                case BIN_LE:  { fprintf(stderr, " <= "); break; }
+                case BIN_GT:  { fprintf(stderr, " > ");  break; }
+                case BIN_GE:  { fprintf(stderr, " >= "); break; }
+
+                default:
+                {
+                    assert(false);
+                    break;
+                }
+            }
+            dump_expr(bin->rhs);
+
+            break;
+        }
+        case IR_EXPR_UN:
+        {
+            auto un = static_cast<IrExprUn *>(expr);
+
+            switch (un->op)
+            {
+                case UN_ADDR:  { un->op = IR_UN_ADDR;  break; }
+                case UN_DEREF: { un->op = IR_UN_DEREF; break; }
+                case UN_NEG:   { un->op = IR_UN_NEG;   break; }
+                default:
+                {
+                    assert(false);
+                    break;
+                }
+            }
+            dump_expr(un->expr);
+
+            break;
+        }
+        case IR_EXPR_FIELD:
+        {
+            auto field = static_cast<IrExprField *>(expr);
+
+            dump_expr(field->lhs);
+            fprintf(stderr, ".%ld", field->index);
+
+            break;
+        }
+        case IR_EXPR_PAREN:
+        {
+            auto paren = static_cast<IrExprParen *>(expr);
+
+            fprintf(stderr, "(");
+            dump_expr(paren->expr);
+            fprintf(stderr, ")");
+
+            break;
+        }
+        default:
+        {
+            assert(false);
+            break;
+        }
+    }
+}
+
+static void dump_ir(Ir *ir)
+{
+    for (i64 i = 0; i < ir->bbs.count; ++i)
+    {
+        fprintf(stderr, "bb%ld: {\n", i);
+
+        foreach(ir->bbs[i].instrs)
+        {
+            fprintf(stderr, "    ");
+            switch (it.type)
+            {
+                case IR_INSTR_SEMI:
+                {
+                    // FIXME
+                    assert(false);
+                    break;
+                }
+                case IR_INSTR_ASSIGN:
+                {
+                    assert(it.arg_count == 2);
+
+                    dump_expr(it.args[0]);
+                    fprintf(stderr, " = ");
+                    dump_expr(it.args[1]);
+
+                    break;
+                }
+                case IR_INSTR_RETURN:
+                {
+                    // FIXME
+                    assert(false);
+                    break;
+                }
+                case IR_INSTR_GOTO:
+                {
+                    // FIXME
+                    assert(false);
+                    break;
+                }
+                case IR_INSTR_GOTOIF:
+                {
+                    // FIXME
+                    assert(false);
+                    break;
+                }
+                default:
+                {
+                    assert(false);
+                    break;
+                }
+            }
+            fprintf(stderr, ";\n");
+        }
+
+        fprintf(stderr, "}\n");
+    }
 }
 
 void gen_ir(AstRoot *ast)
 {
+    Ir ir;
+
+    /*
     foreach(ast->structs)
         gen_struct(it);
+    */
 
     foreach(ast->funcs)
-        gen_func(it);
+        gen_func(&ir, it);
+
+    dump_ir(&ir);
 }
