@@ -1369,7 +1369,7 @@ struct IrBb
 struct IrParam
 {
     IrExprType *type = NULL;
-    char *name = NULL;
+    i64 tmp = -1;
 };
 
 struct IrFunc
@@ -1781,7 +1781,7 @@ static void gen_func(Ir *ir, AstFunc *ast_func)
         var->ir_tmp_index = alloc_tmp(it->scope);
 
         IrParam *param = func->params.next();
-        param->name = it->name->str; // TODO: copy?
+        param->tmp = var->ir_tmp_index;
         param->type = new IrExprType; // TODO: leak?
         param->type->name = it->type->name->str;
         param->type->pointer_depth = it->type->pointer_depth;
@@ -2024,7 +2024,7 @@ static void dump_ir(Ir *ir)
         {
             IrParam *param = &func->params[j];
 
-            fprintf(stderr, "%s ", param->name);
+            fprintf(stderr, "_%ld ", param->tmp);
             dump_expr(param->type);
 
             if (j < func->params.count - 1)
