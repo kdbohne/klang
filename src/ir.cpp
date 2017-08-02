@@ -1215,7 +1215,7 @@ static i64 alloc_tmp(Scope *scope)
     return top_level->ir_tmp_counter++;
 }
 
-enum IrExprType : u32
+enum IrExprType_ : u32
 {
     IR_EXPR_VAR,
     IR_EXPR_LIT,
@@ -1224,12 +1224,13 @@ enum IrExprType : u32
     IR_EXPR_UN,
     IR_EXPR_FIELD,
     IR_EXPR_PAREN,
+    IR_EXPR_TYPE,
 };
 
 struct IrExpr
 {
-    IrExpr(IrExprType type_) : type(type_) {}
-    IrExprType type;
+    IrExpr(IrExprType_ type_) : type(type_) {}
+    IrExprType_ type;
 };
 
 struct IrExprVar : IrExpr
@@ -1319,6 +1320,14 @@ struct IrExprParen : IrExpr
     IrExpr *expr = NULL;
 };
 
+struct IrExprType : IrExpr
+{
+    IrExprType() : IrExpr(IR_EXPR_TYPE) {}
+
+    char *name = NULL;
+    i64 pointer_depth = 0;
+};
+
 enum IrInstrType : u32
 {
     IR_INSTR_SEMI,
@@ -1357,14 +1366,19 @@ struct IrBb
     IrBb *false_ = NULL;
 };
 
+struct IrParam
+{
+    IrExprType *type = NULL;
+    char *name = NULL;
+};
+
 struct IrFunc
 {
     Array<IrBb> bbs;
     i64 current_bb = -1;
 
     char *name = NULL;
-
-    // FIXME: params
+    Array<IrParam> params;
     // FIXME: ret
 };
 
@@ -1737,8 +1751,20 @@ static void gen_func(Ir *ir, AstFunc *ast_func)
 {
     i64 func_index = create_func(ir);
     set_current_func(ir, func_index);
-    IrFunc *func = &ir->funcs[func_index];
 
+    IrFunc *func = &ir->funcs[func_index];
+    func->name =  ast_func->name->str; // TODO: copy?
+
+    // Bleh.
+    func->bbs.data = NULL;
+    func->bbs.count = 0;
+    func->bbs.capacity = 0;
+    func->current_bb = -1;
+    func->params.data = NULL;
+    func->params.count = 0;
+    func->params.capacity = 0;
+
+    // TODO: move ir_tmp_counter to IrFunc?
     // Reserve _0 for the return value.
     if (ast_func->block->expr)
         ++ast_func->scope->ir_tmp_counter;
@@ -1753,6 +1779,12 @@ static void gen_func(Ir *ir, AstFunc *ast_func)
         assert(var);
 
         var->ir_tmp_index = alloc_tmp(it->scope);
+
+        IrParam *param = func->params.next();
+        param->name = it->name->str; // TODO: copy?
+        param->type = new IrExprType; // TODO: leak?
+        param->type->name = it->type->name->str;
+        param->type->pointer_depth = it->type->pointer_depth;
 
         /*
         fprintf(stderr, "_%ld ", var->ir_tmp_index);
@@ -1823,7 +1855,6 @@ static void gen_func(Ir *ir, AstFunc *ast_func)
 
 static void dump_expr(IrExpr *expr)
 {
-    // FIXME
     switch (expr->type)
     {
         case IR_EXPR_VAR:
@@ -1964,6 +1995,16 @@ static void dump_expr(IrExpr *expr)
 
             break;
         }
+        case IR_EXPR_TYPE:
+        {
+            auto type = static_cast<IrExprType *>(expr);
+
+            for (i64 i = 0; i < type->pointer_depth; ++i)
+                fprintf(stderr, "*");
+            fprintf(stderr, "%s", type->name);
+
+            break;
+        }
         default:
         {
             assert(false);
@@ -1977,13 +2018,18 @@ static void dump_ir(Ir *ir)
     for (i64 i = 0; i < ir->funcs.count; ++i)
     {
         IrFunc *func = &ir->funcs[i];
+
         fprintf(stderr, "fn %s(", func->name);
-        // FIXME
-        /*
-        foreach(func->params)
+        for (i64 j = 0; j < func->params.count; ++j)
         {
+            IrParam *param = &func->params[j];
+
+            fprintf(stderr, "%s ", param->name);
+            dump_expr(param->type);
+
+            if (j < func->params.count - 1)
+                fprintf(stderr, ", ");
         }
-        */
         fprintf(stderr, ")");
 
         // FIXME

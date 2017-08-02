@@ -242,6 +242,7 @@ struct AstExprType : AstExpr
     i32 pointer_depth = 0;
 };
 
+// TODO: is this really an expression? Rename -> AstParam?
 struct AstExprParam : AstExpr
 {
     AstExprParam() : AstExpr(AST_EXPR_PARAM) {}
