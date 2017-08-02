@@ -1379,7 +1379,7 @@ struct IrFunc
 
     char *name = NULL;
     Array<IrParam> params;
-    // FIXME: ret
+    IrExprType *ret = NULL;
 };
 
 struct Ir
@@ -1763,14 +1763,13 @@ static void gen_func(Ir *ir, AstFunc *ast_func)
     func->params.data = NULL;
     func->params.count = 0;
     func->params.capacity = 0;
+    func->ret = NULL;
 
     // TODO: move ir_tmp_counter to IrFunc?
     // Reserve _0 for the return value.
     if (ast_func->block->expr)
         ++ast_func->scope->ir_tmp_counter;
 
-    // Function signature.
-//    fprintf(stderr, "fn %s(", func->name->str);
     for (i64 i = 0; i < ast_func->params.count; ++i)
     {
         auto it = ast_func->params[i];
@@ -1782,29 +1781,21 @@ static void gen_func(Ir *ir, AstFunc *ast_func)
 
         IrParam *param = func->params.next();
         param->tmp = var->ir_tmp_index;
-        param->type = new IrExprType; // TODO: leak?
+        param->type = new IrExprType;
         param->type->name = it->type->name->str;
         param->type->pointer_depth = it->type->pointer_depth;
-
-        /*
-        fprintf(stderr, "_%ld ", var->ir_tmp_index);
-        print_type_defn(it->name->type_defn);
-
-        if (i < func->params.count - 1)
-            fprintf(stderr, ", ");
-        */
     }
-//    fprintf(stderr, ")");
+
+    if (ast_func->ret)
+    {
+        IrExprType *ret = new IrExprType;
+        ret->name = ast_func->ret->name->str;
+        ret->pointer_depth = ast_func->ret->pointer_depth;
+
+        func->ret = ret;
+    }
 
     /*
-    // Return type.
-    if (func->ret)
-    {
-        fprintf(stderr, " -> ");
-        print_type_defn(func->ret->type_defn);
-    }
-    fprintf(stderr, " {\n");
-
     // Declare the function block's return value.
     if (func->block->expr)
     {
@@ -2019,6 +2010,7 @@ static void dump_ir(Ir *ir)
     {
         IrFunc *func = &ir->funcs[i];
 
+        // Function signature.
         fprintf(stderr, "fn %s(", func->name);
         for (i64 j = 0; j < func->params.count; ++j)
         {
@@ -2032,11 +2024,11 @@ static void dump_ir(Ir *ir)
         }
         fprintf(stderr, ")");
 
-        // FIXME
-        /*
         if (func->ret)
+        {
             fprintf(stderr, " -> ");
-        */
+            dump_expr(func->ret);
+        }
         fprintf(stderr, " {\n");
 
         for (i64 j = 0; j < func->bbs.count; ++j)
