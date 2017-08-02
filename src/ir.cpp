@@ -1357,15 +1357,53 @@ struct IrBb
     IrBb *false_ = NULL;
 };
 
-struct Ir
+struct IrFunc
 {
     Array<IrBb> bbs;
     i64 current_bb = -1;
+
+    char *name = NULL;
+
+    // FIXME: params
+    // FIXME: ret
 };
+
+struct Ir
+{
+    Array<IrFunc> funcs;
+    i64 current_func = -1;
+};
+
+static i64 create_func(Ir *ir)
+{
+    IrFunc *func = ir->funcs.next();
+
+    // Bleh.
+    func->bbs.data = NULL;
+    func->bbs.count = 0;
+    func->bbs.capacity = 0;
+
+    func->current_bb = -1;
+    func->name = NULL;
+
+    return ir->funcs.count - 1;
+}
+
+static void set_current_func(Ir *ir, i64 func)
+{
+    assert(func >= 0);
+    assert(func < ir->funcs.count);
+
+    ir->current_func = func;
+}
 
 static i64 create_bb(Ir *ir)
 {
-    IrBb *bb = ir->bbs.next();
+    assert(ir->current_func >= 0);
+    assert(ir->current_func < ir->funcs.count);
+    IrFunc *func = &ir->funcs[ir->current_func];
+
+    IrBb *bb = func->bbs.next();
 
     // Bleh.
     bb->instrs.data = NULL;
@@ -1378,16 +1416,31 @@ static i64 create_bb(Ir *ir)
     bb->true_ = NULL;
     bb->false_ = NULL;
 
-    return ir->bbs.count - 1;
+    return func->bbs.count - 1;
+}
+
+static void set_current_bb(Ir *ir, i64 bb)
+{
+    assert(ir->current_func >= 0);
+    assert(ir->current_func < ir->funcs.count);
+    IrFunc *func = &ir->funcs[ir->current_func];
+
+    assert(bb >= 0);
+    assert(bb < ir->funcs.count);
+    func->current_bb = bb;
 }
 
 static void add_instr(Ir *ir, IrInstr instr)
 {
-    assert(ir->bbs.count > 0);
-    assert(ir->current_bb >= 0);
-    assert(ir->current_bb < ir->bbs.count);
+    assert(ir->current_func >= 0);
+    assert(ir->current_func < ir->funcs.count);
+    IrFunc *func = &ir->funcs[ir->current_func];
 
-    IrBb *bb = &ir->bbs[ir->current_bb];
+    assert(func->bbs.count > 0);
+    assert(func->current_bb >= 0);
+    assert(func->current_bb < func->bbs.count);
+
+    IrBb *bb = &func->bbs[func->current_bb];
     bb->instrs.add(instr);
 }
 
@@ -1550,17 +1603,17 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
             if (ast_if->else_expr)
                 else_bb = create_bb(ir);
 
-            ir->current_bb = then_bb;
+            set_current_bb(ir, then_bb);
             IrExpr *then_expr = gen_expr(ir, ast_if->block);
 
             IrExpr *else_expr = NULL;
             if (ast_if->else_expr)
             {
-                ir->current_bb = else_bb;
+                set_current_bb(ir, else_bb);
                 gen_expr(ir, ast_if->block);
             }
 
-            ir->current_bb = merge_bb;
+            set_current_bb(ir, merge_bb);
 
             IrInstr instr;
             instr.type = IR_INSTR_GOTOIF;
@@ -1680,17 +1733,21 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
     }
 }
 
-static void gen_func(Ir *ir, AstFunc *func)
+static void gen_func(Ir *ir, AstFunc *ast_func)
 {
+    i64 func_index = create_func(ir);
+    set_current_func(ir, func_index);
+    IrFunc *func = &ir->funcs[func_index];
+
     // Reserve _0 for the return value.
-    if (func->block->expr)
-        ++func->scope->ir_tmp_counter;
+    if (ast_func->block->expr)
+        ++ast_func->scope->ir_tmp_counter;
 
     // Function signature.
 //    fprintf(stderr, "fn %s(", func->name->str);
-    for (i64 i = 0; i < func->params.count; ++i)
+    for (i64 i = 0; i < ast_func->params.count; ++i)
     {
-        auto it = func->params[i];
+        auto it = ast_func->params[i];
 
         ScopeVar *var = scope_get_var(it->scope, it->name->str);
         assert(var);
@@ -1727,7 +1784,7 @@ static void gen_func(Ir *ir, AstFunc *func)
 
     // Declare each variable in the function block's scope.
     i64 decl_count = 0;
-    foreach(func->block->stmts)
+    foreach(ast_func->block->stmts)
     {
         if (it->type == AST_STMT_DECL)
         {
@@ -1758,8 +1815,8 @@ static void gen_func(Ir *ir, AstFunc *func)
     */
 
     i64 func_bb = create_bb(ir);
-    ir->current_bb = func_bb;
-    gen_expr(ir, func->block);
+    func->current_bb = func_bb;
+    gen_expr(ir, ast_func->block);
 
 //    fprintf(stderr, "}\n\n");
 }
@@ -1917,59 +1974,81 @@ static void dump_expr(IrExpr *expr)
 
 static void dump_ir(Ir *ir)
 {
-    for (i64 i = 0; i < ir->bbs.count; ++i)
+    for (i64 i = 0; i < ir->funcs.count; ++i)
     {
-        fprintf(stderr, "bb%ld: {\n", i);
-
-        foreach(ir->bbs[i].instrs)
+        IrFunc *func = &ir->funcs[i];
+        fprintf(stderr, "fn %s(", func->name);
+        // FIXME
+        /*
+        foreach(func->params)
         {
-            fprintf(stderr, "    ");
-            switch (it.type)
+        }
+        */
+        fprintf(stderr, ")");
+
+        // FIXME
+        /*
+        if (func->ret)
+            fprintf(stderr, " -> ");
+        */
+        fprintf(stderr, " {\n");
+
+        for (i64 j = 0; j < func->bbs.count; ++j)
+        {
+            fprintf(stderr, "    bb%ld: {\n", j);
+
+            foreach(func->bbs[j].instrs)
             {
-                case IR_INSTR_SEMI:
+                fprintf(stderr, "        ");
+                switch (it.type)
                 {
-                    // FIXME
-                    assert(false);
-                    break;
-                }
-                case IR_INSTR_ASSIGN:
-                {
-                    assert(it.arg_count == 2);
+                    case IR_INSTR_SEMI:
+                    {
+                        // FIXME
+                        assert(false);
+                        break;
+                    }
+                    case IR_INSTR_ASSIGN:
+                    {
+                        assert(it.arg_count == 2);
 
-                    dump_expr(it.args[0]);
-                    fprintf(stderr, " = ");
-                    dump_expr(it.args[1]);
+                        dump_expr(it.args[0]);
+                        fprintf(stderr, " = ");
+                        dump_expr(it.args[1]);
 
-                    break;
+                        break;
+                    }
+                    case IR_INSTR_RETURN:
+                    {
+                        // FIXME
+                        assert(false);
+                        break;
+                    }
+                    case IR_INSTR_GOTO:
+                    {
+                        // FIXME
+                        assert(false);
+                        break;
+                    }
+                    case IR_INSTR_GOTOIF:
+                    {
+                        // FIXME
+                        assert(false);
+                        break;
+                    }
+                    default:
+                    {
+                        assert(false);
+                        break;
+                    }
                 }
-                case IR_INSTR_RETURN:
-                {
-                    // FIXME
-                    assert(false);
-                    break;
-                }
-                case IR_INSTR_GOTO:
-                {
-                    // FIXME
-                    assert(false);
-                    break;
-                }
-                case IR_INSTR_GOTOIF:
-                {
-                    // FIXME
-                    assert(false);
-                    break;
-                }
-                default:
-                {
-                    assert(false);
-                    break;
-                }
+                fprintf(stderr, ";\n");
             }
-            fprintf(stderr, ";\n");
+
+            fprintf(stderr, "    }\n");
         }
 
-        fprintf(stderr, "}\n");
+        fprintf(stderr, "}\n\n");
     }
 }
 
