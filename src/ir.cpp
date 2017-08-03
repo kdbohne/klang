@@ -1459,6 +1459,27 @@ static void add_instr(Ir *ir, IrInstr instr)
     bb->instrs.add(instr);
 }
 
+static IrExpr *flatten_expr(Ir *ir, Scope *scope, IrExpr *expr)
+{
+    if (expr->type == IR_EXPR_VAR)
+        return expr;
+
+    // TODO: early exit for literals?
+
+    IrExprVar *var = new IrExprVar();
+    var->tmp = alloc_tmp(scope);
+
+    IrInstr instr;
+    instr.type = IR_INSTR_ASSIGN;
+    instr.args[0] = var;
+    instr.args[1] = expr;
+    instr.arg_count = 2;
+
+    add_instr(ir, instr);
+
+    return var;
+}
+
 static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
 {
     switch (expr->type)
@@ -1508,6 +1529,8 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
             IrExprBin *bin = new IrExprBin();
             bin->lhs = gen_expr(ir, ast_bin->lhs);
             bin->rhs = gen_expr(ir, ast_bin->rhs);
+            bin->lhs = flatten_expr(ir, ast_bin->scope, bin->lhs);
+            bin->rhs = flatten_expr(ir, ast_bin->scope, bin->rhs);
 
             // NOTE: this is a straight conversion of BinOp -> IrBinOp. The two
             // enums are being kept separate for now in case the IR or AST wants
@@ -1540,6 +1563,7 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
 
             IrExprUn *un = new IrExprUn();
             un->expr = gen_expr(ir, ast_un->expr);
+            un->expr = flatten_expr(ir, ast_un->scope, un->expr);
 
             // NOTE: this is a straight conversion of UnOp -> IrUnOp. The two
             // enums are being kept separate for now in case the IR or AST wants
@@ -1570,18 +1594,7 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
             {
                 IrExpr *arg = gen_expr(ir, it);
 
-                // Flatten the argument into a variable.
-                IrExprVar *tmp = new IrExprVar();
-                tmp->tmp = alloc_tmp(it->scope);
-
-                IrInstr instr;
-                instr.type = IR_INSTR_ASSIGN;
-                instr.args[0] = tmp;
-                instr.args[1] = arg;
-                instr.arg_count = 2;
-
-                add_instr(ir, instr);
-
+                IrExpr *tmp = flatten_expr(ir, it->scope, arg);
                 call->args.add(tmp);
             }
 
