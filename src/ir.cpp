@@ -1895,6 +1895,11 @@ static void gen_func(Ir *ir, AstFunc *ast_func)
 
         add_instr(ir, instr);
     }
+
+    IrInstr instr;
+    instr.type = IR_INSTR_RETURN;
+    instr.arg_count = 0;
+    add_instr(ir, instr);
 }
 
 static void dump_expr(IrExpr *expr)
@@ -2122,8 +2127,7 @@ static void dump_ir(Ir *ir)
                     }
                     case IR_INSTR_RETURN:
                     {
-                        // FIXME
-                        assert(false);
+                        fprintf(stderr, "return");
                         break;
                     }
                     case IR_INSTR_GOTO:
