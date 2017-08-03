@@ -1699,6 +1699,8 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
                 }
             }
 
+            // FIXME
+#if 0
             if (block->expr)
             {
                 IrExpr *ret = gen_expr(ir, block->expr);
@@ -1706,6 +1708,7 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
 
                 return ret;
             }
+#endif
 
             return NULL;
         }
