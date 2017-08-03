@@ -1569,7 +1569,20 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
             foreach(ast_call->args)
             {
                 IrExpr *arg = gen_expr(ir, it);
-                call->args.add(arg);
+
+                // Flatten the argument into a variable.
+                IrExprVar *tmp = new IrExprVar();
+                tmp->tmp = alloc_tmp(it->scope);
+
+                IrInstr instr;
+                instr.type = IR_INSTR_ASSIGN;
+                instr.args[0] = tmp;
+                instr.args[1] = arg;
+                instr.arg_count = 2;
+
+                add_instr(ir, instr);
+
+                call->args.add(tmp);
             }
 
             return call;
