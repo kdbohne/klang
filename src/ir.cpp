@@ -1684,9 +1684,9 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
             // Create the basic blocks.
             i64 then_bb = create_bb(ir);
             i64 else_bb = -1;
-            i64 merge_bb = create_bb(ir);
             if (ast_if->else_expr)
                 else_bb = create_bb(ir);
+            i64 merge_bb = create_bb(ir);
 
             IrExpr *cond = gen_expr(ir, ast_if->cond);
             cond = flatten_expr(ir, ast_if, cond);
