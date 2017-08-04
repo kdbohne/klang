@@ -1267,6 +1267,7 @@ enum IrBinOp : u32
     IR_BIN_SUB,
     IR_BIN_MUL,
     IR_BIN_DIV,
+    IR_BIN_MOD,
 
     IR_BIN_EQ,
     IR_BIN_NE,
@@ -1541,6 +1542,7 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
                 case BIN_SUB: { bin->op = IR_BIN_SUB; break; }
                 case BIN_MUL: { bin->op = IR_BIN_MUL; break; }
                 case BIN_DIV: { bin->op = IR_BIN_DIV; break; }
+                case BIN_MOD: { bin->op = IR_BIN_MOD; break; }
                 case BIN_EQ:  { bin->op = IR_BIN_EQ;  break; }
                 case BIN_NE:  { bin->op = IR_BIN_NE;  break; }
                 case BIN_LT:  { bin->op = IR_BIN_LT;  break; }
