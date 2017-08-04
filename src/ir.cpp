@@ -1984,19 +1984,19 @@ static void dump_expr(IrExpr *expr)
             dump_expr(bin->lhs);
             switch (bin->op)
             {
-                case BIN_ADD: { fprintf(stderr, " + ");  break; }
-                case BIN_SUB: { fprintf(stderr, " - ");  break; }
-                case BIN_MUL: { fprintf(stderr, " * ");  break; }
-                case BIN_DIV: { fprintf(stderr, " / ");  break; }
-                case BIN_MOD: { fprintf(stderr, " %% "); break; }
+                case IR_BIN_ADD: { fprintf(stderr, " + ");  break; }
+                case IR_BIN_SUB: { fprintf(stderr, " - ");  break; }
+                case IR_BIN_MUL: { fprintf(stderr, " * ");  break; }
+                case IR_BIN_DIV: { fprintf(stderr, " / ");  break; }
+                case IR_BIN_MOD: { fprintf(stderr, " %% "); break; }
 
-                case BIN_EQ:  { fprintf(stderr, " == "); break; }
-                case BIN_NE:  { fprintf(stderr, " != "); break; }
+                case IR_BIN_EQ:  { fprintf(stderr, " == "); break; }
+                case IR_BIN_NE:  { fprintf(stderr, " != "); break; }
 
-                case BIN_LT:  { fprintf(stderr, " < ");  break; }
-                case BIN_LE:  { fprintf(stderr, " <= "); break; }
-                case BIN_GT:  { fprintf(stderr, " > ");  break; }
-                case BIN_GE:  { fprintf(stderr, " >= "); break; }
+                case IR_BIN_LT:  { fprintf(stderr, " < ");  break; }
+                case IR_BIN_LE:  { fprintf(stderr, " <= "); break; }
+                case IR_BIN_GT:  { fprintf(stderr, " > ");  break; }
+                case IR_BIN_GE:  { fprintf(stderr, " >= "); break; }
 
                 default:
                 {
