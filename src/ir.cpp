@@ -1442,7 +1442,7 @@ static void set_current_bb(Ir *ir, i64 bb)
     IrFunc *func = &ir->funcs[ir->current_func];
 
     assert(bb >= 0);
-    assert(bb < ir->funcs.count);
+    assert(bb < func->bbs.count);
     func->current_bb = bb;
 }
 
