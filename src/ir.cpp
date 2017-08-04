@@ -1378,12 +1378,7 @@ struct Ir
     Array<IrFunc> funcs;
     i64 current_func = -1;
 
-    // Used for block assignments.
-    //   - 'lhs' is the variable being assigned to.
-    //   - 'did_block_assignment' records whether the rhs of an assignment is a
-    //       block expression or not.
-    IrExpr *lhs = NULL;
-    bool did_block_assignment = false; // TODO: flags
+    Array<IrExpr *> lhs_block_assignment_stack;
 };
 
 static i64 alloc_tmp(Ir *ir, AstExpr *expr)
@@ -1649,17 +1644,12 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
             IrExpr *lhs = gen_expr(ir, assign->lhs);
 
             // Store the LHS in case the RHS is a block assignment.
-            ir->lhs = lhs;
+            ir->lhs_block_assignment_stack.add(lhs);
 
             IrExpr *rhs = gen_expr(ir, assign->rhs);
-            ir->lhs = NULL;
+            --ir->lhs_block_assignment_stack.count;
 
-            if (ir->did_block_assignment)
-            {
-                // Nothing to do. The block assignment already happened.
-                ir->did_block_assignment = false;
-            }
-            else
+            if (rhs)
             {
                 // Not a block assignment, just a normal assignment.
                 IrInstr instr;
@@ -1760,18 +1750,15 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
             {
                 IrExpr *ret = gen_expr(ir, block->expr);
 
-                if (ir->lhs)
-                {
-                    IrInstr instr;
-                    instr.type = IR_INSTR_ASSIGN;
-                    instr.arg_count = 2;
-                    instr.args[0] = ir->lhs;
-                    instr.args[1] = ret;
+                assert(ir->lhs_block_assignment_stack.count > 0);
 
-                    add_instr(ir, instr);
-                }
+                IrInstr instr;
+                instr.type = IR_INSTR_ASSIGN;
+                instr.arg_count = 2;
+                instr.args[0] = ir->lhs_block_assignment_stack[ir->lhs_block_assignment_stack.count - 1];
+                instr.args[1] = ret;
 
-                ir->did_block_assignment = true;
+                add_instr(ir, instr);
 
 //                return ret;
             }
@@ -1901,7 +1888,7 @@ static void gen_func(Ir *ir, AstFunc *ast_func)
         // Make the return value to be block-assigned.
         IrExprVar *ret_var = new IrExprVar();
         ret_var->tmp = 0; // 0 is always reserved for the return value.
-        ir->lhs = ret_var;
+        ir->lhs_block_assignment_stack.add(ret_var);
 
         // Declare the return value.
         IrDecl decl;
@@ -1912,7 +1899,9 @@ static void gen_func(Ir *ir, AstFunc *ast_func)
     }
 
     gen_expr(ir, ast_func->block);
-    ir->lhs = NULL;
+
+    if (ast_func->ret)
+        --ir->lhs_block_assignment_stack.count;
 
     IrInstr instr;
     instr.type = IR_INSTR_RETURN;
