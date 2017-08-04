@@ -43,11 +43,11 @@ fn main() {
     v.y = a - 1;
     v.z = v.y * v.x;
 
-/*
-    if x == 1 {
-        x = x + 5;
+    if a == 1 {
+        a = x + 5;
     };
 
+/*
     if x == 6 {
         x = x + 1;
         if x == 7 {

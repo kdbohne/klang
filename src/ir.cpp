@@ -1448,6 +1448,7 @@ static void set_current_bb(Ir *ir, i64 bb)
 
 static void add_instr(Ir *ir, IrInstr instr)
 {
+    // TODO: get_current_bb()?
     assert(ir->current_func >= 0);
     assert(ir->current_func < ir->funcs.count);
     IrFunc *func = &ir->funcs[ir->current_func];
@@ -1472,9 +1473,9 @@ static IrExpr *flatten_expr(Ir *ir, Scope *scope, IrExpr *expr)
 
     IrInstr instr;
     instr.type = IR_INSTR_ASSIGN;
+    instr.arg_count = 2;
     instr.args[0] = var;
     instr.args[1] = expr;
-    instr.arg_count = 2;
 
     add_instr(ir, instr);
 
@@ -1626,9 +1627,9 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
 
             IrInstr instr;
             instr.type = IR_INSTR_ASSIGN;
+            instr.arg_count = 2;
             instr.args[0] = gen_expr(ir, assign->lhs);
             instr.args[1] = gen_expr(ir, assign->rhs);
-            instr.arg_count = 2;
 
             add_instr(ir, instr);
 
@@ -1638,40 +1639,56 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
         {
             auto ast_if = static_cast<AstExprIf *>(expr);
 
-            IrExpr *cond = gen_expr(ir, ast_if->cond);
+            // TODO: get_current_bb()?
+            IrFunc *current_func = &ir->funcs[ir->current_func];
+            i64 current_bb = current_func->current_bb;
 
+            // Create the basic blocks.
             i64 then_bb = create_bb(ir);
             i64 else_bb = -1;
             i64 merge_bb = create_bb(ir);
             if (ast_if->else_expr)
                 else_bb = create_bb(ir);
 
-            set_current_bb(ir, then_bb);
-            IrExpr *then_expr = gen_expr(ir, ast_if->block);
+            IrExpr *cond = gen_expr(ir, ast_if->cond);
+            cond = flatten_expr(ir, ast_if->scope, cond);
 
-            IrExpr *else_expr = NULL;
+            // Make the conditional instruction.
+            IrInstr cond_instr;
+            cond_instr.type = IR_INSTR_GOTOIF;
+            cond_instr.arg_count = 3;
+            cond_instr.args[0] = cond;
+            cond_instr.args[1] = (IrExpr *)then_bb; // HACK: storing the merge bb index as a pointer to avoid an allocation
+
+            if (ast_if->else_expr)
+                cond_instr.args[2] = (IrExpr *)else_bb; // HACK: storing the merge bb index as a pointer to avoid an allocation
+            else
+                cond_instr.args[2] = (IrExpr *)merge_bb; // HACK: storing the merge bb index as a pointer to avoid an allocation
+
+            // Make the merge instruction.
+            IrInstr merge_instr;
+            merge_instr.type = IR_INSTR_GOTO;
+            merge_instr.arg_count = 1;
+            merge_instr.args[0] = (IrExpr *)merge_bb; // HACK: storing the merge bb index as a pointer to avoid an allocation
+
+            add_instr(ir, cond_instr);
+
+            // Make the 'then' block.
+            set_current_bb(ir, then_bb);
+
+            gen_expr(ir, ast_if->block);
+            add_instr(ir, merge_instr);
+
+            // Make the 'else' block.
             if (ast_if->else_expr)
             {
                 set_current_bb(ir, else_bb);
-                gen_expr(ir, ast_if->block);
+
+                gen_expr(ir, ast_if->else_expr);
+                add_instr(ir, merge_instr);
             }
 
             set_current_bb(ir, merge_bb);
-
-            IrInstr instr;
-            instr.type = IR_INSTR_GOTOIF;
-            instr.args[0] = cond;
-            instr.args[1] = then_expr;
-
-            if (ast_if->else_expr)
-            {
-                instr.args[2] = else_expr;
-                instr.arg_count = 3;
-            }
-            else
-            {
-                instr.arg_count = 2;
-            }
 
             // TODO?
             return NULL;
@@ -1835,9 +1852,9 @@ static void gen_func(Ir *ir, AstFunc *ast_func)
 
         IrInstr instr;
         instr.type = IR_INSTR_DECL;
+        instr.arg_count = 2;
         instr.args[0] = var;
         instr.args[1] = func->ret;
-        instr.arg_count = 2;
 
         add_instr(ir, instr);
     }
@@ -1869,9 +1886,9 @@ static void gen_func(Ir *ir, AstFunc *ast_func)
 
             IrInstr instr;
             instr.type = IR_INSTR_DECL;
+            instr.arg_count = 2;
             instr.args[0] = var;
             instr.args[1] = type;
-            instr.arg_count = 2;
 
             add_instr(ir, instr);
         }
@@ -1891,9 +1908,9 @@ static void gen_func(Ir *ir, AstFunc *ast_func)
 
         IrInstr instr;
         instr.type = IR_INSTR_ASSIGN;
+        instr.arg_count = 2;
         instr.args[0] = ret_var;
         instr.args[1] = ret_expr;
-        instr.arg_count = 2;
 
         add_instr(ir, instr);
     }
@@ -2134,14 +2151,24 @@ static void dump_ir(Ir *ir)
                     }
                     case IR_INSTR_GOTO:
                     {
-                        // FIXME
-                        assert(false);
+                        assert(it.arg_count == 1);
+
+                        i64 bb = (i64)it.args[0];
+                        fprintf(stderr, "goto bb%ld", bb);
+
                         break;
                     }
                     case IR_INSTR_GOTOIF:
                     {
-                        // FIXME
-                        assert(false);
+                        assert(it.arg_count == 3);
+
+                        i64 true_bb = (i64)it.args[1];
+                        i64 false_bb = (i64)it.args[2];
+
+                        fprintf(stderr, "gotoif ");
+                        dump_expr(it.args[0]);
+                        fprintf(stderr, " bb%ld bb%ld", true_bb, false_bb);
+
                         break;
                     }
                     default:
