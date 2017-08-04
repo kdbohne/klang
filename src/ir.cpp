@@ -1357,6 +1357,8 @@ struct IrDecl
 {
     IrExprType *type = NULL;
     i64 tmp = -1;
+
+    char *name = NULL;
 };
 
 struct IrFunc
@@ -1395,10 +1397,17 @@ static i64 alloc_tmp(Ir *ir, AstExpr *expr)
     IrFunc *func = &ir->funcs[ir->current_func];
 
     IrDecl *decl = func->decls.next();
-    decl->tmp = tmp;
     decl->type = new IrExprType(); // TODO: reduce allocations
     decl->type->name = expr->type_defn->name;
     decl->type->pointer_depth = get_pointer_depth(expr->type_defn);
+    decl->tmp = tmp;
+    decl->name = NULL;
+
+    if (expr->type == AST_EXPR_IDENT)
+    {
+        auto ident = static_cast<AstExprIdent *>(expr);
+        decl->name = ident->str; // TODO: copy?
+    }
 
     return tmp;
 }
@@ -2102,7 +2111,11 @@ static void dump_ir(Ir *ir)
         {
             fprintf(stderr, "    let _%ld ", it.tmp);
             dump_expr(it.type);
-            fprintf(stderr, ";\n");
+            fprintf(stderr, ";");
+
+            if (it.name)
+                fprintf(stderr, " // %s", it.name);
+            fprintf(stderr, "\n");
         }
 
         if ((func->decls.count > 0) && (func->bbs.count > 0))
