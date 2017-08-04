@@ -68,8 +68,9 @@ fn main() {
     };
 
     let d = if c == 5 {
-        1
+        let m = 4 + 2;
+        m * 2
     } else {
-        2
+        5
     };
 }

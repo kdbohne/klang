@@ -1209,12 +1209,6 @@ static Scope *get_top_level_scope(Scope *scope)
     return NULL;
 }
 
-static i64 alloc_tmp(Scope *scope)
-{
-    Scope *top_level = get_top_level_scope(scope);
-    return top_level->ir_tmp_counter++;
-}
-
 enum IrExprType_ : u32
 {
     IR_EXPR_VAR,
@@ -1331,7 +1325,6 @@ struct IrExprType : IrExpr
 
 enum IrInstrType : u32
 {
-    IR_INSTR_DECL,
     IR_INSTR_SEMI,
     IR_INSTR_ASSIGN,
     IR_INSTR_RETURN,
@@ -1349,26 +1342,18 @@ struct IrInstr
     i64 arg_count = 0;
 };
 
-enum IrBbFlags
-{
-    BB_IS_CONDITIONAL = 0x1,
-};
-
 struct IrBb
 {
     Array<IrInstr> instrs;
-
-    i64 index = -1;
-    u32 flags = 0;
-
-    IrBb *next = NULL;
-
-    // Only used if the BB_IS_CONDITIONAL flag is set.
-    IrBb *true_ = NULL;
-    IrBb *false_ = NULL;
 };
 
 struct IrParam
+{
+    IrExprType *type = NULL;
+    i64 tmp = -1;
+};
+
+struct IrDecl
 {
     IrExprType *type = NULL;
     i64 tmp = -1;
@@ -1382,6 +1367,8 @@ struct IrFunc
     char *name = NULL;
     Array<IrParam> params;
     IrExprType *ret = NULL;
+
+    Array<IrDecl> decls;
 };
 
 struct Ir
@@ -1397,6 +1384,25 @@ struct Ir
     bool did_block_assignment = false; // TODO: flags
 };
 
+static i64 alloc_tmp(Ir *ir, AstExpr *expr)
+{
+    Scope *top_level = get_top_level_scope(expr->scope);
+    i64 tmp = top_level->ir_tmp_counter++;
+
+    // TODO: get_current_func()?
+    assert(ir->current_func >= 0);
+    assert(ir->current_func < ir->funcs.count);
+    IrFunc *func = &ir->funcs[ir->current_func];
+
+    IrDecl *decl = func->decls.next();
+    decl->tmp = tmp;
+    decl->type = new IrExprType(); // TODO: reduce allocations
+    decl->type->name = expr->type_defn->name;
+    decl->type->pointer_depth = get_pointer_depth(expr->type_defn);
+
+    return tmp;
+}
+
 static i64 create_func(Ir *ir)
 {
     IrFunc *func = ir->funcs.next();
@@ -1408,6 +1414,10 @@ static i64 create_func(Ir *ir)
 
     func->current_bb = -1;
     func->name = NULL;
+
+    func->decls.data = NULL;
+    func->decls.count = 0;
+    func->decls.capacity = 0;
 
     return ir->funcs.count - 1;
 }
@@ -1432,12 +1442,6 @@ static i64 create_bb(Ir *ir)
     bb->instrs.data = NULL;
     bb->instrs.count = 0;
     bb->instrs.capacity = 0;
-
-    bb->index = -1;
-    bb->flags = 0;
-    bb->next = NULL;
-    bb->true_ = NULL;
-    bb->false_ = NULL;
 
     return func->bbs.count - 1;
 }
@@ -1468,7 +1472,7 @@ static void add_instr(Ir *ir, IrInstr instr)
     bb->instrs.add(instr);
 }
 
-static IrExpr *flatten_expr(Ir *ir, Scope *scope, IrExpr *expr)
+static IrExpr *flatten_expr(Ir *ir, AstExpr *ast_expr, IrExpr *expr)
 {
     if (expr->type == IR_EXPR_VAR)
         return expr;
@@ -1476,7 +1480,7 @@ static IrExpr *flatten_expr(Ir *ir, Scope *scope, IrExpr *expr)
     // TODO: early exit for literals?
 
     IrExprVar *var = new IrExprVar();
-    var->tmp = alloc_tmp(scope);
+    var->tmp = alloc_tmp(ir, ast_expr);
 
     IrInstr instr;
     instr.type = IR_INSTR_ASSIGN;
@@ -1499,7 +1503,10 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
 
             ScopeVar *var = scope_get_var(ident->scope, ident->str);
             assert(var);
-            assert(var->ir_tmp_index != -1);
+
+            // Allocate a temporary if the variable doesn't already have one.
+            if (var->ir_tmp_index == -1)
+                var->ir_tmp_index = alloc_tmp(ir, expr);
 
             IrExprVar *ir_var = new IrExprVar();
             ir_var->tmp = var->ir_tmp_index;
@@ -1538,8 +1545,8 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
             IrExprBin *bin = new IrExprBin();
             bin->lhs = gen_expr(ir, ast_bin->lhs);
             bin->rhs = gen_expr(ir, ast_bin->rhs);
-            bin->lhs = flatten_expr(ir, ast_bin->scope, bin->lhs);
-            bin->rhs = flatten_expr(ir, ast_bin->scope, bin->rhs);
+            bin->lhs = flatten_expr(ir, ast_bin, bin->lhs);
+            bin->rhs = flatten_expr(ir, ast_bin, bin->rhs);
 
             // NOTE: this is a straight conversion of BinOp -> IrBinOp. The two
             // enums are being kept separate for now in case the IR or AST wants
@@ -1573,7 +1580,7 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
 
             IrExprUn *un = new IrExprUn();
             un->expr = gen_expr(ir, ast_un->expr);
-            un->expr = flatten_expr(ir, ast_un->scope, un->expr);
+            un->expr = flatten_expr(ir, ast_un, un->expr);
 
             // NOTE: this is a straight conversion of UnOp -> IrUnOp. The two
             // enums are being kept separate for now in case the IR or AST wants
@@ -1604,7 +1611,7 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
             {
                 IrExpr *arg = gen_expr(ir, it);
 
-                IrExpr *tmp = flatten_expr(ir, it->scope, arg);
+                IrExpr *tmp = flatten_expr(ir, it, arg);
                 call->args.add(tmp);
             }
 
@@ -1675,7 +1682,7 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
                 else_bb = create_bb(ir);
 
             IrExpr *cond = gen_expr(ir, ast_if->cond);
-            cond = flatten_expr(ir, ast_if->scope, cond);
+            cond = flatten_expr(ir, ast_if, cond);
 
             // Make the conditional instruction.
             IrInstr cond_instr;
@@ -1862,7 +1869,12 @@ static void gen_func(Ir *ir, AstFunc *ast_func)
         ScopeVar *var = scope_get_var(it->scope, it->name->str);
         assert(var);
 
-        var->ir_tmp_index = alloc_tmp(it->scope);
+        // NOTE: not using alloc_tmp() here because params don't need to be
+        // declared. Just get a tmp index directly.
+        // TODO: alloc_param_tmp() or something?
+        Scope *top_level = get_top_level_scope(it->scope);
+        var->ir_tmp_index = top_level->ir_tmp_counter++;
+//        var->ir_tmp_index = alloc_tmp(ir, it->name);
 
         IrParam *param = func->params.next();
         param->tmp = var->ir_tmp_index;
@@ -1879,6 +1891,13 @@ static void gen_func(Ir *ir, AstFunc *ast_func)
         func->ret->name = ast_func->ret->name->str;
         func->ret->pointer_depth = ast_func->ret->pointer_depth;
 
+        IrDecl decl;
+        decl.tmp = 0; // 0 is always reserved for the return value.
+        decl.type = func->ret;
+
+        func->decls.add(decl);
+
+#if 0
         // Make a decl instruction.
         IrExprVar *var = new IrExprVar();
         var->tmp = 0; // 0 is always reserved for the return value.
@@ -1890,41 +1909,7 @@ static void gen_func(Ir *ir, AstFunc *ast_func)
         instr.args[1] = func->ret;
 
         add_instr(ir, instr);
-    }
-
-    // Assign temporaries to each variable in the function block's scope.
-    foreach(ast_func->block->stmts)
-    {
-        if (it->type == AST_STMT_DECL)
-        {
-            auto decl = static_cast<AstStmtDecl *>(it);
-
-            // TODO: multiple decls, patterns, etc
-            assert(decl->bind->type == AST_EXPR_IDENT);
-            auto ident = static_cast<AstExprIdent *>(decl->bind);
-
-            ScopeVar *scope_var = scope_get_var(ident->scope, ident->str);
-            assert(scope_var);
-
-            assert(scope_var->ir_tmp_index == -1);
-            scope_var->ir_tmp_index = alloc_tmp(ident->scope);
-
-            // Make a decl instruction.
-            IrExprVar *var = new IrExprVar();
-            var->tmp = scope_var->ir_tmp_index;
-
-            IrExprType *type = new IrExprType();
-            type->name = decl->bind->type_defn->name;
-            type->pointer_depth = get_pointer_depth(decl->bind->type_defn);
-
-            IrInstr instr;
-            instr.type = IR_INSTR_DECL;
-            instr.arg_count = 2;
-            instr.args[0] = var;
-            instr.args[1] = type;
-
-            add_instr(ir, instr);
-        }
+#endif
     }
 
     gen_expr(ir, ast_func->block);
@@ -2141,6 +2126,13 @@ static void dump_ir(Ir *ir)
         }
         fprintf(stderr, " {\n");
 
+        foreach(func->decls)
+        {
+            fprintf(stderr, "    let _%ld ", it.tmp);
+            dump_expr(it.type);
+            fprintf(stderr, ";\n");
+        }
+
         for (i64 j = 0; j < func->bbs.count; ++j)
         {
             fprintf(stderr, "    bb%ld: {\n", j);
@@ -2150,17 +2142,6 @@ static void dump_ir(Ir *ir)
                 fprintf(stderr, "        ");
                 switch (it.type)
                 {
-                    case IR_INSTR_DECL:
-                    {
-                        assert(it.arg_count == 2);
-
-                        fprintf(stderr, "let ");
-                        dump_expr(it.args[0]);
-                        fprintf(stderr, " ");
-                        dump_expr(it.args[1]);
-
-                        break;
-                    }
                     case IR_INSTR_SEMI:
                     {
                         // FIXME
