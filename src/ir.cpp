@@ -2014,9 +2014,9 @@ static void dump_expr(IrExpr *expr)
 
             switch (un->op)
             {
-                case UN_ADDR:  { un->op = IR_UN_ADDR;  break; }
-                case UN_DEREF: { un->op = IR_UN_DEREF; break; }
-                case UN_NEG:   { un->op = IR_UN_NEG;   break; }
+                case IR_UN_ADDR:  { fprintf(stderr, "&"); break; }
+                case IR_UN_DEREF: { fprintf(stderr, "*"); break; }
+                case IR_UN_NEG:   { fprintf(stderr, "-"); break; }
                 default:
                 {
                     assert(false);
