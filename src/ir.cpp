@@ -1571,7 +1571,6 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
                 }
             }
 
-            // This shouldn't really be needed.
             return bin;
         }
         case AST_EXPR_UN:
@@ -1597,7 +1596,6 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
                 }
             }
 
-            // This shouldn't really be needed.
             return un;
         }
         case AST_EXPR_CALL:
@@ -1840,7 +1838,7 @@ static void gen_func(Ir *ir, AstFunc *ast_func)
 {
     i64 func_index = create_func(ir);
     IrFunc *func = &ir->funcs[func_index];
-    func->name =  ast_func->name->str; // TODO: copy?
+    func->name = ast_func->name->str; // TODO: copy?
 
     // Bleh.
     func->bbs.data = NULL;
@@ -1891,47 +1889,21 @@ static void gen_func(Ir *ir, AstFunc *ast_func)
         func->ret->name = ast_func->ret->name->str;
         func->ret->pointer_depth = ast_func->ret->pointer_depth;
 
+        // Make the return value to be block-assigned.
+        IrExprVar *ret_var = new IrExprVar();
+        ret_var->tmp = 0; // 0 is always reserved for the return value.
+        ir->lhs = ret_var;
+
+        // Declare the return value.
         IrDecl decl;
         decl.tmp = 0; // 0 is always reserved for the return value.
         decl.type = func->ret;
 
         func->decls.add(decl);
-
-#if 0
-        // Make a decl instruction.
-        IrExprVar *var = new IrExprVar();
-        var->tmp = 0; // 0 is always reserved for the return value.
-
-        IrInstr instr;
-        instr.type = IR_INSTR_DECL;
-        instr.arg_count = 2;
-        instr.args[0] = var;
-        instr.args[1] = func->ret;
-
-        add_instr(ir, instr);
-#endif
     }
 
     gen_expr(ir, ast_func->block);
-
-    // Assign the return value to its reserved binding.
-    if (ast_func->block->expr)
-    {
-        IrExpr *ret_expr = gen_expr(ir, ast_func->block->expr);
-
-        // TODO: this is already allocated for _0's decl; reuse it
-        // instead of reallocating it.
-        IrExprVar *ret_var = new IrExprVar();
-        ret_var->tmp = 0; // 0 is always reserved for the return value.
-
-        IrInstr instr;
-        instr.type = IR_INSTR_ASSIGN;
-        instr.arg_count = 2;
-        instr.args[0] = ret_var;
-        instr.args[1] = ret_expr;
-
-        add_instr(ir, instr);
-    }
+    ir->lhs = NULL;
 
     IrInstr instr;
     instr.type = IR_INSTR_RETURN;
