@@ -1388,6 +1388,13 @@ struct Ir
 {
     Array<IrFunc> funcs;
     i64 current_func = -1;
+
+    // Used for block assignments.
+    //   - 'lhs' is the variable being assigned to.
+    //   - 'did_block_assignment' records whether the rhs of an assignment is a
+    //       block expression or not.
+    IrExpr *lhs = NULL;
+    bool did_block_assignment = false; // TODO: flags
 };
 
 static i64 create_func(Ir *ir)
@@ -1625,13 +1632,30 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
         {
             auto assign = static_cast<AstExprAssign *>(expr);
 
-            IrInstr instr;
-            instr.type = IR_INSTR_ASSIGN;
-            instr.arg_count = 2;
-            instr.args[0] = gen_expr(ir, assign->lhs);
-            instr.args[1] = gen_expr(ir, assign->rhs);
+            IrExpr *lhs = gen_expr(ir, assign->lhs);
 
-            add_instr(ir, instr);
+            // Store the LHS in case the RHS is a block assignment.
+            ir->lhs = lhs;
+
+            IrExpr *rhs = gen_expr(ir, assign->rhs);
+            ir->lhs = NULL;
+
+            if (ir->did_block_assignment)
+            {
+                // Nothing to do. The block assignment already happened.
+                ir->did_block_assignment = false;
+            }
+            else
+            {
+                // Not a block assignment, just a normal assignment.
+                IrInstr instr;
+                instr.type = IR_INSTR_ASSIGN;
+                instr.arg_count = 2;
+                instr.args[0] = lhs;
+                instr.args[1] = rhs;
+
+                add_instr(ir, instr);
+            }
 
             return NULL;
         }
@@ -1718,16 +1742,25 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
                 }
             }
 
-            // FIXME
-#if 0
             if (block->expr)
             {
                 IrExpr *ret = gen_expr(ir, block->expr);
-                // FIXME: attach to current bb somehow
 
-                return ret;
+                if (ir->lhs)
+                {
+                    IrInstr instr;
+                    instr.type = IR_INSTR_ASSIGN;
+                    instr.arg_count = 2;
+                    instr.args[0] = ir->lhs;
+                    instr.args[1] = ret;
+
+                    add_instr(ir, instr);
+                }
+
+                ir->did_block_assignment = true;
+
+//                return ret;
             }
-#endif
 
             return NULL;
         }
