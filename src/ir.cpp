@@ -1175,25 +1175,6 @@ static void print_type_defn(TypeDefn *defn)
     fprintf(stderr, "%s", defn->name);
 }
 
-static void gen_struct(AstStruct *struct_)
-{
-    // FIXME
-    /*
-    fprintf(stderr, "type %s { ", struct_->name->str);
-    for (i64 i = 0; i < struct_->fields.count; ++i)
-    {
-        auto field = struct_->fields[i];
-
-        print_type_defn(field->type_defn);
-
-        if (i < struct_->fields.count - 1)
-            fprintf(stderr, ",");
-        fprintf(stderr, " ");
-    }
-    fprintf(stderr, "};\n");
-    */
-}
-
 static Scope *get_top_level_scope(Scope *scope)
 {
     Scope *top_level = scope;
@@ -1373,8 +1354,16 @@ struct IrFunc
     Array<IrDecl> decls;
 };
 
+struct IrStruct
+{
+    char *name = NULL;
+    Array<IrExprType *> fields;
+};
+
 struct Ir
 {
+    Array<IrStruct> structs;
+
     Array<IrFunc> funcs;
     i64 current_func = -1;
 
@@ -2071,6 +2060,26 @@ static void dump_expr(IrExpr *expr)
 
 static void dump_ir(Ir *ir)
 {
+    foreach(ir->structs)
+    {
+        fprintf(stderr, "type %s { ", it.name);
+        for (i64 i = 0; i < it.fields.count; ++i)
+        {
+            auto field = it.fields[i];
+
+            for (i64 j = 0; j < field->pointer_depth; ++i)
+                fprintf(stderr, "*");
+            fprintf(stderr, "%s", field->name);
+
+            if (i < it.fields.count - 1)
+                fprintf(stderr, ",");
+            fprintf(stderr, " ");
+        }
+        fprintf(stderr, "};\n");
+    }
+    if (ir->structs.count > 0)
+        fprintf(stderr, "\n");
+
     for (i64 i = 0; i < ir->funcs.count; ++i)
     {
         IrFunc *func = &ir->funcs[i];
@@ -2180,14 +2189,27 @@ static void dump_ir(Ir *ir)
     }
 }
 
+static void gen_struct(Ir *ir, AstStruct *ast_struct)
+{
+    IrStruct *struct_ = ir->structs.next();
+    struct_->name = ast_struct->name->str; // TODO: copy?
+
+    foreach(ast_struct->fields)
+    {
+        IrExprType *type = new IrExprType();
+        type->name = it->type->name->str;
+        type->pointer_depth = it->type->pointer_depth;
+
+        struct_->fields.add(type);
+    }
+}
+
 void gen_ir(AstRoot *ast)
 {
     Ir ir;
 
-    /*
     foreach(ast->structs)
-        gen_struct(it);
-    */
+        gen_struct(&ir, it);
 
     foreach(ast->funcs)
         gen_func(&ir, it);

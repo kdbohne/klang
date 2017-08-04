@@ -1,13 +1,3 @@
-fn main() {
-    let x = 0;
-    let y = if x == 0 {
-        4
-    } else {
-        5
-    };
-}
-
-/*
 struct Vec3 {
     x i64;
     y i64;
@@ -84,4 +74,3 @@ fn main() {
         5
     };
 }
-*/
