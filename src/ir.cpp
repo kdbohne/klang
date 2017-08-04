@@ -2105,6 +2105,9 @@ static void dump_ir(Ir *ir)
             fprintf(stderr, ";\n");
         }
 
+        if ((func->decls.count > 0) && (func->bbs.count > 0))
+            fprintf(stderr, "\n");
+
         for (i64 j = 0; j < func->bbs.count; ++j)
         {
             fprintf(stderr, "    bb%ld: {\n", j);
@@ -2167,6 +2170,8 @@ static void dump_ir(Ir *ir)
             }
 
             fprintf(stderr, "    }\n");
+            if (j < func->bbs.count - 1)
+                fprintf(stderr, "\n");
         }
 
         fprintf(stderr, "}\n\n");
