@@ -972,11 +972,11 @@ static void dump_ir(Ir *ir)
         fprintf(stderr, "type %s { ", it.name);
         for (i64 i = 0; i < it.fields.count; ++i)
         {
-            auto field = it.fields[i];
+            auto field_type = it.fields[i];
 
-            for (i64 j = 0; j < field->pointer_depth; ++i)
+            for (i64 j = 0; j < field_type->pointer_depth; ++i)
                 fprintf(stderr, "*");
-            fprintf(stderr, "%s", field->name);
+            fprintf(stderr, "%s", field_type->name);
 
             if (i < it.fields.count - 1)
                 fprintf(stderr, ",");
@@ -1096,6 +1096,345 @@ static void dump_ir(Ir *ir)
     }
 }
 
+static void dump_c_expr(IrExpr *expr)
+{
+    switch (expr->type)
+    {
+        case IR_EXPR_VAR:
+        {
+            auto var = static_cast<IrExprVar *>(expr);
+            printf("_%ld", var->tmp);
+
+            break;
+        }
+        case IR_EXPR_LIT:
+        {
+            auto lit = static_cast<IrExprLit *>(expr);
+            switch (lit->type)
+            {
+                case LIT_INT:
+                {
+                    // TODO: explicit type suffix
+                    LitInt v = lit->value_int;
+                    if (v.flags & INT_IS_NEGATIVE)
+                        printf("-");
+
+                    /*
+                    if (v.flags & INT_IS_HEX)
+                        printf("0x");
+                    if (v.flags & INT_IS_BINARY)
+                        printf("0b");
+                    */
+
+                    printf("%lu", v.value);
+
+                    // TODO: explicit integer size suffix?
+
+                    break;
+                }
+                case LIT_FLOAT:
+                {
+                    // FIXME
+                    assert(false);
+                    break;
+                }
+                case LIT_STR:
+                {
+                    // FIXME
+                    assert(false);
+                    break;
+                }
+                default:
+                {
+                    assert(false);
+                    break;
+                }
+            }
+
+            break;
+        }
+        case IR_EXPR_CALL:
+        {
+            auto call = static_cast<IrExprCall *>(expr);
+
+            printf("%s(", call->name);
+            for (i64 i = 0; i < call->args.count; ++i)
+            {
+                dump_c_expr(call->args[i]);
+
+                if (i < call->args.count - 1)
+                    printf(", ");
+            }
+            printf(")");
+
+            break;
+        }
+        case IR_EXPR_BIN:
+        {
+            auto bin = static_cast<IrExprBin *>(expr);
+
+            dump_c_expr(bin->lhs);
+            switch (bin->op)
+            {
+                case IR_BIN_ADD: { printf(" + ");  break; }
+                case IR_BIN_SUB: { printf(" - ");  break; }
+                case IR_BIN_MUL: { printf(" * ");  break; }
+                case IR_BIN_DIV: { printf(" / ");  break; }
+                case IR_BIN_MOD: { printf(" %% "); break; }
+
+                case IR_BIN_EQ:  { printf(" == "); break; }
+                case IR_BIN_NE:  { printf(" != "); break; }
+
+                case IR_BIN_LT:  { printf(" < ");  break; }
+                case IR_BIN_LE:  { printf(" <= "); break; }
+                case IR_BIN_GT:  { printf(" > ");  break; }
+                case IR_BIN_GE:  { printf(" >= "); break; }
+
+                default:
+                {
+                    assert(false);
+                    break;
+                }
+            }
+            dump_c_expr(bin->rhs);
+
+            break;
+        }
+        case IR_EXPR_UN:
+        {
+            auto un = static_cast<IrExprUn *>(expr);
+
+            switch (un->op)
+            {
+                case IR_UN_ADDR:  { printf("&"); break; }
+                case IR_UN_DEREF: { printf("*"); break; }
+                case IR_UN_NEG:   { printf("-"); break; }
+                default:
+                {
+                    assert(false);
+                    break;
+                }
+            }
+            dump_c_expr(un->expr);
+
+            break;
+        }
+        case IR_EXPR_FIELD:
+        {
+            auto field = static_cast<IrExprField *>(expr);
+
+            dump_c_expr(field->lhs);
+            printf("._%ld", field->index);
+
+            break;
+        }
+        case IR_EXPR_PAREN:
+        {
+            auto paren = static_cast<IrExprParen *>(expr);
+
+            printf("(");
+            dump_c_expr(paren->expr);
+            printf(")");
+
+            break;
+        }
+        case IR_EXPR_TYPE:
+        {
+            auto type = static_cast<IrExprType *>(expr);
+
+            printf("%s", type->name);
+            if (type->pointer_depth > 0)
+                printf(" ");
+
+            for (i64 i = 0; i < type->pointer_depth; ++i)
+                printf("*");
+
+            break;
+        }
+        default:
+        {
+            assert(false);
+            break;
+        }
+    }
+}
+
+static void dump_c_func_signature(IrFunc *func)
+{
+    printf("static ");
+    if (func->ret)
+        dump_c_expr(func->ret);
+    else
+        printf("void");
+
+    // TODO: better way of checking for main?
+    if (strings_match(func->name, "main"))
+        printf(" __main(");
+    else
+        printf(" %s(", func->name);
+
+    for (i64 i = 0; i < func->params.count; ++i)
+    {
+        IrParam *param = &func->params[i];
+
+        dump_c_expr(param->type);
+        printf(" _%ld", param->tmp);
+
+        if (i < func->params.count - 1)
+            printf(", ");
+    }
+    printf(")");
+}
+
+static void dump_c(Ir *ir)
+{
+    printf("#include <stdint.h>\n");
+    printf("#include <stdbool.h>\n");
+    printf("typedef int8_t    i8;\n");
+    printf("typedef int16_t  i16;\n");
+    printf("typedef int32_t  i32;\n");
+    printf("typedef int64_t  i64;\n");
+    printf("typedef uint8_t   u8;\n");
+    printf("typedef uint16_t u16;\n");
+    printf("typedef uint32_t u32;\n");
+    printf("typedef uint64_t u64;\n");
+    printf("\n");
+
+    foreach(ir->structs)
+        printf("typedef struct %s %s;\n", it.name, it.name);
+    if (ir->structs.count > 0)
+        printf("\n");
+
+    foreach(ir->structs)
+    {
+        printf("struct %s {\n", it.name);
+        for (i64 i = 0; i < it.fields.count; ++i)
+        {
+            IrExprType *type = it.fields[i];
+
+            printf("    ");
+
+            dump_c_expr(type);
+            if (type->pointer_depth == 0)
+                printf(" ");
+
+            printf("_%ld;\n", i);
+        }
+        printf("};\n");
+    }
+    if (ir->structs.count > 0)
+        printf("\n");
+
+    foreach(ir->funcs)
+    {
+        dump_c_func_signature(&it);
+        printf(";\n");
+    }
+    if (ir->funcs.count > 0)
+        printf("\n");
+
+    for (i64 i = 0; i < ir->funcs.count; ++i)
+    {
+        IrFunc *func = &ir->funcs[i];
+
+        dump_c_func_signature(func);
+        printf(" {\n");
+
+        foreach(func->decls)
+        {
+            printf("    ");
+
+            dump_c_expr(it.type);
+            if (it.type->pointer_depth == 0)
+                printf(" ");
+
+            printf("_%ld;", it.tmp);
+
+            if (it.name)
+                printf(" // %s", it.name);
+            printf("\n");
+        }
+
+        if ((func->decls.count > 0) && (func->bbs.count > 0))
+            printf("\n");
+
+        for (i64 j = 0; j < func->bbs.count; ++j)
+        {
+            printf("bb%ld:\n", j);
+
+            foreach(func->bbs[j].instrs)
+            {
+                printf("    ");
+                switch (it.type)
+                {
+                    case IR_INSTR_SEMI:
+                    {
+                        // FIXME
+                        assert(false);
+                        break;
+                    }
+                    case IR_INSTR_ASSIGN:
+                    {
+                        assert(it.arg_count == 2);
+
+                        dump_c_expr(it.args[0]);
+                        printf(" = ");
+                        dump_c_expr(it.args[1]);
+
+                        break;
+                    }
+                    case IR_INSTR_RETURN:
+                    {
+                        // FIXME: void
+                        printf("return");
+                        if (func->ret)
+                            printf(" _0");
+                        break;
+                    }
+                    case IR_INSTR_GOTO:
+                    {
+                        assert(it.arg_count == 1);
+
+                        i64 bb = (i64)it.args[0];
+                        printf("goto bb%ld", bb);
+
+                        break;
+                    }
+                    case IR_INSTR_GOTOIF:
+                    {
+                        assert(it.arg_count == 3);
+
+                        i64 true_bb = (i64)it.args[1];
+                        i64 false_bb = (i64)it.args[2];
+
+                        printf("if (");
+                        dump_c_expr(it.args[0]);
+                        printf(") goto bb%ld; else goto bb%ld", true_bb, false_bb);
+
+                        break;
+                    }
+                    default:
+                    {
+                        assert(false);
+                        break;
+                    }
+                }
+                printf(";\n");
+            }
+
+            if (j < func->bbs.count - 1)
+                printf("\n");
+        }
+
+        printf("}\n\n");
+    }
+
+    printf("int main(int argc, char *argv[]) {\n");
+    printf("    __main();\n");
+    printf("    return 0;\n");
+    printf("}\n");
+}
+
 void gen_ir(AstRoot *ast)
 {
     Ir ir;
@@ -1106,5 +1445,6 @@ void gen_ir(AstRoot *ast)
     foreach(ast->funcs)
         gen_func(&ir, it);
 
-    dump_ir(&ir);
+//    dump_ir(&ir);
+    dump_c(&ir);
 }
