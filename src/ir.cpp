@@ -223,7 +223,7 @@ struct Ir
     Array<IrExpr *> lhs_block_assignment_stack;
 };
 
-static i64 alloc_tmp(Ir *ir, AstExpr *expr)
+static i64 alloc_tmp(Ir *ir, AstExpr *expr, IrExprType *type)
 {
     Scope *top_level = get_top_level_scope(expr->scope);
     i64 tmp = top_level->ir_tmp_counter++;
@@ -234,9 +234,7 @@ static i64 alloc_tmp(Ir *ir, AstExpr *expr)
     IrFunc *func = &ir->funcs[ir->current_func];
 
     IrDecl *decl = func->decls.next();
-    decl->type = new IrExprType(); // TODO: reduce allocations
-    decl->type->name = expr->type_defn->name;
-    decl->type->pointer_depth = get_pointer_depth(expr->type_defn);
+    decl->type = type;
     decl->tmp = tmp;
     decl->name = NULL;
 
@@ -247,6 +245,15 @@ static i64 alloc_tmp(Ir *ir, AstExpr *expr)
     }
 
     return tmp;
+}
+
+static i64 alloc_tmp(Ir *ir, AstExpr *expr)
+{
+    IrExprType *type = new IrExprType(); // TODO: reduce allocations
+    type->name = expr->type_defn->name;
+    type->pointer_depth = get_pointer_depth(expr->type_defn);
+
+    return alloc_tmp(ir, expr, type);
 }
 
 static i64 create_func(Ir *ir)
@@ -318,6 +325,26 @@ static void add_instr(Ir *ir, IrInstr instr)
     bb->instrs.add(instr);
 }
 
+static bool is_comparison(IrExpr *expr)
+{
+    if (expr->type != IR_EXPR_BIN)
+        return false;
+
+    auto bin = static_cast<IrExprBin *>(expr);
+    switch (bin->op)
+    {
+        case IR_BIN_EQ:
+        case IR_BIN_NE:
+        case IR_BIN_LT:
+        case IR_BIN_LE:
+        case IR_BIN_GT:
+        case IR_BIN_GE:
+            return true;
+        default:
+            return false;
+    }
+}
+
 static IrExpr *flatten_expr(Ir *ir, AstExpr *ast_expr, IrExpr *expr)
 {
     if (expr->type == IR_EXPR_VAR)
@@ -326,7 +353,19 @@ static IrExpr *flatten_expr(Ir *ir, AstExpr *ast_expr, IrExpr *expr)
     // TODO: early exit for literals?
 
     IrExprVar *var = new IrExprVar();
-    var->tmp = alloc_tmp(ir, ast_expr);
+    if (is_comparison(expr))
+    {
+        // TODO: don't allocate this every time!
+        IrExprType *bool_type = new IrExprType();
+        bool_type->name = string_duplicate("bool");
+        bool_type->pointer_depth = 0;
+
+        var->tmp = alloc_tmp(ir, ast_expr, bool_type);
+    }
+    else
+    {
+        var->tmp = alloc_tmp(ir, ast_expr);
+    }
 
     IrInstr instr;
     instr.type = IR_INSTR_ASSIGN;
