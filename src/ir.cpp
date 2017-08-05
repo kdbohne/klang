@@ -228,6 +228,11 @@ static void gen_struct(Ir *ir, AstStruct *ast_struct)
     IrStruct *struct_ = ir->structs.next();
     struct_->name = ast_struct->name->str; // TODO: copy?
 
+    // Bleh.
+    struct_->fields.data = NULL;
+    struct_->fields.count = 0;
+    struct_->fields.capacity = 0;
+
     foreach(ast_struct->fields)
     {
         IrExprType *type = new IrExprType();
@@ -1320,10 +1325,8 @@ static void dump_c(Ir *ir)
 
             printf("_%ld;\n", i);
         }
-        printf("};\n");
+        printf("};\n\n");
     }
-    if (ir->structs.count > 0)
-        printf("\n");
 
     foreach(ir->funcs)
     {

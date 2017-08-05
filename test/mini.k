@@ -1,3 +1,7 @@
+struct Foo {
+    p *i64;
+};
+
 struct Vec3 {
     x i64;
     y i64;
