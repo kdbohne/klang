@@ -223,6 +223,21 @@ struct Ir
     Array<IrExpr *> lhs_block_assignment_stack;
 };
 
+static void gen_struct(Ir *ir, AstStruct *ast_struct)
+{
+    IrStruct *struct_ = ir->structs.next();
+    struct_->name = ast_struct->name->str; // TODO: copy?
+
+    foreach(ast_struct->fields)
+    {
+        IrExprType *type = new IrExprType();
+        type->name = it->type->name->str;
+        type->pointer_depth = it->type->pointer_depth;
+
+        struct_->fields.add(type);
+    }
+}
+
 static i64 alloc_tmp(Ir *ir, AstExpr *expr, IrExprType *type)
 {
     Scope *top_level = get_top_level_scope(expr->scope);
@@ -1078,21 +1093,6 @@ static void dump_ir(Ir *ir)
         }
 
         fprintf(stderr, "}\n\n");
-    }
-}
-
-static void gen_struct(Ir *ir, AstStruct *ast_struct)
-{
-    IrStruct *struct_ = ir->structs.next();
-    struct_->name = ast_struct->name->str; // TODO: copy?
-
-    foreach(ast_struct->fields)
-    {
-        IrExprType *type = new IrExprType();
-        type->name = it->type->name->str;
-        type->pointer_depth = it->type->pointer_depth;
-
-        struct_->fields.add(type);
     }
 }
 
