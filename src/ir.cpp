@@ -1446,7 +1446,12 @@ void gen_ir(AstRoot *ast)
         gen_struct(&ir, it);
 
     foreach(ast->funcs)
+    {
+        if (it->flags & FUNC_IS_EXTERN)
+            continue;
+
         gen_func(&ir, it);
+    }
 
 //    dump_ir(&ir);
     dump_c(&ir);
