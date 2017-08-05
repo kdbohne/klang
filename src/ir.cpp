@@ -693,6 +693,12 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
 
             return field;
         }
+        case AST_EXPR_LOOP:
+        {
+            // FIXME
+            assert(false);
+            return NULL;
+        }
         case AST_EXPR_BREAK:
         {
             // FIXME
