@@ -798,14 +798,14 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
             for_->block->scope = make_scope(for_->scope);
             for_->range->scope = for_->block->scope;
 
+            for_->range->type_defn = determine_expr_type(for_->range);
+
             // TODO: multiple decls, patterns, etc.
             // Declare the iterator.
             assert(for_->it->type == AST_EXPR_IDENT);
             auto it = static_cast<AstExprIdent *>(for_->it);
-            scope_add_var(for_->scope, it);
-
-            for_->range->type_defn = determine_expr_type(for_->range);
             it->type_defn = for_->range->type_defn;
+            scope_add_var(for_->scope, it);
 
             for_->block->type_defn = determine_expr_type(for_->block);
             for_->type_defn = for_->block->type_defn;
