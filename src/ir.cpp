@@ -53,6 +53,7 @@ enum IrExprType_ : u32
     IR_EXPR_FIELD,
     IR_EXPR_PAREN,
     IR_EXPR_TYPE,
+    IR_EXPR_CAST,
 };
 
 struct IrExpr
@@ -157,6 +158,14 @@ struct IrExprType : IrExpr
 
     char *name = NULL;
     i64 pointer_depth = 0;
+};
+
+struct IrExprCast : IrExpr
+{
+    IrExprCast() : IrExpr(IR_EXPR_CAST) {}
+
+    IrExprType *type = NULL;
+    IrExpr *expr = NULL;
 };
 
 enum IrInstrType : u32
@@ -576,10 +585,19 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
         }
         case AST_EXPR_CAST:
         {
-            auto cast = static_cast<AstExprCast *>(expr);
+            auto ast_cast = static_cast<AstExprCast *>(expr);
 
-            // FIXME?
-            return gen_expr(ir, cast->expr);
+            // TODO: smarter allocation
+            // TODO: TypeDefn -> IrExprType helper function
+            IrExprType *type = new IrExprType();
+            type->name = ast_cast->type_defn->name; // TODO: copy?
+            type->pointer_depth = get_pointer_depth(ast_cast->type_defn);
+
+            IrExprCast *cast = new IrExprCast();
+            cast->type = type;
+            cast->expr = gen_expr(ir, ast_cast->expr);
+
+            return flatten_expr(ir, ast_cast, cast);
         }
         case AST_EXPR_ASSIGN:
         {
@@ -1482,6 +1500,18 @@ static void dump_c_expr(IrExpr *expr)
 
             break;
         }
+        case IR_EXPR_CAST:
+        {
+            auto cast = static_cast<IrExprCast *>(expr);
+
+            printf("((");
+            dump_c_expr(cast->type);
+            printf(")");
+            dump_c_expr(cast->expr);
+            printf(")");
+
+            break;
+        }
         default:
         {
             assert(false);
@@ -1518,7 +1548,11 @@ static void dump_c_func_signature(IrFunc *func)
 
         // External functions don't have temporary parameter bindings.
         if (!(func->flags & IR_FUNC_IS_EXTERN))
-            printf(" _%ld", param->tmp);
+        {
+            if (param->type->pointer_depth == 0)
+                printf(" ");
+            printf("_%ld", param->tmp);
+        }
 
         if (i < func->params.count - 1)
             printf(", ");
