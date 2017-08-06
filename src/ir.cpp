@@ -150,6 +150,7 @@ struct IrExprParen : IrExpr
     IrExpr *expr = NULL;
 };
 
+// TODO: is this really an expression? Rename to IrType?
 struct IrExprType : IrExpr
 {
     IrExprType() : IrExpr(IR_EXPR_TYPE) {}
@@ -1493,21 +1494,29 @@ static void dump_c_func_signature(IrFunc *func)
 {
     printf("static ");
     if (func->ret)
+    {
         dump_c_expr(func->ret);
+        if (func->ret->pointer_depth == 0)
+            printf(" ");
+    }
     else
-        printf("void");
+    {
+        printf("void ");
+    }
 
     // TODO: better way of checking for main?
     if (strings_match(func->name, "main"))
-        printf(" __main(");
+        printf("__main(");
     else
-        printf(" %s(", func->name);
+        printf("%s(", func->name);
 
     for (i64 i = 0; i < func->params.count; ++i)
     {
         IrParam *param = &func->params[i];
 
         dump_c_expr(param->type);
+
+        // External functions don't have temporary parameter bindings.
         if (!(func->flags & IR_FUNC_IS_EXTERN))
             printf(" _%ld", param->tmp);
 
@@ -1531,6 +1540,7 @@ static void dump_c(Ir *ir)
     printf("typedef uint64_t u64;\n");
     printf("typedef float    f32;\n");
     printf("typedef double   f64;\n");
+    printf("#define c_void void\n");
     printf("\n");
 
     foreach(ir->structs)
