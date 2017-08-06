@@ -553,7 +553,10 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
                 }
             }
 
-            return flatten_expr(ir, ast_un, un);
+            // TODO: this shouldn't be flattened for UN_DEREF, but do the other
+            // cases need to be flattened?
+//            return flatten_expr(ir, ast_un, un);
+            return un;
         }
         case AST_EXPR_CALL:
         {
@@ -923,6 +926,15 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
             // TODO: this could be made much neater by making make_x() helpers
             // for various AST nodes.
 
+            // loop {
+            //     if (cond) {
+            //         // body
+            //     } else {
+            //         break;
+            //     };
+            // };
+            //
+
             // Make the comparison at the top of the while-block.
             auto stmt = new AstStmtSemi();
 
@@ -930,10 +942,16 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
             if_->cond = ast_while->cond;
             if_->block = new AstExprBlock();
 
-            auto break_ = new AstExprBreak();
+            auto else_block = new AstExprBlock();
             stmt = new AstStmtSemi();
-            stmt->expr = break_;
-            if_->block->stmts.add(stmt);
+            stmt->expr = new AstExprBreak();
+            else_block->stmts.add(stmt);
+
+            if_->else_expr = else_block;
+
+            // Generate the main body.
+            foreach(ast_while->block->stmts)
+                if_->block->stmts.add(it);
 
             // Make the desugared loop.
             auto loop = new AstExprLoop();
@@ -942,10 +960,6 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
             stmt = new AstStmtSemi();
             stmt->expr = if_;
             loop->block->stmts.add(stmt);
-
-            // Generate the main body.
-            foreach(ast_while->block->stmts)
-                loop->block->stmts.add(it);
 
             // The while loop has been fully desugared into a simple loop.
             // Generate that loop now.
