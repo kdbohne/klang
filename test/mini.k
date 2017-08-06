@@ -1,3 +1,34 @@
+extern fn syscall5(num *i64, arg1 *i64, arg2 *i64, arg3 *i64, arg4 *i64, arg5 *i64) -> i64;
+extern fn test(x i64);
+fn test2(x i64) { let z = x + 1; }
+fn test3(x i64) -> i64 { let z = x + 1; z }
+fn main() {
+//    syscall5(cast (*i64) 0, cast (*i64) 0, cast (*i64) 0, cast (*i64) 0, cast (*i64) 0, cast (*i64) 0);
+    5 + 4;
+    test(5);
+    test2(5);
+    let x = test3(5);
+}
+
+/*
+fn main() {
+    let x = 0;
+    loop {
+        if x == 5 {
+            x = 4;
+            break;
+        };
+
+        x = x + 1;
+        let y = 3;
+        y = y + x;
+    };
+
+    x = 3;
+}
+*/
+
+/*
 struct Foo {
     p *i64;
 };
@@ -78,3 +109,4 @@ fn main() {
         5
     };
 }
+*/

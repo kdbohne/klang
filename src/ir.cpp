@@ -81,11 +81,12 @@ struct IrExprLit : IrExpr
     };
 };
 
+struct IrFunc;
 struct IrExprCall : IrExpr
 {
     IrExprCall() : IrExpr(IR_EXPR_CALL) {}
 
-    char *name = NULL;
+    IrFunc *func = NULL;
     Array<IrExpr *> args; // TODO: static array?
 };
 
@@ -195,8 +196,15 @@ struct IrDecl
     char *name = NULL;
 };
 
+enum IrFuncFlags
+{
+    IR_FUNC_IS_EXTERN = 0x1,
+};
+
 struct IrFunc
 {
+    u32 flags = 0;
+
     Array<IrBb> bbs;
     i64 current_bb = -1;
 
@@ -221,6 +229,7 @@ struct Ir
     i64 current_func = -1;
 
     Array<IrExpr *> lhs_block_assignment_stack;
+    Array<i64> break_stack;
 };
 
 static void gen_struct(Ir *ir, AstStruct *ast_struct)
@@ -281,12 +290,20 @@ static i64 create_func(Ir *ir)
     IrFunc *func = ir->funcs.next();
 
     // Bleh.
+    func->flags = 0;
+
     func->bbs.data = NULL;
     func->bbs.count = 0;
     func->bbs.capacity = 0;
-
     func->current_bb = -1;
+
     func->name = NULL;
+
+    func->params.data = NULL;
+    func->params.count = 0;
+    func->params.capacity = 0;
+
+    func->ret = NULL;
 
     func->decls.data = NULL;
     func->decls.count = 0;
@@ -370,6 +387,13 @@ static IrExpr *flatten_expr(Ir *ir, AstExpr *ast_expr, IrExpr *expr)
     if (expr->type == IR_EXPR_VAR)
         return expr;
 
+    if (expr->type == IR_EXPR_CALL)
+    {
+        auto call = static_cast<IrExprCall *>(expr);
+        if (!call->func->ret)
+            return expr;
+    }
+
     // TODO: early exit for literals?
 
     IrExprVar *var = new IrExprVar();
@@ -396,6 +420,15 @@ static IrExpr *flatten_expr(Ir *ir, AstExpr *ast_expr, IrExpr *expr)
     add_instr(ir, instr);
 
     return var;
+}
+
+static bool bb_ends_with_goto(IrBb *bb)
+{
+    if (bb->instrs.count == 0)
+        return false;
+
+    IrInstr last = bb->instrs[bb->instrs.count - 1];
+    return (last.type == IR_INSTR_GOTO) || (last.type == IR_INSTR_GOTOIF);
 }
 
 static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
@@ -476,7 +509,7 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
                 }
             }
 
-            return bin;
+            return flatten_expr(ir, ast_bin, bin);
         }
         case AST_EXPR_UN:
         {
@@ -501,14 +534,22 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
                 }
             }
 
-            return un;
+            return flatten_expr(ir, ast_un, un);
         }
         case AST_EXPR_CALL:
         {
             auto ast_call = static_cast<AstExprCall *>(expr);
 
             IrExprCall *call = new IrExprCall();
-            call->name = ast_call->name->str; // TODO: copy?
+
+            // TODO: handle overloads if they are added as a feature
+            // Find the matching function and cache it for later use.
+            foreach(ir->funcs)
+            {
+                if (strings_match(it.name, ast_call->name->str))
+                    call->func = &it;
+            }
+            assert(call->func);
 
             foreach(ast_call->args)
             {
@@ -534,9 +575,10 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
         }
         case AST_EXPR_CAST:
         {
-            // FIXME
-            assert(false);
-            return NULL;
+            auto cast = static_cast<AstExprCast *>(expr);
+
+            // FIXME?
+            return gen_expr(ir, cast->expr);
         }
         case AST_EXPR_ASSIGN:
         {
@@ -606,7 +648,10 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
             set_current_bb(ir, then_bb);
 
             gen_expr(ir, ast_if->block);
-            add_instr(ir, merge_instr);
+
+            // Don't insert a merge block goto if the block already ended with a goto.
+            if (!bb_ends_with_goto(&current_func->bbs[then_bb]))
+                add_instr(ir, merge_instr);
 
             // Make the 'else' block.
             if (ast_if->else_expr)
@@ -614,7 +659,10 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
                 set_current_bb(ir, else_bb);
 
                 gen_expr(ir, ast_if->else_expr);
-                add_instr(ir, merge_instr);
+
+                // Don't insert a merge block goto if the block already ended with a goto.
+                if (!bb_ends_with_goto(&current_func->bbs[else_bb]))
+                    add_instr(ir, merge_instr);
             }
 
             set_current_bb(ir, merge_bb);
@@ -695,21 +743,147 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
         }
         case AST_EXPR_LOOP:
         {
-            // FIXME
-            assert(false);
+            auto loop = static_cast<AstExprLoop *>(expr);
+
+            i64 loop_bb = create_bb(ir);
+            i64 merge_bb = create_bb(ir);
+
+            IrInstr entry;
+            entry.type = IR_INSTR_GOTO;
+            entry.arg_count = 1;
+            entry.args[0] = (IrExpr *)loop_bb; // HACK: storing the bb index as a pointer to avoid an allocation
+            add_instr(ir, entry);
+
+            set_current_bb(ir, loop_bb);
+
+            // Add the block to the break stack to allow breaks to know where to go.
+            ir->break_stack.add(merge_bb);
+
+            gen_expr(ir, loop->block);
+
+            IrInstr instr;
+            instr.type = IR_INSTR_GOTO;
+            instr.arg_count = 1;
+            instr.args[0] = (IrExpr *)loop_bb; // HACK: storing the bb index as a pointer to avoid an allocation
+
+            add_instr(ir, instr);
+
+            set_current_bb(ir, merge_bb);
+
             return NULL;
         }
         case AST_EXPR_BREAK:
         {
-            // FIXME
-            assert(false);
+//            auto break_ = static_cast<AstExprBreak *>(expr);
+
+            assert(ir->break_stack.count > 0);
+            i64 dest_bb = ir->break_stack[ir->break_stack.count - 1];
+            --ir->break_stack.count;
+
+            IrInstr instr;
+            instr.type = IR_INSTR_GOTO;
+            instr.arg_count = 1;
+            instr.args[0] = (IrExpr *)dest_bb; // HACK: storing the bb index as a pointer to avoid an allocation
+
+            add_instr(ir, instr);
+
             return NULL;
         }
         case AST_EXPR_FOR:
         {
-            // FIXME
-            assert(false);
+            auto ast_for = static_cast<AstExprFor *>(expr);
+            auto it = static_cast<AstExprIdent *>(ast_for->it);
+            auto range = static_cast<AstExprRange *>(ast_for->range);
+
+            auto loop = new AstExprLoop();
+            loop->block = new AstExprBlock();
+
+            // TODO: this could be made much neater by making make_x() helpers
+            // for various AST nodes.
+
+            // Make the iterator initializer.
+            auto assign = new AstExprAssign();
+            assign->lhs = it;
+            assign->rhs = range->start;
+
+            auto stmt = new AstStmtSemi();
+            stmt->expr = assign;
+            loop->block->stmts.add(stmt);
+
+            // Make the comparison.
+            auto cond = new AstExprBin();
+            cond->lhs = it;
+            cond->rhs = range->end;
+            cond->op = BIN_LT;
+            cond->type_defn = it->type_defn;
+            cond->scope = it->scope;
+
+            stmt = new AstStmtSemi();
+            stmt->expr = cond;
+            loop->block->stmts.add(stmt);
+
+            // Generate the main body.
+            for (i64 i = 0; i < ast_for->block->stmts.count; ++i)
+                loop->block->stmts.add(ast_for->block->stmts[i]);
+
+            // TODO: avoid allocating 'one' each time!
+            // Make the increment.
+            auto inc_rhs = new AstExprBin();
+            inc_rhs->lhs = it;
+            auto one = new AstExprLit();
+            one->lit_type = LIT_INT;
+            one->value_int.type = INT_I64; // TODO: match iterator type?
+            one->value_int.flags = 0;
+            one->value_int.value = 1;
+            one->type_defn = get_type_defn("i64");
+            inc_rhs->rhs = one;
+
+            auto inc = new AstExprAssign();
+            inc->lhs = it;
+            inc->rhs = inc_rhs;
+
+            stmt = new AstStmtSemi();
+            stmt->expr = inc;
+            ast_for->block->stmts.add(stmt);
+
+            // The for loop has been fully desugared into a simple loop.
+            // Generate that loop now.
+            gen_expr(ir, loop);
+
+            // TODO: should this be assignable?
             return NULL;
+#if 0
+            auto ast_for = static_cast<AstExprFor *>(expr);
+            auto range = static_cast<AstExprRange *>(ast_for->range);
+
+            i64 bb = create_bb(ir);
+            set_current_bb(ir, bb);
+
+            // Add the block to the break stack to allow breaks to know where to go.
+            ir->break_stack.add(bb);
+
+            IrExpr *it = gen_expr(ir, ast_for->it);
+            IrExpr *start = gen_expr(ir, rangefor->start);
+            IrExpr *end = gen_expr(ir, range->end);
+
+            IrInstr init;
+            init.type = IR_INSTR_ASSIGN;
+            init.arg_count = 2;
+            init.args[0] = it;
+            init.args[1] = start;
+
+            add_instr(init);
+
+            IrInstr cond;
+            cond.type = IR_INSTR_GOTOIF;
+            cond.arg_count = 2;
+            cond.args[0] = it;
+            cond.args[1] = end;
+
+            gen_expr(ir, ast_for->block);
+
+            return NULL;
+#endif
         }
         case AST_EXPR_RANGE:
         {
@@ -719,15 +893,31 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
         }
         case AST_EXPR_WHILE:
         {
-            // FIXME
-            assert(false);
+            auto ast_while = static_cast<AstExprWhile *>(expr);
+
+            auto loop = new AstExprLoop();
+            loop->block = new AstExprBlock();
+
+            // Make the comparison.
+            auto stmt = new AstStmtSemi();
+            stmt->expr = ast_while->cond;
+            loop->block->stmts.add(stmt);
+
+            // Generate the main body.
+            foreach(ast_while->block->stmts)
+                loop->block->stmts.add(it);
+
+            // The while loop has been fully desugared into a simple loop.
+            // Generate that loop now.
+            gen_expr(ir, loop);
+
+            // TODO: should this be assignable?
             return NULL;
         }
         case AST_EXPR_PAREN:
         {
-            // FIXME
-            assert(false);
-            return NULL;
+            auto paren = static_cast<AstExprParen *>(expr);
+            return gen_expr(ir, paren->expr);
         }
         default:
         {
@@ -737,61 +927,78 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
     }
 }
 
-static void gen_func(Ir *ir, AstFunc *ast_func)
+// Allocate temporaries, fill out information in IrFunc, etc.
+// This must be done for each function before gen_func() can handle
+// call expressions, as those reference other IrFuncs directly.
+static void gen_func_prototype(Ir *ir, AstFunc *ast_func)
 {
     i64 func_index = create_func(ir);
     IrFunc *func = &ir->funcs[func_index];
     func->name = ast_func->name->str; // TODO: copy?
 
-    // Bleh.
-    func->bbs.data = NULL;
-    func->bbs.count = 0;
-    func->bbs.capacity = 0;
-    func->current_bb = -1;
-    func->params.data = NULL;
-    func->params.count = 0;
-    func->params.capacity = 0;
-    func->ret = NULL;
+    if (ast_func->flags & FUNC_IS_EXTERN)
+    {
+        func->flags |= IR_FUNC_IS_EXTERN;
+    }
+    else
+    {
+        // TODO: move ir_tmp_counter to IrFunc?
+        // Reserve _0 for the return value.
+        if (ast_func->block->expr)
+            ++ast_func->scope->ir_tmp_counter;
+    }
+
+    for (i64 i = 0; i < ast_func->params.count; ++i)
+    {
+        auto it = ast_func->params[i];
+
+        IrParam *param = func->params.next();
+        param->type = new IrExprType();
+        param->type->name = it->type->name->str;
+        param->type->pointer_depth = it->type->pointer_depth;
+
+        // For an external function, just fill out its parameters and return type.
+        // Otherwise, generate temporary bindings as well.
+        if (!(ast_func->flags & FUNC_IS_EXTERN))
+        {
+            ScopeVar *var = scope_get_var(it->scope, it->name->str);
+            assert(var);
+
+            // NOTE: not using alloc_tmp() here because params don't need to be
+            // declared. Just get a tmp index directly.
+            // TODO: alloc_param_tmp() or something?
+            Scope *top_level = get_top_level_scope(it->scope);
+            var->ir_tmp_index = top_level->ir_tmp_counter++;
+//          var->ir_tmp_index = alloc_tmp(ir, it->name);
+
+            param->tmp = var->ir_tmp_index;
+        }
+    }
+
+    if (ast_func->ret)
+    {
+        func->ret = new IrExprType();
+        func->ret->name = ast_func->ret->name->str;
+        func->ret->pointer_depth = ast_func->ret->pointer_depth;
+    }
+}
+
+static void gen_func(Ir *ir, AstFunc *ast_func, i64 func_index)
+{
+    IrFunc *func = &ir->funcs[func_index];
+
+    // Nothing to do for an external function.
+    if (ast_func->flags & FUNC_IS_EXTERN)
+        return;
 
     set_current_func(ir, func_index);
 
     i64 func_bb = create_bb(ir);
     set_current_bb(ir, func_bb);
 
-    // TODO: move ir_tmp_counter to IrFunc?
-    // Reserve _0 for the return value.
-    if (ast_func->block->expr)
-        ++ast_func->scope->ir_tmp_counter;
-
-    for (i64 i = 0; i < ast_func->params.count; ++i)
-    {
-        auto it = ast_func->params[i];
-
-        ScopeVar *var = scope_get_var(it->scope, it->name->str);
-        assert(var);
-
-        // NOTE: not using alloc_tmp() here because params don't need to be
-        // declared. Just get a tmp index directly.
-        // TODO: alloc_param_tmp() or something?
-        Scope *top_level = get_top_level_scope(it->scope);
-        var->ir_tmp_index = top_level->ir_tmp_counter++;
-//        var->ir_tmp_index = alloc_tmp(ir, it->name);
-
-        IrParam *param = func->params.next();
-        param->tmp = var->ir_tmp_index;
-        param->type = new IrExprType();
-        param->type->name = it->type->name->str;
-        param->type->pointer_depth = it->type->pointer_depth;
-    }
-
-    // Declare the function block's return value and type.
+    // Declare the function block's return value.
     if (ast_func->ret)
     {
-        // Fill out the return type.
-        func->ret = new IrExprType();
-        func->ret->name = ast_func->ret->name->str;
-        func->ret->pointer_depth = ast_func->ret->pointer_depth;
-
         // Make the return value to be block-assigned.
         IrExprVar *ret_var = new IrExprVar();
         ret_var->tmp = 0; // 0 is always reserved for the return value.
@@ -877,7 +1084,7 @@ static void dump_expr(IrExpr *expr)
         {
             auto call = static_cast<IrExprCall *>(expr);
 
-            fprintf(stderr, "%s(", call->name);
+            fprintf(stderr, "%s(", call->func->name);
             for (i64 i = 0; i < call->args.count; ++i)
             {
                 dump_expr(call->args[i]);
@@ -985,7 +1192,7 @@ static void dump_ir(Ir *ir)
         {
             auto field_type = it.fields[i];
 
-            for (i64 j = 0; j < field_type->pointer_depth; ++i)
+            for (i64 j = 0; j < field_type->pointer_depth; ++j)
                 fprintf(stderr, "*");
             fprintf(stderr, "%s", field_type->name);
 
@@ -1145,14 +1352,26 @@ static void dump_c_expr(IrExpr *expr)
                 }
                 case LIT_FLOAT:
                 {
-                    // FIXME
-                    assert(false);
+                    printf("%.9g", lit->value_float);
                     break;
                 }
                 case LIT_STR:
                 {
-                    // FIXME
-                    assert(false);
+                    printf("((u8 *)\"");
+                    auto s = lit->value_str;
+                    for (int i = 0; i < string_length(s); ++i)
+                    {
+                        char c = s[i];
+                        switch (c)
+                        {
+                            case '\n': { printf("\\n");   break; }
+                            case '\r': { printf("\\r");   break; }
+                            case '\t': { printf("\\t");   break; }
+                            default:   { printf("%c", c); break; }
+                        }
+                    }
+                    printf("\")");
+
                     break;
                 }
                 default:
@@ -1168,7 +1387,7 @@ static void dump_c_expr(IrExpr *expr)
         {
             auto call = static_cast<IrExprCall *>(expr);
 
-            printf("%s(", call->name);
+            printf("%s(", call->func->name);
             for (i64 i = 0; i < call->args.count; ++i)
             {
                 dump_c_expr(call->args[i]);
@@ -1289,7 +1508,8 @@ static void dump_c_func_signature(IrFunc *func)
         IrParam *param = &func->params[i];
 
         dump_c_expr(param->type);
-        printf(" _%ld", param->tmp);
+        if (!(func->flags & IR_FUNC_IS_EXTERN))
+            printf(" _%ld", param->tmp);
 
         if (i < func->params.count - 1)
             printf(", ");
@@ -1309,6 +1529,8 @@ static void dump_c(Ir *ir)
     printf("typedef uint16_t u16;\n");
     printf("typedef uint32_t u32;\n");
     printf("typedef uint64_t u64;\n");
+    printf("typedef float    f32;\n");
+    printf("typedef double   f64;\n");
     printf("\n");
 
     foreach(ir->structs)
@@ -1345,6 +1567,8 @@ static void dump_c(Ir *ir)
     for (i64 i = 0; i < ir->funcs.count; ++i)
     {
         IrFunc *func = &ir->funcs[i];
+        if (func->flags & IR_FUNC_IS_EXTERN)
+            continue;
 
         dump_c_func_signature(func);
         printf(" {\n");
@@ -1452,12 +1676,9 @@ void gen_ir(AstRoot *ast)
         gen_struct(&ir, it);
 
     foreach(ast->funcs)
-    {
-        if (it->flags & FUNC_IS_EXTERN)
-            continue;
-
-        gen_func(&ir, it);
-    }
+        gen_func_prototype(&ir, it);
+    for (i64 i = 0; i < ast->funcs.count; ++i)
+        gen_func(&ir, ast->funcs[i], i);
 
 //    dump_ir(&ir);
     dump_c(&ir);
