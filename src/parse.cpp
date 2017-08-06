@@ -118,7 +118,42 @@ static AstExprType *parse_type(Parser *parser)
     return type;
 }
 
-static AstExpr *parse_expr(Parser *parser, bool is_unary = false)
+static AstExpr *parse_expr(Parser *parser, bool is_unary = false);
+
+static AstExprBin *parse_cond(Parser *parser)
+{
+    assert(parser->index > 0);
+    Token tok = parser->tokens->data[parser->index - 1];
+
+    // If the condition is a single expression, make an implicit
+    // comparison: != 0.
+    AstExpr *cond = parse_expr(parser);
+    if (cond->type != AST_EXPR_BIN)
+    {
+        AstExprLit *zero = ast_alloc(AstExprLit);
+        zero->scope = cond->scope;
+        zero->lit_type = LIT_INT;
+        zero->value_int.type = INT_I64;
+        zero->value_int.value = 0;
+        zero->value_int.flags = 0;
+
+        AstExprBin *bin_cond = ast_alloc(AstExprBin);
+        bin_cond->scope = cond->scope;
+        bin_cond->lhs = cond;
+        bin_cond->rhs = zero;
+        bin_cond->op = BIN_NE;
+
+        copy_loc(bin_cond, tok);
+        return bin_cond;
+    }
+    else
+    {
+        AstExprBin *bin_cond = static_cast<AstExprBin *>(cond);
+        return bin_cond;
+    }
+}
+
+static AstExpr *parse_expr(Parser *parser, bool is_unary)
 {
     AstExpr *lhs = NULL;
 
@@ -208,32 +243,7 @@ static AstExpr *parse_expr(Parser *parser, bool is_unary = false)
         {
             AstExprIf *if_expr = ast_alloc(AstExprIf);
 
-            // If the condition is a single expression, make an implicit
-            // comparison: != 0.
-            AstExpr *cond = parse_expr(parser);
-            if (cond->type != AST_EXPR_BIN)
-            {
-                AstExprLit *zero = ast_alloc(AstExprLit);
-                zero->scope = cond->scope;
-                zero->lit_type = LIT_INT;
-                zero->value_int.type = INT_I64;
-                zero->value_int.value = 0;
-                zero->value_int.flags = 0;
-
-                AstExprBin *bin_cond = ast_alloc(AstExprBin);
-                bin_cond->scope = cond->scope;
-                bin_cond->lhs = cond;
-                bin_cond->rhs = zero;
-                bin_cond->op = BIN_NE;
-
-                copy_loc(bin_cond, tok);
-                if_expr->cond = bin_cond;
-            }
-            else
-            {
-                AstExprBin *bin_cond = static_cast<AstExprBin *>(cond);
-                if_expr->cond = bin_cond;
-            }
+            if_expr->cond = parse_cond(parser);
 
             expect(parser, TOK_OPEN_BRACE);
             if_expr->block = parse_block(parser);
@@ -283,7 +293,7 @@ static AstExpr *parse_expr(Parser *parser, bool is_unary = false)
         {
             AstExprWhile *while_ = ast_alloc(AstExprWhile);
 
-            while_->cond = parse_expr(parser);
+            while_->cond = parse_cond(parser);
 
             expect(parser, TOK_OPEN_BRACE);
             while_->block = parse_block(parser);

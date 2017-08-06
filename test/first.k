@@ -196,6 +196,8 @@ fn print_f32(x f32) {
 }
 
 fn main() {
+    print_string_literal("this is a test string!\n");
+/*
     print_i64(123456789);
     print_string_literal("\n");
 
@@ -213,4 +215,5 @@ fn main() {
     print_string_literal("\n");
     print_f32(-3.141592654);
     print_string_literal("\n");
+*/
 }

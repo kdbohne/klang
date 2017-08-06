@@ -823,11 +823,16 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
             auto it = static_cast<AstExprIdent *>(ast_for->it);
             auto range = static_cast<AstExprRange *>(ast_for->range);
 
-            auto loop = new AstExprLoop();
-            loop->block = new AstExprBlock();
-
             // TODO: this could be made much neater by making make_x() helpers
             // for various AST nodes.
+
+            // This block encloses the loop and the iterator, i.e.
+            // {
+            //     let it = ..
+            //     loop {
+            //     }
+            // }
+            auto enclosing_block = new AstExprBlock();
 
             // Make the iterator initializer.
             auto assign = new AstExprAssign();
@@ -836,7 +841,11 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
 
             auto stmt = new AstStmtSemi();
             stmt->expr = assign;
-            loop->block->stmts.add(stmt);
+            enclosing_block->stmts.add(stmt);
+
+            // Make the actual loop block.
+            auto loop = new AstExprLoop();
+            loop->block = new AstExprBlock();
 
             // Make the comparison.
             auto cond = new AstExprBin();
@@ -844,10 +853,19 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
             cond->rhs = range->end;
             cond->op = BIN_LT;
             cond->type_defn = it->type_defn;
-            cond->scope = it->scope;
+            cond->scope = ast_for->block->scope;
+
+            auto if_ = new AstExprIf();
+            if_->cond = cond;
+            if_->block = new AstExprBlock();
+
+            auto break_ = new AstExprBreak();
+            stmt = new AstStmtSemi();
+            stmt->expr = break_;
+            if_->block->stmts.add(stmt);
 
             stmt = new AstStmtSemi();
-            stmt->expr = cond;
+            stmt->expr = if_;
             loop->block->stmts.add(stmt);
 
             // Generate the main body.
@@ -856,27 +874,38 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
 
             // TODO: avoid allocating 'one' each time!
             // Make the increment.
-            auto inc_rhs = new AstExprBin();
-            inc_rhs->lhs = it;
             auto one = new AstExprLit();
+            one->scope = ast_for->block->scope;
             one->lit_type = LIT_INT;
             one->value_int.type = INT_I64; // TODO: match iterator type?
             one->value_int.flags = 0;
             one->value_int.value = 1;
             one->type_defn = get_type_defn("i64");
+
+            auto inc_rhs = new AstExprBin();
+            inc_rhs->scope = ast_for->block->scope;
+            inc_rhs->lhs = it;
             inc_rhs->rhs = one;
+            inc_rhs->op = BIN_ADD;
+            inc_rhs->type_defn = one->type_defn;
 
             auto inc = new AstExprAssign();
             inc->lhs = it;
             inc->rhs = inc_rhs;
+            inc->type_defn = one->type_defn;
 
             stmt = new AstStmtSemi();
             stmt->expr = inc;
-            ast_for->block->stmts.add(stmt);
+            loop->block->stmts.add(stmt);
+
+            // Add the loop block to the enclosing block.
+            stmt = new AstStmtSemi();
+            stmt->expr = loop;
+            enclosing_block->stmts.add(stmt);
 
             // The for loop has been fully desugared into a simple loop.
             // Generate that loop now.
-            gen_expr(ir, loop);
+            gen_expr(ir, enclosing_block);
 
             // TODO: should this be assignable?
             return NULL;
@@ -923,12 +952,27 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
         {
             auto ast_while = static_cast<AstExprWhile *>(expr);
 
+            // TODO: this could be made much neater by making make_x() helpers
+            // for various AST nodes.
+
+            // Make the comparison at the top of the while-block.
+            auto stmt = new AstStmtSemi();
+
+            auto if_ = new AstExprIf();
+            if_->cond = ast_while->cond;
+            if_->block = new AstExprBlock();
+
+            auto break_ = new AstExprBreak();
+            stmt = new AstStmtSemi();
+            stmt->expr = break_;
+            if_->block->stmts.add(stmt);
+
+            // Make the desugared loop.
             auto loop = new AstExprLoop();
             loop->block = new AstExprBlock();
 
-            // Make the comparison.
-            auto stmt = new AstStmtSemi();
-            stmt->expr = ast_while->cond;
+            stmt = new AstStmtSemi();
+            stmt->expr = if_;
             loop->block->stmts.add(stmt);
 
             // Generate the main body.

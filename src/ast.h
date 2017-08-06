@@ -339,7 +339,7 @@ struct AstExprWhile : AstExpr
 {
     AstExprWhile() : AstExpr(AST_EXPR_WHILE) {}
 
-    AstExpr *cond = NULL;
+    AstExprBin *cond = NULL;
     AstExprBlock *block = NULL;
 };
 
