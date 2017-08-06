@@ -401,7 +401,16 @@ static IrExpr *flatten_expr(Ir *ir, AstExpr *ast_expr, IrExpr *expr)
     {
         auto call = static_cast<IrExprCall *>(expr);
         if (!call->func->ret)
+        {
+            IrInstr instr;
+            instr.type = IR_INSTR_SEMI;
+            instr.arg_count = 1;
+            instr.args[0] = expr;
+
+            add_instr(ir, instr);
+
             return expr;
+        }
     }
 
     // TODO: early exit for literals?
@@ -1646,8 +1655,11 @@ static void dump_c(Ir *ir)
                 {
                     case IR_INSTR_SEMI:
                     {
-                        // FIXME
-                        assert(false);
+                        assert(it.arg_count == 1);
+
+                        dump_c_expr(it.args[0]);
+                        // The semicolon is already handled after the switch.
+
                         break;
                     }
                     case IR_INSTR_ASSIGN:
