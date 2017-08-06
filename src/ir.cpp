@@ -493,8 +493,8 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
             IrExprBin *bin = new IrExprBin();
             bin->lhs = gen_expr(ir, ast_bin->lhs);
             bin->rhs = gen_expr(ir, ast_bin->rhs);
-            bin->lhs = flatten_expr(ir, ast_bin, bin->lhs);
-            bin->rhs = flatten_expr(ir, ast_bin, bin->rhs);
+            bin->lhs = flatten_expr(ir, ast_bin->lhs, bin->lhs);
+            bin->rhs = flatten_expr(ir, ast_bin->rhs, bin->rhs);
 
             // NOTE: this is a straight conversion of BinOp -> IrBinOp. The two
             // enums are being kept separate for now in case the IR or AST wants
