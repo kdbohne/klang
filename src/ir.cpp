@@ -909,38 +909,6 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
 
             // TODO: should this be assignable?
             return NULL;
-#if 0
-            auto ast_for = static_cast<AstExprFor *>(expr);
-            auto range = static_cast<AstExprRange *>(ast_for->range);
-
-            i64 bb = create_bb(ir);
-            set_current_bb(ir, bb);
-
-            // Add the block to the break stack to allow breaks to know where to go.
-            ir->break_stack.add(bb);
-
-            IrExpr *it = gen_expr(ir, ast_for->it);
-            IrExpr *start = gen_expr(ir, rangefor->start);
-            IrExpr *end = gen_expr(ir, range->end);
-
-            IrInstr init;
-            init.type = IR_INSTR_ASSIGN;
-            init.arg_count = 2;
-            init.args[0] = it;
-            init.args[1] = start;
-
-            add_instr(init);
-
-            IrInstr cond;
-            cond.type = IR_INSTR_GOTOIF;
-            cond.arg_count = 2;
-            cond.args[0] = it;
-            cond.args[1] = end;
-
-            gen_expr(ir, ast_for->block);
-
-            return NULL;
-#endif
         }
         case AST_EXPR_RANGE:
         {
