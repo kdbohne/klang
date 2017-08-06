@@ -632,11 +632,12 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
                 }
             }
 
-            if (func->ret)
-                return func->ret->type_defn;
-
             // TODO: static type defn for void instead of looking up every time
-            return get_type_defn("void");
+            if (func->ret)
+                call->type_defn = func->ret->type_defn;
+            else
+                call->type_defn = get_type_defn("void");
+            return call->type_defn;
         }
         case AST_EXPR_CAST:
         {

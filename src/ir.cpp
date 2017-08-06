@@ -518,7 +518,7 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
                 call->args.add(tmp);
             }
 
-            return call;
+            return flatten_expr(ir, ast_call, call);
         }
         case AST_EXPR_TYPE:
         {
