@@ -1531,7 +1531,13 @@ static void dump_c_expr(IrExpr *expr)
 
 static void dump_c_func_signature(IrFunc *func)
 {
-    printf("static ");
+    bool is_extern = (func->flags & IR_FUNC_IS_EXTERN);
+
+    if (is_extern)
+        printf("extern ");
+    else
+        printf("static ");
+
     if (func->ret)
     {
         dump_c_expr(func->ret);
@@ -1556,7 +1562,7 @@ static void dump_c_func_signature(IrFunc *func)
         dump_c_expr(param->type);
 
         // External functions don't have temporary parameter bindings.
-        if (!(func->flags & IR_FUNC_IS_EXTERN))
+        if (!is_extern)
         {
             if (param->type->pointer_depth == 0)
                 printf(" ");
