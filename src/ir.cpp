@@ -833,7 +833,13 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
             // {
             //     let it = ..
             //     loop {
-            //     }
+            //         if (cond) {
+            //             // body
+            //             it += 1;
+            //         } else {
+            //             break;
+            //         };
+            //     };
             // }
             auto enclosing_block = new AstExprBlock();
 
@@ -845,10 +851,6 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
             auto stmt = new AstStmtSemi();
             stmt->expr = assign;
             enclosing_block->stmts.add(stmt);
-
-            // Make the actual loop block.
-            auto loop = new AstExprLoop();
-            loop->block = new AstExprBlock();
 
             // Make the comparison.
             auto cond = new AstExprBin();
@@ -862,18 +864,16 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
             if_->cond = cond;
             if_->block = new AstExprBlock();
 
-            auto break_ = new AstExprBreak();
+            auto else_block = new AstExprBlock();
             stmt = new AstStmtSemi();
-            stmt->expr = break_;
-            if_->block->stmts.add(stmt);
+            stmt->expr = new AstExprBreak();
+            else_block->stmts.add(stmt);
 
-            stmt = new AstStmtSemi();
-            stmt->expr = if_;
-            loop->block->stmts.add(stmt);
+            if_->else_expr = else_block;
 
             // Generate the main body.
             for (i64 i = 0; i < ast_for->block->stmts.count; ++i)
-                loop->block->stmts.add(ast_for->block->stmts[i]);
+                if_->block->stmts.add(ast_for->block->stmts[i]);
 
             // TODO: avoid allocating 'one' each time!
             // Make the increment.
@@ -899,6 +899,14 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
 
             stmt = new AstStmtSemi();
             stmt->expr = inc;
+            if_->block->stmts.add(stmt);
+
+            // Make the actual loop block.
+            auto loop = new AstExprLoop();
+            loop->block = new AstExprBlock();
+
+            stmt = new AstStmtSemi();
+            stmt->expr = if_;
             loop->block->stmts.add(stmt);
 
             // Add the loop block to the enclosing block.
