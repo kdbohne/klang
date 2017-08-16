@@ -316,6 +316,11 @@ static AstExpr *parse_expr(Parser *parser, bool is_unary)
             {
                 auto lit = static_cast<AstExprLit *>(expr);
                 lit->value_int.flags |= INT_IS_NEGATIVE;
+
+                // Drop the unary minus for negative literals.
+                // They are already flagged as negative.
+                lhs = lit;
+                break;
             }
 
             auto un = ast_alloc(AstExprUn);
