@@ -844,19 +844,11 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
             auto enclosing_block = new AstExprBlock();
 
             // Make the iterator initializer.
-            auto assign = new AstExprAssign();
-            assign->lhs = it;
-            assign->rhs = range->start;
-
-            auto stmt = new AstStmtSemi();
-            stmt->expr = assign;
-            enclosing_block->stmts.add(stmt);
+            auto assign = make_assign(it, range->start);
+            enclosing_block->stmts.add(make_stmt(assign));
 
             // Make the comparison.
-            auto cond = new AstExprBin();
-            cond->lhs = it;
-            cond->rhs = range->end;
-            cond->op = BIN_LT;
+            auto cond = make_bin(it, range->end, BIN_LT);
             cond->type_defn = it->type_defn;
             cond->scope = ast_for->block->scope;
 
@@ -865,9 +857,7 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
             if_->block = new AstExprBlock();
 
             auto else_block = new AstExprBlock();
-            stmt = new AstStmtSemi();
-            stmt->expr = new AstExprBreak();
-            else_block->stmts.add(stmt);
+            else_block->stmts.add(make_stmt(new AstExprBreak()));
 
             if_->else_expr = else_block;
 
@@ -876,43 +866,28 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
                 if_->block->stmts.add(ast_for->block->stmts[i]);
 
             // TODO: avoid allocating 'one' each time!
+            // TODO: match iterator type?
             // Make the increment.
-            auto one = new AstExprLit();
+            auto one = make_lit_int(INT_I64, 0, 1);
             one->scope = ast_for->block->scope;
-            one->lit_type = LIT_INT;
-            one->value_int.type = INT_I64; // TODO: match iterator type?
-            one->value_int.flags = 0;
-            one->value_int.value = 1;
-            one->type_defn = get_type_defn("i64");
 
-            auto inc_rhs = new AstExprBin();
+            auto inc_rhs = make_bin(it, one, BIN_ADD);
             inc_rhs->scope = ast_for->block->scope;
-            inc_rhs->lhs = it;
-            inc_rhs->rhs = one;
-            inc_rhs->op = BIN_ADD;
             inc_rhs->type_defn = one->type_defn;
 
-            auto inc = new AstExprAssign();
-            inc->lhs = it;
-            inc->rhs = inc_rhs;
+            auto inc = make_assign(it, inc_rhs);
             inc->type_defn = one->type_defn;
 
-            stmt = new AstStmtSemi();
-            stmt->expr = inc;
-            if_->block->stmts.add(stmt);
+            if_->block->stmts.add(make_stmt(inc));
 
             // Make the actual loop block.
             auto loop = new AstExprLoop();
             loop->block = new AstExprBlock();
 
-            stmt = new AstStmtSemi();
-            stmt->expr = if_;
-            loop->block->stmts.add(stmt);
+            loop->block->stmts.add(make_stmt(if_));
 
             // Add the loop block to the enclosing block.
-            stmt = new AstStmtSemi();
-            stmt->expr = loop;
-            enclosing_block->stmts.add(stmt);
+            enclosing_block->stmts.add(make_stmt(loop));
 
             // The for loop has been fully desugared into a simple loop.
             // Generate that loop now.

@@ -265,6 +265,48 @@ AstExprLit *make_lit_str(Token tok)
     return lit;
 }
 
+AstExprLit *make_lit_int(IntType type, u32 flags, u64 value)
+{
+    AstExprLit *lit = ast_alloc(AstExprLit);
+    lit->lit_type = LIT_INT;
+    lit->value_int.type = type;
+    lit->value_int.flags = flags;
+    lit->value_int.value = value;
+
+    // FIXME: support other types
+    assert(type == INT_I64);
+    lit->type_defn = get_type_defn("i64");
+
+    return lit;
+}
+
+AstExprBin *make_bin(AstExpr *lhs, AstExpr *rhs, BinOp op)
+{
+    AstExprBin *bin = ast_alloc(AstExprBin);
+    bin->lhs = lhs;
+    bin->rhs = rhs;
+    bin->op = op;
+
+    return bin;
+}
+
+AstExprAssign *make_assign(AstExpr *lhs, AstExpr *rhs)
+{
+    AstExprAssign *assign = ast_alloc(AstExprAssign);
+    assign->lhs = lhs;
+    assign->rhs = rhs;
+
+    return assign;
+}
+
+AstStmt *make_stmt(AstExpr *expr)
+{
+    AstStmtSemi *semi = ast_alloc(AstStmtSemi);
+    semi->expr = expr;
+
+    return semi;
+}
+
 void copy_loc(AstNode *node, Token tok)
 {
     node->file = tok.file;

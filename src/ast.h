@@ -423,6 +423,11 @@ AstExprLit *make_lit_int(Token tok);
 AstExprLit *make_lit_float(Token tok);
 AstExprLit *make_lit_str(Token tok);
 
+AstExprLit *make_lit_int(IntType type, u32 flags, u64 value);
+AstExprBin *make_bin(AstExpr *lhs, AstExpr *rhs, BinOp op);
+AstExprAssign *make_assign(AstExpr *lhs, AstExpr *rhs);
+AstStmt *make_stmt(AstExpr *expr);
+
 void copy_loc(AstNode *node, Token tok);
 
 void debug_dump(AstRoot *root);
