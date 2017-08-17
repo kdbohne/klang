@@ -204,6 +204,8 @@ fn main() {
 
     print_i64(238947 - 123 + 45 * 34);
     print_string_literal("\n");
+    print_i64(240354);
+    print_string_literal("\n");
 
     print_string_literal("\n");
 

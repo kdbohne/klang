@@ -8,3 +8,4 @@ build
 
 *.el
 *.so
+*.o

@@ -1,12 +1,5 @@
 fn main() {
-    let x = 0;
-    for i in 0..10 {
-        x = x + i;
-
-        if x == 4 {
-            x = x + 2;
-        };
-    };
+    let x = 45 - 32 + 4 * 3;
 }
 
 /*
