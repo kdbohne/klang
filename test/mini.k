@@ -1,28 +1,13 @@
 fn main() {
     let x = 0;
-    let y = 5;
-    while x < y {
-        x = x + 1;
-    };
-}
+    for i in 0..10 {
+        x = x + i;
 
-/*
-fn main() {
-    let x = 0;
-    loop {
-        if x == 5 {
-            x = 4;
-            break;
+        if x == 4 {
+            x = x + 2;
         };
-
-        x = x + 1;
-        let y = 3;
-        y = y + x;
     };
-
-    x = 3;
 }
-*/
 
 /*
 struct Foo {

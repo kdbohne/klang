@@ -262,39 +262,6 @@ static void gen_struct(Ir *ir, AstStruct *ast_struct)
     }
 }
 
-static i64 alloc_tmp(Ir *ir, AstExpr *expr, IrExprType *type)
-{
-    Scope *top_level = get_top_level_scope(expr->scope);
-    i64 tmp = top_level->ir_tmp_counter++;
-
-    // TODO: get_current_func()?
-    assert(ir->current_func >= 0);
-    assert(ir->current_func < ir->funcs.count);
-    IrFunc *func = &ir->funcs[ir->current_func];
-
-    IrDecl *decl = func->decls.next();
-    decl->type = type;
-    decl->tmp = tmp;
-    decl->name = NULL;
-
-    if (expr->type == AST_EXPR_IDENT)
-    {
-        auto ident = static_cast<AstExprIdent *>(expr);
-        decl->name = ident->str; // TODO: copy?
-    }
-
-    return tmp;
-}
-
-static i64 alloc_tmp(Ir *ir, AstExpr *expr)
-{
-    IrExprType *type = new IrExprType(); // TODO: reduce allocations
-    type->name = expr->type_defn->name;
-    type->pointer_depth = get_pointer_depth(expr->type_defn);
-
-    return alloc_tmp(ir, expr, type);
-}
-
 static i64 create_func(Ir *ir)
 {
     IrFunc *func = ir->funcs.next();
@@ -322,6 +289,14 @@ static i64 create_func(Ir *ir)
     return ir->funcs.count - 1;
 }
 
+static IrFunc *get_current_func(Ir *ir)
+{
+    assert(ir->current_func >= 0);
+    assert(ir->current_func < ir->funcs.count);
+
+    return &ir->funcs[ir->current_func];
+}
+
 static void set_current_func(Ir *ir, i64 func)
 {
     assert(func >= 0);
@@ -332,10 +307,7 @@ static void set_current_func(Ir *ir, i64 func)
 
 static i64 create_bb(Ir *ir)
 {
-    assert(ir->current_func >= 0);
-    assert(ir->current_func < ir->funcs.count);
-    IrFunc *func = &ir->funcs[ir->current_func];
-
+    IrFunc *func = get_current_func(ir);
     IrBb *bb = func->bbs.next();
 
     // Bleh.
@@ -344,6 +316,15 @@ static i64 create_bb(Ir *ir)
     bb->instrs.capacity = 0;
 
     return func->bbs.count - 1;
+}
+
+static IrBb *get_current_bb(Ir *ir)
+{
+    IrFunc *func = get_current_func(ir);
+    assert(func->current_bb >= 0);
+    assert(func->current_bb < func->bbs.count);
+
+    return &func->bbs[func->current_bb];
 }
 
 static void set_current_bb(Ir *ir, i64 bb)
@@ -359,17 +340,38 @@ static void set_current_bb(Ir *ir, i64 bb)
 
 static void add_instr(Ir *ir, IrInstr instr)
 {
-    // TODO: get_current_bb()?
-    assert(ir->current_func >= 0);
-    assert(ir->current_func < ir->funcs.count);
-    IrFunc *func = &ir->funcs[ir->current_func];
-
-    assert(func->bbs.count > 0);
-    assert(func->current_bb >= 0);
-    assert(func->current_bb < func->bbs.count);
-
-    IrBb *bb = &func->bbs[func->current_bb];
+    IrBb *bb = get_current_bb(ir);
     bb->instrs.add(instr);
+}
+
+static i64 alloc_tmp(Ir *ir, AstExpr *expr, IrExprType *type)
+{
+    Scope *top_level = get_top_level_scope(expr->scope);
+    i64 tmp = top_level->ir_tmp_counter++;
+
+    IrFunc *func = get_current_func(ir);
+
+    IrDecl *decl = func->decls.next();
+    decl->type = type;
+    decl->tmp = tmp;
+    decl->name = NULL;
+
+    if (expr->type == AST_EXPR_IDENT)
+    {
+        auto ident = static_cast<AstExprIdent *>(expr);
+        decl->name = ident->str; // TODO: copy?
+    }
+
+    return tmp;
+}
+
+static i64 alloc_tmp(Ir *ir, AstExpr *expr)
+{
+    IrExprType *type = new IrExprType(); // TODO: reduce allocations
+    type->name = expr->type_defn->name;
+    type->pointer_depth = get_pointer_depth(expr->type_defn);
+
+    return alloc_tmp(ir, expr, type);
 }
 
 static bool is_comparison(IrExpr *expr)
@@ -448,6 +450,23 @@ static bool bb_ends_with_goto(IrBb *bb)
 
     IrInstr last = bb->instrs[bb->instrs.count - 1];
     return (last.type == IR_INSTR_GOTO) || (last.type == IR_INSTR_GOTOIF);
+}
+
+static void debug_validate_bb(IrBb *bb)
+{
+    if (bb->instrs.count == 0)
+        return;
+
+    IrInstr last = bb->instrs[bb->instrs.count - 1];
+    if ((last.type != IR_INSTR_GOTO) && (last.type != IR_INSTR_GOTOIF) && (last.type != IR_INSTR_RETURN))
+        assert(false);
+}
+
+static void debug_validate_func(IrFunc *func)
+{
+    // TODO: should anything else be done here other than validating bbs?
+    foreach(func->bbs)
+        debug_validate_bb(&it);
 }
 
 static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
@@ -643,7 +662,6 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
 
             // TODO: get_current_bb()?
             IrFunc *current_func = &ir->funcs[ir->current_func];
-            i64 current_bb = current_func->current_bb;
 
             // Create the basic blocks.
             i64 then_bb = create_bb(ir);
@@ -681,7 +699,7 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
             gen_expr(ir, ast_if->block);
 
             // Don't insert a merge block goto if the block already ended with a goto.
-            if (!bb_ends_with_goto(&current_func->bbs[then_bb]))
+            if (!bb_ends_with_goto(get_current_bb(ir)))
                 add_instr(ir, merge_instr);
 
             // Make the 'else' block.
@@ -692,11 +710,16 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
                 gen_expr(ir, ast_if->else_expr);
 
                 // Don't insert a merge block goto if the block already ended with a goto.
-                if (!bb_ends_with_goto(&current_func->bbs[else_bb]))
+                if (!bb_ends_with_goto(get_current_bb(ir)))
                     add_instr(ir, merge_instr);
             }
 
             set_current_bb(ir, merge_bb);
+
+            debug_validate_bb(&current_func->bbs[then_bb]);
+            if (else_bb != -1)
+                debug_validate_bb(&current_func->bbs[else_bb]);
+            debug_validate_bb(&current_func->bbs[merge_bb]);
 
             // TODO?
             return NULL;
@@ -798,6 +821,7 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
             instr.args[0] = (IrExpr *)loop_bb; // HACK: storing the bb index as a pointer to avoid an allocation
 
             add_instr(ir, instr);
+            debug_validate_bb(get_current_bb(ir));
 
             set_current_bb(ir, merge_bb);
 
@@ -1058,6 +1082,8 @@ static void gen_func(Ir *ir, AstFunc *ast_func, i64 func_index)
     instr.type = IR_INSTR_RETURN;
     instr.arg_count = 0;
     add_instr(ir, instr);
+
+    debug_validate_func(func);
 }
 
 static void dump_expr(IrExpr *expr)
