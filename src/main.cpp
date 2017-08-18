@@ -8,7 +8,6 @@
 #include "lex.h"
 #include "parse.h"
 #include "llvm.h"
-#include "c.h"
 //#include "interp.h"
 #include "ir.h"
 
