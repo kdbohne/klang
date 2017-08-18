@@ -609,11 +609,25 @@ AstStruct *parse_struct(Parser *parser)
     return struct_;
 }
 
+static Module *make_module(AstRoot *root, char *name, Module *parent)
+{
+    Module *mod = new Module();
+    mod->name = name;
+    mod->parent = parent;
+
+    root->modules.add(mod);
+
+    return mod;
+}
+
 void parse_file(AstRoot *root, Array<Token> *tokens)
 {
     Parser parser;
     parser.tokens = tokens;
     parser.index = 0;
+
+    Module *local_module = make_module(root, NULL, NULL);
+    root->current_module = root->modules.count - 1;
 
     while (true)
     {
@@ -641,8 +655,26 @@ void parse_file(AstRoot *root, Array<Token> *tokens)
         }
         else if (tok.type == TOK_KEY_MODULE)
         {
-            // FIXME
-            assert(false);
+            eat(&parser);
+
+            // TODO: nested module name parsing
+            tok = expect(&parser, TOK_IDENT);
+
+            // TODO: Better allocation?
+            char *name = (char *)malloc(tok.len + 1);
+            string_copy(tok.str, name, tok.len);
+            name[tok.len] = '\0';
+
+            mod = make_module(root, name, mod);
+
+            expect(&parser, TOK_OPEN_BRACE);
+        }
+        else if (tok.type == TOK_CLOSE_BRACE)
+        {
+            eat(&parser);
+
+            assert(mod);
+            mod = mod->parent;
         }
         else
         {
