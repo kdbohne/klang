@@ -1,3 +1,4 @@
+#if 0
 #include "interp.h"
 #include "ast.h"
 
@@ -1544,3 +1545,4 @@ void interp_run(Interp *interp)
 
     dump_registers(interp);
 }
+#endif

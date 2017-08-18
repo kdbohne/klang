@@ -46,6 +46,8 @@ const char *token_type_names[]
     "key for",
     "key in",
     "key while",
+    "key import",
+    "key module",
 
     "eof",
     "unknown",

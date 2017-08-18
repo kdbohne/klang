@@ -621,15 +621,28 @@ void parse_file(AstRoot *root, Array<Token> *tokens)
         if (tok.type == TOK_EOF)
             break;
 
+        assert(root->current_module != -1);
+        Module *mod = root->modules[root->current_module];
+
         if ((tok.type == TOK_KEY_FN) || (tok.type == TOK_KEY_EXTERN))
         {
             AstFunc *func = parse_func(&parser);
-            root->funcs.add(func);
+            mod->funcs.add(func);
         }
         else if (tok.type == TOK_KEY_STRUCT)
         {
             AstStruct *struct_ = parse_struct(&parser);
-            root->structs.add(struct_);
+            mod->structs.add(struct_);
+        }
+        else if (tok.type == TOK_KEY_IMPORT)
+        {
+            // FIXME
+            assert(false);
+        }
+        else if (tok.type == TOK_KEY_MODULE)
+        {
+            // FIXME
+            assert(false);
         }
         else
         {

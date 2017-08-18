@@ -314,3 +314,9 @@ void copy_loc(AstNode *node, Token tok)
     node->col = tok.col;
     node->span = tok.len;
 }
+
+bool resolve_imports(AstRoot *root)
+{
+    // FIXME
+    return true;
+}

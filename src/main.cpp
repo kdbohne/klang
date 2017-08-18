@@ -41,7 +41,7 @@ static void print_help()
 
 int main(int argc, char *argv[])
 {
-    if (argc < 2)
+    if (argc != 2)
     {
         print_help();
         return 0;
@@ -49,23 +49,26 @@ int main(int argc, char *argv[])
 
     AstRoot *root = ast_alloc(AstRoot);
 
-    for (int i = 1; i < argc; ++i)
+    char *path = argv[1];
+    File file = read_file(path);
+    if (!file.src)
     {
-        char *path = argv[i];
-        File file = read_file(path);
-        if (!file.src)
-        {
-            fprintf(stderr, "Error: missing input file \"%s\"\n", path);
-            return 1;
-        }
+        fprintf(stderr, "Error: couldn't open \"%s\".\n", path);
+        return 1;
+    }
 
-        Array<Token> tokens = lex_file(file);
+    Array<Token> tokens = lex_file(file);
 #if 0
-        foreach(tokens)
-            fprintf(stderr, "%12s: '%.*s'\n", token_type_names[it.type], it.len, it.str);
+    foreach(tokens)
+        fprintf(stderr, "%12s: '%.*s'\n", token_type_names[it.type], it.len, it.str);
 #endif
 
-        parse_file(root, &tokens);
+    parse_file(root, &tokens);
+
+    if (!resolve_imports(root))
+    {
+        fprintf(stderr, "There were errors. Exiting.\n");
+        return 1;
     }
 
     if (!type_check(root))

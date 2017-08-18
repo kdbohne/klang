@@ -1,3 +1,4 @@
+#if 0
 #include "c.h"
 #include "core/array.h"
 #include "ast.h"
@@ -441,24 +442,30 @@ void c_gen_ir(AstRoot *ast)
 
     printf("\n");
 
-    foreach(ast->structs)
-        printf("typedef struct %s %s;\n", it->name->str, it->name->str);
+    for (auto &mod : ast->modules)
+    {
+        for (auto &it : mod->structs)
+            printf("typedef struct %s %s;\n", it->name->str, it->name->str);
+    }
 
     printf("\n");
 
-    foreach(ast->structs)
+    for (auto &mod : ast->modules)
     {
-        printf("struct %s\n{\n", it->name->str);
-
-        // TODO: default values
-        for (auto &field : it->fields)
+        for (auto &it : mod->structs)
         {
-            printf("    ");
-            gen_expr(field->type);
-            printf(" %s;\n", field->name->str);
-        }
+            printf("struct %s\n{\n", it->name->str);
 
-        printf("};\n\n");
+            // TODO: default values
+            for (auto &field : it->fields)
+            {
+                printf("    ");
+                gen_expr(field->type);
+                printf(" %s;\n", field->name->str);
+            }
+
+            printf("};\n\n");
+        }
     }
 
     foreach(ast->funcs)
@@ -501,3 +508,4 @@ void c_gen_ir(AstRoot *ast)
     printf("    return 0;\n");
     printf("}\n");
 }
+#endif

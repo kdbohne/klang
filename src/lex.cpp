@@ -364,6 +364,10 @@ static Token get_token(Lexer *lex)
                     tok.type = TOK_KEY_IN;
                 else if (token_matches(tok, "while"))
                     tok.type = TOK_KEY_WHILE;
+                else if (token_matches(tok, "import"))
+                    tok.type = TOK_KEY_IMPORT;
+                else if (token_matches(tok, "module"))
+                    tok.type = TOK_KEY_MODULE;
             }
             else if (is_number(c))
             {

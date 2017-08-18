@@ -586,10 +586,10 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
         case AST_EXPR_CALL:
         {
             auto call = static_cast<AstExprCall *>(expr);
-            foreach(call->args)
+            for (auto &arg : call->args)
             {
-                it->scope = call->scope;
-                it->type_defn = determine_expr_type(it);
+                arg->scope = call->scope;
+                arg->type_defn = determine_expr_type(arg);
             }
 
             auto func = scope_get_func(call->scope, call->name->str);
@@ -702,10 +702,10 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
             auto block = static_cast<AstExprBlock *>(expr);
             block->scope = make_scope(block->scope);
 
-            foreach(block->stmts)
+            for (auto &stmt : block->stmts)
             {
-                it->scope = block->scope;
-                determine_stmt_type(it);
+                stmt->scope = block->scope;
+                determine_stmt_type(stmt);
             }
 
             if (block->expr)
@@ -762,11 +762,11 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
             assert(struct_type->struct_);
 
             AstExprType *type = NULL;
-            foreach(struct_type->struct_->fields)
+            for (auto &struct_field : struct_type->struct_->fields)
             {
-                if (strings_match(it->name->str, field->name->str))
+                if (strings_match(struct_field->name->str, field->name->str))
                 {
-                    type = it->type;
+                    type = struct_field->type;
                     break;
                 }
             }
@@ -931,27 +931,29 @@ static void determine_node_types(AstRoot *root)
 {
     root->scope = make_scope(NULL);
 
-    foreach(root->funcs)
+    for (auto &mod : root->modules)
     {
-        scope_add_func(root->scope, it->name->str, it);
-        it->scope = make_scope(root->scope);
-
-        for (int i = 0; i < it->params.count; ++i)
+        for (auto &func : mod->funcs)
         {
-            auto param = it->params[i];
-            param->scope = it->scope;
+            scope_add_func(root->scope, func->name->str, func);
+            func->scope = make_scope(root->scope);
 
-            param->name->type_defn = get_type_defn(param->type);
-            scope_add_var(param->scope, param->name);
-        }
+            for (auto &param : func->params)
+            {
+                param->scope = func->scope;
 
-        if (it->ret)
-            it->ret->type_defn = get_type_defn(it->ret);
+                param->name->type_defn = get_type_defn(param->type);
+                scope_add_var(param->scope, param->name);
+            }
 
-        if (it->block)
-        {
-            it->block->scope = it->scope;
-            it->block->type_defn = determine_expr_type(it->block);
+            if (func->ret)
+                func->ret->type_defn = get_type_defn(func->ret);
+
+            if (func->block)
+            {
+                func->block->scope = func->scope;
+                func->block->type_defn = determine_expr_type(func->block);
+            }
         }
     }
 }
@@ -1004,23 +1006,23 @@ static TypeDefn *register_struct(AstStruct *struct_)
     // the struct's size and alignmentt.
     i64 size = 0;
     i64 alignment = 0;
-    foreach(struct_->fields)
+    for (auto &field : struct_->fields)
     {
-        it->type_defn = get_type_defn(it->type);
-        assert(it->type_defn->size > 0);
-        assert(it->type_defn->alignment > 0);
+        field->type_defn = get_type_defn(field->type);
+        assert(field->type_defn->size > 0);
+        assert(field->type_defn->alignment > 0);
 
-        it->offset = size;
+        field->offset = size;
 
         // Pad the field to satisfy its own alignment.
-        if (size % it->type_defn->alignment > 0)
-            it->offset += it->type_defn->alignment - (it->offset % it->type_defn->alignment);
+        if (size % field->type_defn->alignment > 0)
+            field->offset += field->type_defn->alignment - (field->offset % field->type_defn->alignment);
 
-        size = it->offset + it->type_defn->size;
+        size = field->offset + field->type_defn->size;
 
         // The struct's alignment is the maximum alignment of its fields.
-        if (it->type_defn->alignment > alignment)
-            alignment = it->type_defn->alignment;
+        if (field->type_defn->alignment > alignment)
+            alignment = field->type_defn->alignment;
     }
 
     size += size % alignment;
@@ -1066,19 +1068,26 @@ bool type_check(AstRoot *root)
 
     register_type_defn("c_void", -1);
 
+    // FIXME: use modules
     // TODO: register these to scoped type tables instead of dumping
     // all of them into the global type table?
-    foreach(root->structs)
-        register_struct(it);
+    for (auto &mod : root->modules)
+    {
+        for (auto &struct_ : mod->structs)
+            register_struct(struct_);
+    }
 
     determine_node_types(root);
 
-    foreach(root->funcs)
+    for (auto &mod : root->modules)
     {
-        if (it->flags & FUNC_IS_EXTERN)
-            continue;
+        for (auto &func : mod->funcs)
+        {
+            if (func->flags & FUNC_IS_EXTERN)
+                continue;
 
-        type_check_func(it);
+            type_check_func(func);
+        }
     }
 
     return (global_error_count == 0);

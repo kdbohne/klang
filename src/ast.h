@@ -74,6 +74,8 @@ enum AstNodeType : u32
     AST_STRUCT,
     AST_STRUCT_FIELD,
 
+    AST_IMPORT,
+
     AST_ERR,
 };
 
@@ -85,6 +87,15 @@ struct Bb
     Bb *false_ = NULL;
 };
 
+struct Module
+{
+    char *name = NULL;
+    Array<AstFunc *> funcs;
+    Array<AstStruct *> structs;
+
+    Module *parent = NULL;
+};
+
 struct AstNode
 {
     AstNode(AstNodeType type_) : type(type_) {}
@@ -93,6 +104,7 @@ struct AstNode
 
     TypeDefn *type_defn = NULL;
     Scope *scope = NULL;
+    Module *module = NULL;
 
     Bb *bb = NULL;
 
@@ -107,8 +119,8 @@ struct AstRoot : AstNode
 {
     AstRoot() : AstNode(AST_ROOT) {}
 
-    Array<AstFunc *> funcs;
-    Array<AstStruct *> structs;
+    Array<Module *> modules;
+    i64 current_module = -1;
 };
 
 struct AstExpr : AstNode
@@ -415,6 +427,14 @@ struct AstStructField : AstNode
     i64 offset = 0;
 };
 
+struct AstImport : AstNode
+{
+    AstImport() : AstNode(AST_IMPORT) {}
+
+    // TODO: nested modules
+    AstExprIdent *name = NULL;
+};
+
 // TODO: this is really bad; use a pool allocator (one for each type?)
 #define ast_alloc(Type) (new Type())
 
@@ -429,5 +449,7 @@ AstExprAssign *make_assign(AstExpr *lhs, AstExpr *rhs);
 AstStmt *make_stmt(AstExpr *expr);
 
 void copy_loc(AstNode *node, Token tok);
+
+bool resolve_imports(AstRoot *root);
 
 void debug_dump(AstRoot *root);

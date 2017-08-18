@@ -12,8 +12,6 @@ extern "C"
 #define ARRAY_INITIAL_CAPACITY 8
 #define ARRAY_GROWTH_RATE      1.5
 
-#define foreach(array) for (auto &it : array)
-
 template<typename T>
 struct Array
 {

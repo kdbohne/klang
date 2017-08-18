@@ -252,11 +252,11 @@ static void gen_struct(Ir *ir, AstStruct *ast_struct)
     struct_->fields.count = 0;
     struct_->fields.capacity = 0;
 
-    foreach(ast_struct->fields)
+    for (auto &field : ast_struct->fields)
     {
         IrExprType *type = new IrExprType();
-        type->name = it->type->name->str;
-        type->pointer_depth = it->type->pointer_depth;
+        type->name = field->type->name->str;
+        type->pointer_depth = field->type->pointer_depth;
 
         struct_->fields.add(type);
     }
@@ -465,8 +465,8 @@ static void debug_validate_bb(IrBb *bb)
 static void debug_validate_func(IrFunc *func)
 {
     // TODO: should anything else be done here other than validating bbs?
-    foreach(func->bbs)
-        debug_validate_bb(&it);
+    for (auto &bb : func->bbs)
+        debug_validate_bb(&bb);
 }
 
 static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
@@ -585,18 +585,18 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
 
             // TODO: handle overloads if they are added as a feature
             // Find the matching function and cache it for later use.
-            foreach(ir->funcs)
+            for (auto &func : ir->funcs)
             {
-                if (strings_match(it.name, ast_call->name->str))
-                    call->func = &it;
+                if (strings_match(func.name, ast_call->name->str))
+                    call->func = &func;
             }
             assert(call->func);
 
-            foreach(ast_call->args)
+            for (auto &ast_arg : ast_call->args)
             {
-                IrExpr *arg = gen_expr(ir, it);
+                IrExpr *arg = gen_expr(ir, ast_arg);
 
-                IrExpr *tmp = flatten_expr(ir, it, arg);
+                IrExpr *tmp = flatten_expr(ir, ast_arg, arg);
                 call->args.add(tmp);
             }
 
@@ -727,13 +727,13 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
         case AST_EXPR_BLOCK:
         {
             auto block = static_cast<AstExprBlock *>(expr);
-            foreach(block->stmts)
+            for (auto &stmt : block->stmts)
             {
-                switch (it->type)
+                switch (stmt->type)
                 {
                     case AST_STMT_SEMI:
                     {
-                        auto semi = static_cast<AstStmtSemi *>(it);
+                        auto semi = static_cast<AstStmtSemi *>(stmt);
                         gen_expr(ir, semi->expr);
                     }
                     case AST_STMT_DECL:
@@ -850,9 +850,6 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
             auto it = static_cast<AstExprIdent *>(ast_for->it);
             auto range = static_cast<AstExprRange *>(ast_for->range);
 
-            // TODO: this could be made much neater by making make_x() helpers
-            // for various AST nodes.
-
             // This block encloses the loop and the iterator, i.e.
             // {
             //     let it = ..
@@ -865,7 +862,7 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
             //         };
             //     };
             // }
-            auto enclosing_block = new AstExprBlock();
+            auto enclosing_block = ast_alloc(AstExprBlock);
 
             // Make the iterator initializer.
             auto assign = make_assign(it, range->start);
@@ -876,18 +873,17 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
             cond->type_defn = it->type_defn;
             cond->scope = ast_for->block->scope;
 
-            auto if_ = new AstExprIf();
+            auto if_ = ast_alloc(AstExprIf);
             if_->cond = cond;
-            if_->block = new AstExprBlock();
+            if_->block = ast_alloc(AstExprBlock);
 
-            auto else_block = new AstExprBlock();
-            else_block->stmts.add(make_stmt(new AstExprBreak()));
-
+            auto else_block = ast_alloc(AstExprBlock);
+            else_block->stmts.add(make_stmt(ast_alloc(AstExprBreak)));
             if_->else_expr = else_block;
 
             // Generate the main body.
-            for (i64 i = 0; i < ast_for->block->stmts.count; ++i)
-                if_->block->stmts.add(ast_for->block->stmts[i]);
+            for (auto &stmt : ast_for->block->stmts)
+                if_->block->stmts.add(stmt);
 
             // TODO: avoid allocating 'one' each time!
             // TODO: match iterator type?
@@ -905,8 +901,8 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
             if_->block->stmts.add(make_stmt(inc));
 
             // Make the actual loop block.
-            auto loop = new AstExprLoop();
-            loop->block = new AstExprBlock();
+            auto loop = ast_alloc(AstExprLoop);
+            loop->block = ast_alloc(AstExprBlock);
 
             loop->block->stmts.add(make_stmt(if_));
 
@@ -930,9 +926,6 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
         {
             auto ast_while = static_cast<AstExprWhile *>(expr);
 
-            // TODO: this could be made much neater by making make_x() helpers
-            // for various AST nodes.
-
             // loop {
             //     if (cond) {
             //         // body
@@ -943,30 +936,24 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
             //
 
             // Make the comparison at the top of the while-block.
-            auto stmt = new AstStmtSemi();
-
-            auto if_ = new AstExprIf();
+            auto if_ = ast_alloc(AstExprIf);
             if_->cond = ast_while->cond;
-            if_->block = new AstExprBlock();
+            if_->block = ast_alloc(AstExprBlock);
 
-            auto else_block = new AstExprBlock();
-            stmt = new AstStmtSemi();
-            stmt->expr = new AstExprBreak();
-            else_block->stmts.add(stmt);
+            auto else_block = ast_alloc(AstExprBlock);
+            else_block->stmts.add(make_stmt(ast_alloc(AstExprBreak)));
 
             if_->else_expr = else_block;
 
             // Generate the main body.
-            foreach(ast_while->block->stmts)
-                if_->block->stmts.add(it);
+            for (auto &stmt : ast_while->block->stmts)
+                if_->block->stmts.add(stmt);
 
             // Make the desugared loop.
-            auto loop = new AstExprLoop();
-            loop->block = new AstExprBlock();
+            auto loop = ast_alloc(AstExprLoop);
+            loop->block = ast_alloc(AstExprBlock);
 
-            stmt = new AstStmtSemi();
-            stmt->expr = if_;
-            loop->block->stmts.add(stmt);
+            loop->block->stmts.add(make_stmt(if_));
 
             // The while loop has been fully desugared into a simple loop.
             // Generate that loop now.
@@ -1248,18 +1235,18 @@ static void dump_expr(IrExpr *expr)
 
 static void dump_ir(Ir *ir)
 {
-    foreach(ir->structs)
+    for (auto &struct_ : ir->structs)
     {
-        fprintf(stderr, "type %s { ", it.name);
-        for (i64 i = 0; i < it.fields.count; ++i)
+        fprintf(stderr, "type %s { ", struct_.name);
+        for (i64 i = 0; i < struct_.fields.count; ++i)
         {
-            auto field_type = it.fields[i];
+            auto field_type = struct_.fields[i];
 
             for (i64 j = 0; j < field_type->pointer_depth; ++j)
                 fprintf(stderr, "*");
             fprintf(stderr, "%s", field_type->name);
 
-            if (i < it.fields.count - 1)
+            if (i < struct_.fields.count - 1)
                 fprintf(stderr, ",");
             fprintf(stderr, " ");
         }
@@ -1268,53 +1255,51 @@ static void dump_ir(Ir *ir)
     if (ir->structs.count > 0)
         fprintf(stderr, "\n");
 
-    for (i64 i = 0; i < ir->funcs.count; ++i)
+    for (auto &func : ir->funcs)
     {
-        IrFunc *func = &ir->funcs[i];
-
         // Function signature.
-        fprintf(stderr, "fn %s(", func->name);
-        for (i64 j = 0; j < func->params.count; ++j)
+        fprintf(stderr, "fn %s(", func.name);
+        for (i64 j = 0; j < func.params.count; ++j)
         {
-            IrParam *param = &func->params[j];
+            IrParam *param = &func.params[j];
 
             fprintf(stderr, "_%ld ", param->tmp);
             dump_expr(param->type);
 
-            if (j < func->params.count - 1)
+            if (j < func.params.count - 1)
                 fprintf(stderr, ", ");
         }
         fprintf(stderr, ")");
 
-        if (func->ret)
+        if (func.ret)
         {
             fprintf(stderr, " -> ");
-            dump_expr(func->ret);
+            dump_expr(func.ret);
         }
         fprintf(stderr, " {\n");
 
-        foreach(func->decls)
+        for (auto &decl : func.decls)
         {
-            fprintf(stderr, "    let _%ld ", it.tmp);
-            dump_expr(it.type);
+            fprintf(stderr, "    let _%ld ", decl.tmp);
+            dump_expr(decl.type);
             fprintf(stderr, ";");
 
-            if (it.name)
-                fprintf(stderr, " // %s", it.name);
+            if (decl.name)
+                fprintf(stderr, " // %s", decl.name);
             fprintf(stderr, "\n");
         }
 
-        if ((func->decls.count > 0) && (func->bbs.count > 0))
+        if ((func.decls.count > 0) && (func.bbs.count > 0))
             fprintf(stderr, "\n");
 
-        for (i64 j = 0; j < func->bbs.count; ++j)
+        for (i64 j = 0; j < func.bbs.count; ++j)
         {
             fprintf(stderr, "    bb%ld: {\n", j);
 
-            foreach(func->bbs[j].instrs)
+            for (auto &instr : func.bbs[j].instrs)
             {
                 fprintf(stderr, "        ");
-                switch (it.type)
+                switch (instr.type)
                 {
                     case IR_INSTR_SEMI:
                     {
@@ -1324,11 +1309,11 @@ static void dump_ir(Ir *ir)
                     }
                     case IR_INSTR_ASSIGN:
                     {
-                        assert(it.arg_count == 2);
+                        assert(instr.arg_count == 2);
 
-                        dump_expr(it.args[0]);
+                        dump_expr(instr.args[0]);
                         fprintf(stderr, " = ");
-                        dump_expr(it.args[1]);
+                        dump_expr(instr.args[1]);
 
                         break;
                     }
@@ -1339,22 +1324,22 @@ static void dump_ir(Ir *ir)
                     }
                     case IR_INSTR_GOTO:
                     {
-                        assert(it.arg_count == 1);
+                        assert(instr.arg_count == 1);
 
-                        i64 bb = (i64)it.args[0];
+                        i64 bb = (i64)instr.args[0];
                         fprintf(stderr, "goto bb%ld", bb);
 
                         break;
                     }
                     case IR_INSTR_GOTOIF:
                     {
-                        assert(it.arg_count == 3);
+                        assert(instr.arg_count == 3);
 
-                        i64 true_bb = (i64)it.args[1];
-                        i64 false_bb = (i64)it.args[2];
+                        i64 true_bb = (i64)instr.args[1];
+                        i64 false_bb = (i64)instr.args[2];
 
                         fprintf(stderr, "gotoif ");
-                        dump_expr(it.args[0]);
+                        dump_expr(instr.args[0]);
                         fprintf(stderr, " bb%ld bb%ld", true_bb, false_bb);
 
                         break;
@@ -1369,7 +1354,7 @@ static void dump_ir(Ir *ir)
             }
 
             fprintf(stderr, "    }\n");
-            if (j < func->bbs.count - 1)
+            if (j < func.bbs.count - 1)
                 fprintf(stderr, "\n");
         }
 
@@ -1627,22 +1612,22 @@ static void dump_c(Ir *ir)
     printf("#define c_void void\n");
     printf("\n");
 
-    foreach(ir->structs)
-        printf("typedef struct %s %s;\n", it.name, it.name);
+    for (auto &struct_ : ir->structs)
+        printf("typedef struct %s %s;\n", struct_.name, struct_.name);
     if (ir->structs.count > 0)
         printf("\n");
 
-    foreach(ir->structs)
+    for (auto &struct_ : ir->structs)
     {
-        printf("struct %s {\n", it.name);
-        for (i64 i = 0; i < it.fields.count; ++i)
+        printf("struct %s {\n", struct_.name);
+        for (i64 i = 0; i < struct_.fields.count; ++i)
         {
-            IrExprType *type = it.fields[i];
+            auto field = struct_.fields[i];
 
             printf("    ");
 
-            dump_c_expr(type);
-            if (type->pointer_depth == 0)
+            dump_c_expr(field);
+            if (field->pointer_depth == 0)
                 printf(" ");
 
             printf("_%ld;\n", i);
@@ -1650,66 +1635,65 @@ static void dump_c(Ir *ir)
         printf("};\n\n");
     }
 
-    foreach(ir->funcs)
+    for (auto &func : ir->funcs)
     {
-        dump_c_func_signature(&it);
+        dump_c_func_signature(&func);
         printf(";\n");
     }
     if (ir->funcs.count > 0)
         printf("\n");
 
-    for (i64 i = 0; i < ir->funcs.count; ++i)
+    for (auto &func : ir->funcs)
     {
-        IrFunc *func = &ir->funcs[i];
-        if (func->flags & IR_FUNC_IS_EXTERN)
+        if (func.flags & IR_FUNC_IS_EXTERN)
             continue;
 
-        dump_c_func_signature(func);
+        dump_c_func_signature(&func);
         printf(" {\n");
 
-        foreach(func->decls)
+        for (auto &decl : func.decls)
         {
             printf("    ");
 
-            dump_c_expr(it.type);
-            if (it.type->pointer_depth == 0)
+            dump_c_expr(decl.type);
+            if (decl.type->pointer_depth == 0)
                 printf(" ");
 
-            printf("_%ld;", it.tmp);
+            printf("_%ld;", decl.tmp);
 
-            if (it.name)
-                printf(" // %s", it.name);
+            if (decl.name)
+                printf(" // %s", decl.name);
             printf("\n");
         }
 
-        if ((func->decls.count > 0) && (func->bbs.count > 0))
+        if ((func.decls.count > 0) && (func.bbs.count > 0))
             printf("\n");
 
-        for (i64 j = 0; j < func->bbs.count; ++j)
+        for (i64 j = 0; j < func.bbs.count; ++j)
         {
             printf("bb%ld:\n", j);
 
-            foreach(func->bbs[j].instrs)
+            for (auto &instr : func.bbs[j].instrs)
             {
                 printf("    ");
-                switch (it.type)
+                switch (instr.type)
                 {
                     case IR_INSTR_SEMI:
                     {
-                        assert(it.arg_count == 1);
+                        assert(instr.arg_count == 1);
 
-                        dump_c_expr(it.args[0]);
+                        dump_c_expr(instr.args[0]);
                         // The semicolon is already handled after the switch.
 
                         break;
                     }
                     case IR_INSTR_ASSIGN:
                     {
-                        assert(it.arg_count == 2);
+                        assert(instr.arg_count == 2);
 
-                        dump_c_expr(it.args[0]);
+                        dump_c_expr(instr.args[0]);
                         printf(" = ");
-                        dump_c_expr(it.args[1]);
+                        dump_c_expr(instr.args[1]);
 
                         break;
                     }
@@ -1717,28 +1701,28 @@ static void dump_c(Ir *ir)
                     {
                         // FIXME: void
                         printf("return");
-                        if (func->ret)
+                        if (func.ret)
                             printf(" _0");
                         break;
                     }
                     case IR_INSTR_GOTO:
                     {
-                        assert(it.arg_count == 1);
+                        assert(instr.arg_count == 1);
 
-                        i64 bb = (i64)it.args[0];
+                        i64 bb = (i64)instr.args[0];
                         printf("goto bb%ld", bb);
 
                         break;
                     }
                     case IR_INSTR_GOTOIF:
                     {
-                        assert(it.arg_count == 3);
+                        assert(instr.arg_count == 3);
 
-                        i64 true_bb = (i64)it.args[1];
-                        i64 false_bb = (i64)it.args[2];
+                        i64 true_bb = (i64)instr.args[1];
+                        i64 false_bb = (i64)instr.args[2];
 
                         printf("if (");
-                        dump_c_expr(it.args[0]);
+                        dump_c_expr(instr.args[0]);
                         printf(") goto bb%ld; else goto bb%ld", true_bb, false_bb);
 
                         break;
@@ -1752,7 +1736,7 @@ static void dump_c(Ir *ir)
                 printf(";\n");
             }
 
-            if (j < func->bbs.count - 1)
+            if (j < func.bbs.count - 1)
                 printf("\n");
         }
 
@@ -1769,13 +1753,21 @@ void gen_ir(AstRoot *ast)
 {
     Ir ir;
 
-    foreach(ast->structs)
-        gen_struct(&ir, it);
+    for (auto &mod : ast->modules)
+    {
+        // FIXME: mangling
+        for (auto &struct_ : mod->structs)
+            gen_struct(&ir, struct_);
+    }
 
-    foreach(ast->funcs)
-        gen_func_prototype(&ir, it);
-    for (i64 i = 0; i < ast->funcs.count; ++i)
-        gen_func(&ir, ast->funcs[i], i);
+    for (auto &mod : ast->modules)
+    {
+        // FIXME: mangling
+        for (auto &func : mod->funcs)
+            gen_func_prototype(&ir, func);
+        for (i64 i = 0; i < mod->funcs.count; ++i)
+            gen_func(&ir, mod->funcs[i], i);
+    }
 
 //    dump_ir(&ir);
     dump_c(&ir);
