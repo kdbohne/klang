@@ -775,6 +775,13 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
             field->type_defn = get_type_defn(type);
             field->expr->type_defn = lhs_type;
 
+            if (!field->type_defn->struct_)
+            {
+                report_error("Accessing member of unknown struct type: \"%s\".\n",
+                             field->expr,
+                             get_type_string(struct_type));
+            }
+
             return field->type_defn;
         }
         case AST_EXPR_LOOP:

@@ -102,6 +102,17 @@ void scope_add_var(Scope *scope, AstExprIdent *name)
     scope->vars.insert(name->str, var);
 }
 
+Module *make_module(AstRoot *root, char *name, Module *parent)
+{
+    Module *mod = new Module();
+    mod->name = name;
+    mod->parent = parent;
+
+    root->modules.add(mod);
+
+    return mod;
+}
+
 const char *bin_op_strings[] =
 {
     "+",  // BIN_ADD

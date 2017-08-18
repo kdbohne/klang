@@ -96,6 +96,8 @@ struct Module
     Module *parent = NULL;
 };
 
+Module *make_module(AstRoot *root, char *name, Module *parent);
+
 struct AstNode
 {
     AstNode(AstNodeType type_) : type(type_) {}
@@ -120,6 +122,7 @@ struct AstRoot : AstNode
     AstRoot() : AstNode(AST_ROOT) {}
 
     Array<Module *> modules;
+    i64 global_module = -1;
     i64 current_module = -1;
 };
 

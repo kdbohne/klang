@@ -609,25 +609,13 @@ AstStruct *parse_struct(Parser *parser)
     return struct_;
 }
 
-static Module *make_module(AstRoot *root, char *name, Module *parent)
-{
-    Module *mod = new Module();
-    mod->name = name;
-    mod->parent = parent;
-
-    root->modules.add(mod);
-
-    return mod;
-}
-
 void parse_file(AstRoot *root, Array<Token> *tokens)
 {
     Parser parser;
     parser.tokens = tokens;
     parser.index = 0;
 
-    Module *local_module = make_module(root, NULL, NULL);
-    root->current_module = root->modules.count - 1;
+    root->current_module = root->global_module;
 
     while (true)
     {
@@ -650,8 +638,10 @@ void parse_file(AstRoot *root, Array<Token> *tokens)
         }
         else if (tok.type == TOK_KEY_IMPORT)
         {
-            // FIXME
-            assert(false);
+            // Imports are handled in main.cpp, so ignore them here.
+            eat(&parser);
+            eat(&parser);
+            eat(&parser);
         }
         else if (tok.type == TOK_KEY_MODULE)
         {

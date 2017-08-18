@@ -47,8 +47,27 @@ int main(int argc, char *argv[])
     }
 
     AstRoot *root = ast_alloc(AstRoot);
+    make_module(root, NULL, NULL);
+    root->global_module = root->modules.count - 1;
 
     char *path = argv[1];
+
+    // TODO: cleanup
+    char *dir = path + string_length(path) - 1;
+    while ((*dir != '/') && (dir >= path))
+        --dir;
+    i64 dir_len = dir - path;
+    if (dir_len > 0)
+    {
+        dir = (char *)malloc(dir_len + 1);
+        string_copy(path, dir, dir_len);
+        dir[dir_len] = '\0';
+    }
+    else
+    {
+        dir = NULL;
+    }
+
     File file = read_file(path);
     if (!file.src)
     {
@@ -62,13 +81,36 @@ int main(int argc, char *argv[])
         fprintf(stderr, "%12s: '%.*s'\n", token_type_names[it.type], it.len, it.str);
 #endif
 
-    parse_file(root, &tokens);
-
-    if (!resolve_imports(root))
+    for (i64 i = 0; i < tokens.count; ++i)
     {
-        fprintf(stderr, "There were errors. Exiting.\n");
-        return 1;
+        if (tokens[i].type == TOK_KEY_IMPORT)
+        {
+            assert(i < tokens.count - 2);
+
+            Token tok = tokens[i + 1];
+            assert(tok.type == TOK_STR);
+
+            static char buf[256];
+            if (dir)
+                snprintf(buf, sizeof(buf), "%s/%.*s", dir, tok.len, tok.str);
+            else
+                snprintf(buf, sizeof(buf), "%.*s", tok.len, tok.str);
+
+            file = read_file(buf);
+            if (!file.src)
+            {
+                fprintf(stderr, "Error: couldn't open imported file \"%s\".\n", buf);
+                return 1;
+            }
+
+            Array<Token> import_tokens = lex_file(file);
+            parse_file(root, &import_tokens);
+
+            // TODO: free file at end of main()?
+        }
     }
+
+    parse_file(root, &tokens);
 
     if (!type_check(root))
     {
