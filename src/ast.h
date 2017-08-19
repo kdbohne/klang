@@ -79,14 +79,6 @@ enum AstNodeType : u32
     AST_ERR,
 };
 
-struct Bb
-{
-    i64 index = -1;
-
-    Bb *true_ = NULL;
-    Bb *false_ = NULL;
-};
-
 struct Module
 {
     char *name = NULL;
@@ -107,8 +99,6 @@ struct AstNode
     TypeDefn *type_defn = NULL;
     Scope *scope = NULL;
     Module *module = NULL;
-
-    Bb *bb = NULL;
 
     // Location info for error reporting.
     File file;
