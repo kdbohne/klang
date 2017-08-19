@@ -1,2 +1,10 @@
-[ ] Operator precedence
-[ ] Immutable arguments
+Language Features
+    [ ] Operator precedence
+    [ ] Immutable arguments
+
+Modules
+    [ ] Clean up interactions between modules and types
+
+Types
+    [ ] Clean up pointer depth handling
+    [x] register_global_type_defn()

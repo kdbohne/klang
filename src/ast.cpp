@@ -286,7 +286,7 @@ AstExprLit *make_lit_int(IntType type, u32 flags, u64 value)
 
     // FIXME: support other types
     assert(type == INT_I64);
-    lit->type_defn = get_type_defn("i64");
+    lit->type_defn = get_global_type_defn("i64");
 
     return lit;
 }

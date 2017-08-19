@@ -1,6 +1,7 @@
 import "module.k";
 
 fn main() {
+    let x = 4;
 /*
     let t0 test::Thing;
     t0.x = 3;

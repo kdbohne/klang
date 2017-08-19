@@ -18,15 +18,14 @@ do { \
     ++global_error_count; \
 } while (0)
 
-// TODO: size?
-TypeDefn global_type_defns[512];
-static i32 global_type_defns_count;
+static Module *global_module;
 
 static i32 global_error_count;
 
-static void determine_stmt_type(AstStmt *stmt);
-static TypeDefn *determine_expr_type(AstExpr *expr);
+static void determine_stmt_type(Module *module, AstStmt *stmt);
+static TypeDefn *determine_expr_type(Module *module, AstExpr *expr);
 
+#if 0
 static void dump_type_defns()
 {
     for (int i = 0; i < global_type_defns_count; ++i)
@@ -35,6 +34,7 @@ static void dump_type_defns()
         fprintf(stderr, "%s\n", defn->name);
     }
 }
+#endif
 
 static char *get_type_string(TypeDefn *defn)
 {
@@ -44,7 +44,7 @@ static char *get_type_string(TypeDefn *defn)
     if (!defn)
         return (char *)null_type_string;
 
-    int depth = get_pointer_depth(defn);
+    int depth = get_ptr_depth(defn);
     assert(depth < string_length(xxx_hack));
 
     // FIXME: memory leak
@@ -55,19 +55,19 @@ static char *get_type_string(TypeDefn *defn)
     return buf;
 }
 
-TypeDefn *get_type_defn(const char *name, int pointer_depth)
+TypeDefn *get_type_defn(Module *module, const char *name, int ptr_depth)
 {
     // TODO: optimize if needed
 
     TypeDefn *base_type = NULL;
-    for (int i = 0; i < global_type_defns_count; ++i)
+    for (int i = 0; i < module->type_defns_count; ++i)
     {
-        TypeDefn *defn = &global_type_defns[i];
+        TypeDefn *defn = &module->type_defns[i];
         if (!strings_match(defn->name, name))
             continue;
 
-        int depth = get_pointer_depth(defn);
-        if (depth == pointer_depth)
+        int depth = get_ptr_depth(defn);
+        if (depth == ptr_depth)
             return defn;
 
         if (depth == 0)
@@ -81,51 +81,92 @@ TypeDefn *get_type_defn(const char *name, int pointer_depth)
     {
         TypeDefn *parent = base_type;
 
-        if (pointer_depth > 1)
+        if (ptr_depth > 1)
         {
-            for (int i = 0; i < pointer_depth - 1; ++i)
-                parent = get_type_defn(parent->name, 1);
+            for (int i = 0; i < ptr_depth - 1; ++i)
+                parent = get_type_defn(module, parent->name, 1);
         }
 
-        TypeDefn *defn = &global_type_defns[global_type_defns_count++];
+        assert(module->type_defns_count < (sizeof(module->type_defns) / sizeof(module->type_defns[0])));
+        TypeDefn *defn = &module->type_defns[module->type_defns_count++];
         defn->name = string_duplicate(name);
         defn->size = 8; // 64-bit pointer size.
         defn->alignment = defn->size;
-        defn->struct_ = NULL;
+        defn->struct_ = base_type->struct_;
         defn->ptr = parent;
 
         return defn;
     }
 
-    static const char *xxx_hack = "***********************";
-    assert(pointer_depth < string_length(xxx_hack));
-    report_error_anon("Unknown type \"%.*s%s\".\n", pointer_depth, xxx_hack, name);
+    // Check parent modules until the type is found or no more parent modules exist.
+    if (module->parent)
+    {
+        return get_type_defn(module->parent, name, ptr_depth);
+    }
+    else
+    {
+        static const char *xxx_hack = "***********************";
+        assert(ptr_depth < string_length(xxx_hack));
+        report_error_anon("Unknown type \"%.*s%s\".\n", ptr_depth, xxx_hack, name);
 
-    return NULL;
+        return NULL;
+    }
 }
 
-static TypeDefn *get_type_defn(AstExprType *type)
+static TypeDefn *get_type_defn(Module *module, AstExprType *type)
 {
-    return get_type_defn(type->name->str, type->pointer_depth);
+    return get_type_defn(module, type->name->str, type->ptr_depth);
 }
+
+TypeDefn *get_global_type_defn(const char *name, int ptr_depth)
+{
+    assert(global_module);
+    return get_type_defn(global_module, name, ptr_depth);
+}
+
+#if 0
+bool types_match(TypeDefn *a, TypeDefn *b)
+{
+    if (a->module != b->module)
+        return false;
+
+    if (a->ptr != b->ptr)
+        return false;
+    if (a->ptr_depth != b->ptr_depth)
+        return false;
+
+    if (!strings_match(a->name, b->name))
+        return false;
+
+    // These should never differ if the above checks already passed.
+    assert(a->struct_ == b->struct_);
+    assert(a->size == b->size);
+    assert(a->alignment == b->alignment);
+
+    return true;
+}
+#endif
 
 static TypeDefn *get_pointer_to(TypeDefn *defn)
 {
-    int depth = get_pointer_depth(defn) + 1;
+    int depth = get_ptr_depth(defn) + 1;
+    Module *module = defn->module;
 
+    // TODO: better way of doing pointer depth
     // Check if a pointer to the type already exists.
-    for (int i = 0; i < global_type_defns_count; ++i)
+    for (int i = 0; i < module->type_defns_count; ++i)
     {
-        TypeDefn *cand = &global_type_defns[i];
+        TypeDefn *cand = &module->type_defns[i];
         if (!strings_match(cand->name, defn->name))
             continue;
 
-        int cand_depth = get_pointer_depth(cand);
+        int cand_depth = get_ptr_depth(cand);
         if (cand_depth == depth)
             return cand;
     }
 
-    TypeDefn *new_defn = &global_type_defns[global_type_defns_count++];
+    assert(module->type_defns_count < (sizeof(module->type_defns) / sizeof(module->type_defns[0])));
+    TypeDefn *new_defn = &module->type_defns[module->type_defns_count++];
     new_defn->name = defn->name;
     new_defn->size = 8; // 64-bit pointer size.
     new_defn->alignment = new_defn->size;
@@ -138,7 +179,7 @@ static TypeDefn *get_pointer_to(TypeDefn *defn)
 // NOTE: expr is only passed for error reporting purposes.
 static TypeDefn *get_deref(AstExpr *expr, TypeDefn *defn)
 {
-    int depth = get_pointer_depth(defn) - 1;
+    int depth = get_ptr_depth(defn) - 1;
     if (depth < 0)
     {
         report_error("Dereferencing non-pointer type \"%s\".\n",
@@ -147,15 +188,17 @@ static TypeDefn *get_deref(AstExpr *expr, TypeDefn *defn)
         return NULL;
     }
 
+    Module *module = defn->module;
+
     // Check if a pointer to the type already exists.
     TypeDefn *parent = NULL;
-    for (int i = 0; i < global_type_defns_count; ++i)
+    for (int i = 0; i < module->type_defns_count; ++i)
     {
-        TypeDefn *cand = &global_type_defns[i];
+        TypeDefn *cand = &module->type_defns[i];
         if (!strings_match(cand->name, defn->name))
             continue;
 
-        int cand_depth = get_pointer_depth(cand);
+        int cand_depth = get_ptr_depth(cand);
         if (cand_depth == depth - 1)
             parent = cand;
 
@@ -166,7 +209,8 @@ static TypeDefn *get_deref(AstExpr *expr, TypeDefn *defn)
     if (depth > 0)
         assert(parent != NULL);
 
-    TypeDefn *new_defn = &global_type_defns[global_type_defns_count++];
+    assert(module->type_defns_count < (sizeof(module->type_defns) / sizeof(module->type_defns[0])));
+    TypeDefn *new_defn = &module->type_defns[module->type_defns_count++];
     new_defn->name = defn->name;
     new_defn->struct_ = defn->struct_;
     new_defn->ptr = parent;
@@ -185,7 +229,7 @@ static TypeDefn *get_deref(AstExpr *expr, TypeDefn *defn)
     return NULL;
 }
 
-int get_pointer_depth(TypeDefn *defn)
+int get_ptr_depth(TypeDefn *defn)
 {
     int depth = 0;
     while (defn->ptr)
@@ -354,32 +398,32 @@ static void check_int_overflow(AstExprLit *lit)
     }
 }
 
-static TypeDefn *narrow_lit_type(TypeDefn *target, AstExprLit *lit)
+static TypeDefn *narrow_lit_type(Module *module, TypeDefn *target, AstExprLit *lit)
 {
     assert(target);
 
     // Do nothing for non-integers.
     // TODO: are there other types that need to be narrowed?
     if (lit->lit_type != LIT_INT)
-        return determine_expr_type(lit);
+        return determine_expr_type(module, lit);
 
     // TODO: optimize
     // TODO: floating-point
-    if (target == get_type_defn("i8"))
+    if (target == get_global_type_defn("i8"))
         lit->value_int.type = INT_I8;
-    else if (target == get_type_defn("i16"))
+    else if (target == get_global_type_defn("i16"))
         lit->value_int.type = INT_I16;
-    else if (target == get_type_defn("i32"))
+    else if (target == get_global_type_defn("i32"))
         lit->value_int.type = INT_I32;
-    else if (target == get_type_defn("i64"))
+    else if (target == get_global_type_defn("i64"))
         lit->value_int.type = INT_I64;
-    else if (target == get_type_defn("u8"))
+    else if (target == get_global_type_defn("u8"))
         lit->value_int.type = INT_U8;
-    else if (target == get_type_defn("u16"))
+    else if (target == get_global_type_defn("u16"))
         lit->value_int.type = INT_U16;
-    else if (target == get_type_defn("u32"))
+    else if (target == get_global_type_defn("u32"))
         lit->value_int.type = INT_U32;
-    else if (target == get_type_defn("u64"))
+    else if (target == get_global_type_defn("u64"))
         lit->value_int.type = INT_U64;
     else
         assert(false);
@@ -390,7 +434,7 @@ static TypeDefn *narrow_lit_type(TypeDefn *target, AstExprLit *lit)
     return lit->type_defn;
 }
 
-static bool try_narrow_lit_type(AstExpr *lhs, AstExpr *rhs)
+static bool try_narrow_lit_type(Module *module, AstExpr *lhs, AstExpr *rhs)
 {
     // Make sure the literal is on the rhs.
     if ((rhs->type != AST_EXPR_LIT) && (rhs->type != AST_EXPR_UN))
@@ -407,7 +451,7 @@ static bool try_narrow_lit_type(AstExpr *lhs, AstExpr *rhs)
     if (rhs->type == AST_EXPR_LIT)
     {
         auto lit = static_cast<AstExprLit *>(rhs);
-        lit->type_defn = narrow_lit_type(lhs->type_defn, lit);
+        lit->type_defn = narrow_lit_type(module, lhs->type_defn, lit);
     }
     else if (rhs->type == AST_EXPR_UN)
     {
@@ -416,12 +460,12 @@ static bool try_narrow_lit_type(AstExpr *lhs, AstExpr *rhs)
         {
             auto lit = static_cast<AstExprLit *>(un->expr);
 
-            lit->type_defn = narrow_lit_type(lhs->type_defn, lit);
+            lit->type_defn = narrow_lit_type(module, lhs->type_defn, lit);
             un->type_defn = lit->type_defn;
         }
         else
         {
-            rhs->type_defn = determine_expr_type(rhs);
+            rhs->type_defn = determine_expr_type(module, rhs);
         }
     }
 
@@ -436,7 +480,7 @@ static TypeDefn *get_struct_type(TypeDefn *defn)
     return defn;
 }
 
-static TypeDefn *determine_expr_type(AstExpr *expr)
+static TypeDefn *determine_expr_type(Module *module, AstExpr *expr)
 {
     switch (expr->type)
     {
@@ -467,14 +511,14 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
                 {
                     switch (lit->value_int.type)
                     {
-                        case INT_I8:  { lit->type_defn = get_type_defn("i8");  break; }
-                        case INT_I16: { lit->type_defn = get_type_defn("i16"); break; }
-                        case INT_I32: { lit->type_defn = get_type_defn("i32"); break; }
-                        case INT_I64: { lit->type_defn = get_type_defn("i64"); break; }
-                        case INT_U8:  { lit->type_defn = get_type_defn("u8");  break; }
-                        case INT_U16: { lit->type_defn = get_type_defn("u16"); break; }
-                        case INT_U32: { lit->type_defn = get_type_defn("u32"); break; }
-                        case INT_U64: { lit->type_defn = get_type_defn("u64"); break; }
+                        case INT_I8:  { lit->type_defn = get_type_defn(module, "i8");  break; }
+                        case INT_I16: { lit->type_defn = get_type_defn(module, "i16"); break; }
+                        case INT_I32: { lit->type_defn = get_type_defn(module, "i32"); break; }
+                        case INT_I64: { lit->type_defn = get_type_defn(module, "i64"); break; }
+                        case INT_U8:  { lit->type_defn = get_type_defn(module, "u8");  break; }
+                        case INT_U16: { lit->type_defn = get_type_defn(module, "u16"); break; }
+                        case INT_U32: { lit->type_defn = get_type_defn(module, "u32"); break; }
+                        case INT_U64: { lit->type_defn = get_type_defn(module, "u64"); break; }
                         default:
                         {
                             assert(false);
@@ -486,13 +530,13 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
                 }
                 case LIT_FLOAT:
                 {
-                    lit->type_defn = get_type_defn("f32");
+                    lit->type_defn = get_type_defn(module, "f32");
                     break;
                 }
                 case LIT_STR:
                 {
                     // TODO: primitive str type?
-                    lit->type_defn = get_type_defn("u8", 1);
+                    lit->type_defn = get_type_defn(module, "u8", 1);
                     break;
                 }
                 default:
@@ -513,8 +557,8 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
             lhs->scope = bin->scope;
             rhs->scope = bin->scope;
 
-            lhs->type_defn = determine_expr_type(lhs);
-            rhs->type_defn = determine_expr_type(rhs);
+            lhs->type_defn = determine_expr_type(module, lhs);
+            rhs->type_defn = determine_expr_type(module, rhs);
 
             if (lhs->type_defn != rhs->type_defn)
             {
@@ -523,7 +567,7 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
                 {
                     // TODO: does anything need to be checked here?
                 }
-                else if (!try_narrow_lit_type(lhs, rhs))
+                else if (!try_narrow_lit_type(module, lhs, rhs))
                 {
                     report_error("Type mismatch in binary operation:\n    %s %s %s\n",
                                  bin,
@@ -543,7 +587,7 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
             auto un = static_cast<AstExprUn *>(expr);
             un->expr->scope = un->scope;
 
-            un->expr->type_defn = determine_expr_type(un->expr);
+            un->expr->type_defn = determine_expr_type(module, un->expr);
 
             switch (un->op)
             {
@@ -559,7 +603,7 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
                 }
                 case UN_NEG:
                 {
-                    un->expr->type_defn = determine_expr_type(un->expr);
+                    un->expr->type_defn = determine_expr_type(module, un->expr);
 
                     // Sanity check to make sure the literal has been flagged
                     // negative by the parser.
@@ -589,7 +633,7 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
             for (auto &arg : call->args)
             {
                 arg->scope = call->scope;
-                arg->type_defn = determine_expr_type(arg);
+                arg->type_defn = determine_expr_type(module, arg);
             }
 
             auto func = scope_get_func(call->scope, call->name->str);
@@ -615,12 +659,12 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
                     auto param = func->params[i];
                     auto arg = call->args[i];
 
-                    arg->type_defn = determine_expr_type(arg);
+                    arg->type_defn = determine_expr_type(module, arg);
 
                     // NOTE: the param type is only attached to the 'name' field of the param.
                     if (arg->type_defn != param->name->type_defn)
                     {
-                        if (!try_narrow_lit_type(param->name, arg))
+                        if (!try_narrow_lit_type(module, param->name, arg))
                         {
                             report_error("Type mismatch in argument %d of \"%s\" call. Expected %s, got %s.\n",
                                          arg,
@@ -636,7 +680,7 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
             if (func->ret)
                 call->type_defn = func->ret->type_defn;
             else
-                call->type_defn = get_type_defn("void");
+                call->type_defn = get_type_defn(module, "void");
             return call->type_defn;
         }
         case AST_EXPR_CAST:
@@ -644,8 +688,8 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
             auto cast = static_cast<AstExprCast *>(expr);
             cast->expr->scope = cast->scope;
 
-            cast->type_defn = get_type_defn(cast->type);
-            cast->expr->type_defn = determine_expr_type(cast->expr);
+            cast->type_defn = get_type_defn(module, cast->type);
+            cast->expr->type_defn = determine_expr_type(module, cast->expr);
 
             return cast->type_defn;
         }
@@ -658,13 +702,13 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
             lhs->scope = assign->scope;
             rhs->scope = assign->scope;
 
-            lhs->type_defn = determine_expr_type(lhs);
+            lhs->type_defn = determine_expr_type(module, lhs);
 
-            if (!try_narrow_lit_type(lhs, rhs))
-                rhs->type_defn = determine_expr_type(rhs);
+            if (!try_narrow_lit_type(module, lhs, rhs))
+                rhs->type_defn = determine_expr_type(module, rhs);
 
             // TODO: optimize, don't look up void each time
-            if (rhs->type_defn == get_type_defn("void"))
+            if (rhs->type_defn == get_type_defn(module, "void"))
             {
                 // TODO: output lhs expr
                 report_error("Assigning \"%s\" to a block with a void return value.\n",
@@ -689,9 +733,11 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
                 auto func = scope_get_func(call->scope, call->name->str);
 
                 if (!func->ret || !func->ret->type_defn)
+                {
                     report_error("Attempting to assign void return value from function \"%s\".\n",
                                  decl,
                                  func->name->str);
+                }
             }
 #endif
 
@@ -705,18 +751,18 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
             for (auto &stmt : block->stmts)
             {
                 stmt->scope = block->scope;
-                determine_stmt_type(stmt);
+                determine_stmt_type(module, stmt);
             }
 
             if (block->expr)
             {
                 block->expr->scope = block->scope;
-                block->expr->type_defn = determine_expr_type(block->expr);
+                block->expr->type_defn = determine_expr_type(module, block->expr);
                 block->type_defn = block->expr->type_defn;
             }
             else
             {
-                block->type_defn = get_type_defn("void");
+                block->type_defn = get_type_defn(module, "void");
             }
 
             return block->type_defn;
@@ -728,17 +774,17 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
 
             // TODO: are these assignments necessary? just do determine_expr_type()
             // and it should already set the node's type_defn
-            if_expr->cond->type_defn = determine_expr_type(if_expr->cond);
+            if_expr->cond->type_defn = determine_expr_type(module, if_expr->cond);
 
             if_expr->block->scope = make_scope(if_expr->scope);
-            if_expr->block->type_defn = determine_expr_type(if_expr->block);
+            if_expr->block->type_defn = determine_expr_type(module, if_expr->block);
             if_expr->type_defn = if_expr->block->type_defn;
 
             auto else_expr = if_expr->else_expr;
             if (else_expr)
             {
                 else_expr->scope = if_expr->scope;
-                else_expr->type_defn = determine_expr_type(else_expr);
+                else_expr->type_defn = determine_expr_type(module, else_expr);
 
                 if (if_expr->type_defn != else_expr->type_defn)
                 {
@@ -757,7 +803,7 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
             field->expr->scope = field->scope;
             field->name->scope = field->scope;
 
-            auto lhs_type = determine_expr_type(field->expr);
+            auto lhs_type = determine_expr_type(module, field->expr);
             TypeDefn *struct_type = get_struct_type(lhs_type);
             assert(struct_type->struct_);
 
@@ -772,10 +818,10 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
             }
             assert(type);
 
-            field->type_defn = get_type_defn(type);
+            field->type_defn = get_type_defn(module, type);
             field->expr->type_defn = lhs_type;
 
-            if (!field->type_defn->struct_)
+            if (!field->expr->type_defn->struct_)
             {
                 report_error("Accessing member of unknown struct type: \"%s\".\n",
                              field->expr,
@@ -789,7 +835,7 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
             auto loop = static_cast<AstExprLoop *>(expr);
 
             loop->block->scope = make_scope(loop->scope);
-            loop->block->type_defn = determine_expr_type(loop->block);
+            loop->block->type_defn = determine_expr_type(module, loop->block);
             loop->type_defn = loop->block->type_defn;
 
             return loop->type_defn;
@@ -798,7 +844,7 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
         {
             // TODO: support labels?
             // TODO: optimize, avoid looking up void each time
-            return get_type_defn("void");
+            return get_type_defn(module, "void");
         }
         case AST_EXPR_FOR:
         {
@@ -806,7 +852,7 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
             for_->block->scope = make_scope(for_->scope);
             for_->range->scope = for_->block->scope;
 
-            for_->range->type_defn = determine_expr_type(for_->range);
+            for_->range->type_defn = determine_expr_type(module, for_->range);
 
             // TODO: multiple decls, patterns, etc.
             // Declare the iterator.
@@ -815,7 +861,7 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
             it->type_defn = for_->range->type_defn;
             scope_add_var(for_->scope, it);
 
-            for_->block->type_defn = determine_expr_type(for_->block);
+            for_->block->type_defn = determine_expr_type(module, for_->block);
             for_->type_defn = for_->block->type_defn;
 
             return for_->type_defn;
@@ -826,8 +872,8 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
             range->start->scope = range->scope;
             range->end->scope = range->scope;
 
-            range->start->type_defn = determine_expr_type(range->start);
-            range->end->type_defn = determine_expr_type(range->end);
+            range->start->type_defn = determine_expr_type(module, range->start);
+            range->end->type_defn = determine_expr_type(module, range->end);
 
             if (range->start->type_defn != range->end->type_defn)
             {
@@ -845,10 +891,10 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
             auto while_ = static_cast<AstExprWhile *>(expr);
 
             while_->cond->scope = while_->scope;
-            while_->cond->type_defn = determine_expr_type(while_->cond);
+            while_->cond->type_defn = determine_expr_type(module, while_->cond);
 
             while_->block->scope = make_scope(while_->scope);
-            while_->block->type_defn = determine_expr_type(while_->block);
+            while_->block->type_defn = determine_expr_type(module, while_->block);
             while_->type_defn = while_->block->type_defn;
 
             return while_->type_defn;
@@ -858,7 +904,7 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
             auto paren = static_cast<AstExprParen *>(expr);
             paren->expr->scope = paren->scope;
 
-            paren->expr->type_defn = determine_expr_type(paren->expr);
+            paren->expr->type_defn = determine_expr_type(module, paren->expr);
             paren->type_defn = paren->expr->type_defn;
 
             return paren->type_defn;
@@ -874,7 +920,7 @@ static TypeDefn *determine_expr_type(AstExpr *expr)
     return NULL;
 }
 
-static void determine_stmt_type(AstStmt *stmt)
+static void determine_stmt_type(Module *module, AstStmt *stmt)
 {
     switch (stmt->type)
     {
@@ -883,7 +929,7 @@ static void determine_stmt_type(AstStmt *stmt)
             auto expr = static_cast<AstStmtExpr *>(stmt);
             expr->expr->scope = expr->scope;
 
-            determine_expr_type(expr->expr);
+            determine_expr_type(module, expr->expr);
 
             break;
         }
@@ -892,7 +938,7 @@ static void determine_stmt_type(AstStmt *stmt)
             auto semi = static_cast<AstStmtSemi *>(stmt);
             semi->expr->scope = semi->scope;
 
-            determine_expr_type(semi->expr);
+            determine_expr_type(module, semi->expr);
 
             break;
         }
@@ -908,18 +954,18 @@ static void determine_stmt_type(AstStmt *stmt)
             lhs->scope = decl->scope;
 
             // TODO: avoid looking up void each time
-            lhs->type_defn = get_type_defn("void");
+            lhs->type_defn = get_type_defn(module, "void");
 
             if (decl->type)
             {
-                decl->type->type_defn = get_type_defn(decl->type);
+                decl->type->type_defn = get_type_defn(module, decl->type);
                 lhs->type_defn = decl->type->type_defn;
             }
             else
             {
                 assert(rhs);
                 rhs->scope = decl->scope;
-                lhs->type_defn = determine_expr_type(rhs);
+                lhs->type_defn = determine_expr_type(module, rhs);
             }
 
             scope_add_var(lhs->scope, lhs);
@@ -949,17 +995,17 @@ static void determine_node_types(AstRoot *root)
             {
                 param->scope = func->scope;
 
-                param->name->type_defn = get_type_defn(param->type);
+                param->name->type_defn = get_type_defn(mod, param->type);
                 scope_add_var(param->scope, param->name);
             }
 
             if (func->ret)
-                func->ret->type_defn = get_type_defn(func->ret);
+                func->ret->type_defn = get_type_defn(mod, func->ret);
 
             if (func->block)
             {
                 func->block->scope = func->scope;
-                func->block->type_defn = determine_expr_type(func->block);
+                func->block->type_defn = determine_expr_type(mod, func->block);
             }
         }
     }
@@ -967,11 +1013,13 @@ static void determine_node_types(AstRoot *root)
 
 bool is_int_type(TypeDefn *defn)
 {
+    auto mod = defn->module;
+
     // TODO: optimize
-    return ((defn == get_type_defn("i8")) ||
-            (defn == get_type_defn("i16")) ||
-            (defn == get_type_defn("i32")) ||
-            (defn == get_type_defn("i64")));
+    return ((defn == get_type_defn(mod, "i8")) ||
+            (defn == get_type_defn(mod, "i16")) ||
+            (defn == get_type_defn(mod, "i32")) ||
+            (defn == get_type_defn(mod, "i64")));
 }
 
 bool is_struct_type(TypeDefn *defn)
@@ -979,14 +1027,12 @@ bool is_struct_type(TypeDefn *defn)
     return get_struct_type(defn) != NULL;
 }
 
-static TypeDefn *register_type_defn(const char *name, int size)
+static TypeDefn *register_type_defn(Module *module, const char *name, int size)
 {
-    assert(global_type_defns_count < (i32)(sizeof(global_type_defns) / sizeof(global_type_defns[0])));
-
     // Make sure there's not already a type defn with this name.
-    for (int i = 0; i < global_type_defns_count; ++i)
+    for (int i = 0; i < module->type_defns_count; ++i)
     {
-        TypeDefn *defn = &global_type_defns[i];
+        TypeDefn *defn = &module->type_defns[i];
         if (strings_match(defn->name, name))
         {
             // TODO: better error message
@@ -995,17 +1041,25 @@ static TypeDefn *register_type_defn(const char *name, int size)
         }
     }
 
-    TypeDefn *defn = &global_type_defns[global_type_defns_count++];
+    assert(module->type_defns_count < (sizeof(module->type_defns) / sizeof(module->type_defns[0])));
+    TypeDefn *defn = &module->type_defns[module->type_defns_count++];
     defn->name = string_duplicate(name);
     defn->size = size;
     defn->alignment = defn->size;
     defn->struct_ = NULL;
     defn->ptr = NULL;
+    defn->module = module;
 
     return defn;
 }
 
-static TypeDefn *register_struct(AstStruct *struct_)
+static TypeDefn *register_global_type_defn(const char *name, int size)
+{
+    assert(global_module);
+    return register_type_defn(global_module, name, size);
+}
+
+static TypeDefn *register_struct(Module *module, AstStruct *struct_)
 {
     // TODO: allow reordering of fields based on size and alignment
 
@@ -1015,7 +1069,7 @@ static TypeDefn *register_struct(AstStruct *struct_)
     i64 alignment = 0;
     for (auto &field : struct_->fields)
     {
-        field->type_defn = get_type_defn(field->type);
+        field->type_defn = get_type_defn(module, field->type);
         assert(field->type_defn->size > 0);
         assert(field->type_defn->alignment > 0);
 
@@ -1034,11 +1088,15 @@ static TypeDefn *register_struct(AstStruct *struct_)
 
     size += size % alignment;
 
-    TypeDefn *defn = register_type_defn(struct_->name->str, size);
+    // TODO: this is basically duplicated from register_type_defn()
+    assert(module->type_defns_count < (sizeof(module->type_defns) / sizeof(module->type_defns[0])));
+    TypeDefn *defn = &module->type_defns[module->type_defns_count++];
+    defn->name = string_duplicate(struct_->name->str);
     defn->size = size;
     defn->alignment = alignment;
     defn->struct_ = struct_;
     defn->ptr = NULL;
+    defn->module = module;
 
 #if 0
     fprintf(stderr, "Registered struct %s: size=%ld, alignment=%ld:\n", defn->name, defn->size, defn->alignment);
@@ -1055,33 +1113,36 @@ static TypeDefn *register_struct(AstStruct *struct_)
 
 bool type_check(AstRoot *root)
 {
+    global_module = root->global_module;
+
     // TODO: optimize by reordering based on most common cases?
-    register_type_defn("i8",  1);
-    register_type_defn("i16", 2);
-    register_type_defn("i32", 4);
-    register_type_defn("i64", 8);
+    register_global_type_defn("i8",  1);
+    register_global_type_defn("i16", 2);
+    register_global_type_defn("i32", 4);
+    register_global_type_defn("i64", 8);
 
-    register_type_defn("u8",  1);
-    register_type_defn("u16", 2);
-    register_type_defn("u32", 4);
-    register_type_defn("u64", 8);
+    register_global_type_defn("u8",  1);
+    register_global_type_defn("u16", 2);
+    register_global_type_defn("u32", 4);
+    register_global_type_defn("u64", 8);
 
-    register_type_defn("f32", 4);
-    register_type_defn("f64", 8);
+    register_global_type_defn("f32", 4);
+    register_global_type_defn("f64", 8);
 
-//    register_type_defn("str");
+//    register_global_type_defn("str");
 
-    register_type_defn("void", -1);
+    register_global_type_defn("void", -1);
 
-    register_type_defn("c_void", -1);
+    register_global_type_defn("c_void", -1);
 
-    // FIXME: use modules
-    // TODO: register these to scoped type tables instead of dumping
-    // all of them into the global type table?
     for (auto &mod : root->modules)
     {
+//        fprintf(stderr, "Registering structs for module %s:\n", mod->name);
         for (auto &struct_ : mod->structs)
-            register_struct(struct_);
+        {
+//            fprintf(stderr, "    %s\n", struct_->name->str);
+            register_struct(mod, struct_);
+        }
     }
 
     determine_node_types(root);

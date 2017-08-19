@@ -105,15 +105,15 @@ static UnOp get_un_op(TokenType type)
 
 static AstExprType *parse_type(Parser *parser)
 {
-    int pointer_depth = 0;
+    int ptr_depth = 0;
     while (eat_optional(parser, TOK_ASTERISK))
-        ++pointer_depth;
+        ++ptr_depth;
 
     Token type_tok = expect(parser, TOK_IDENT);
 
     AstExprType *type = ast_alloc(AstExprType);
     type->name = make_ident(type_tok);
-    type->pointer_depth = pointer_depth;
+    type->ptr_depth = ptr_depth;
 
     return type;
 }
@@ -623,8 +623,8 @@ void parse_file(AstRoot *root, Array<Token> *tokens)
         if (tok.type == TOK_EOF)
             break;
 
-        assert(root->current_module != -1);
-        Module *mod = root->modules[root->current_module];
+        assert(root->current_module);
+        Module *mod = root->current_module;
 
         if ((tok.type == TOK_KEY_FN) || (tok.type == TOK_KEY_EXTERN))
         {
@@ -656,6 +656,7 @@ void parse_file(AstRoot *root, Array<Token> *tokens)
             name[tok.len] = '\0';
 
             mod = make_module(root, name, mod);
+            root->current_module = mod;
 
             expect(&parser, TOK_OPEN_BRACE);
         }

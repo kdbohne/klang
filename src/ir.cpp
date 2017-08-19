@@ -21,7 +21,7 @@
 
 static void print_type_defn(TypeDefn *defn)
 {
-    int depth = get_pointer_depth(defn);
+    int depth = get_ptr_depth(defn);
     for (i64 i = 0; i < depth; ++i)
         fprintf(stderr, "*");
 
@@ -157,7 +157,7 @@ struct IrExprType : IrExpr
     IrExprType() : IrExpr(IR_EXPR_TYPE) {}
 
     char *name = NULL;
-    i64 pointer_depth = 0;
+    i64 ptr_depth = 0;
 };
 
 struct IrExprCast : IrExpr
@@ -256,7 +256,7 @@ static void gen_struct(Ir *ir, AstStruct *ast_struct)
     {
         IrExprType *type = new IrExprType();
         type->name = field->type->name->str;
-        type->pointer_depth = field->type->pointer_depth;
+        type->ptr_depth = field->type->ptr_depth;
 
         struct_->fields.add(type);
     }
@@ -369,7 +369,7 @@ static i64 alloc_tmp(Ir *ir, AstExpr *expr)
 {
     IrExprType *type = new IrExprType(); // TODO: reduce allocations
     type->name = expr->type_defn->name;
-    type->pointer_depth = get_pointer_depth(expr->type_defn);
+    type->ptr_depth = get_ptr_depth(expr->type_defn);
 
     return alloc_tmp(ir, expr, type);
 }
@@ -423,7 +423,7 @@ static IrExpr *flatten_expr(Ir *ir, AstExpr *ast_expr, IrExpr *expr)
         // TODO: don't allocate this every time!
         IrExprType *bool_type = new IrExprType();
         bool_type->name = string_duplicate("bool");
-        bool_type->pointer_depth = 0;
+        bool_type->ptr_depth = 0;
 
         var->tmp = alloc_tmp(ir, ast_expr, bool_type);
     }
@@ -622,7 +622,7 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
             // TODO: TypeDefn -> IrExprType helper function
             IrExprType *type = new IrExprType();
             type->name = ast_cast->type_defn->name; // TODO: copy?
-            type->pointer_depth = get_pointer_depth(ast_cast->type_defn);
+            type->ptr_depth = get_ptr_depth(ast_cast->type_defn);
 
             IrExprCast *cast = new IrExprCast();
             cast->type = type;
@@ -978,11 +978,30 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
 // Allocate temporaries, fill out information in IrFunc, etc.
 // This must be done for each function before gen_func() can handle
 // call expressions, as those reference other IrFuncs directly.
-static void gen_func_prototype(Ir *ir, AstFunc *ast_func)
+static void gen_func_prototype(Ir *ir, Module *module, AstFunc *ast_func)
 {
     i64 func_index = create_func(ir);
     IrFunc *func = &ir->funcs[func_index];
     func->name = ast_func->name->str; // TODO: copy?
+
+    // Mangle the function name by prepending the module name plus two underscores.
+    //     e.g. module test { fn foo() {} }    ->    test__foo()
+    if (module->name)
+    {
+        i64 mod_name_len = string_length(module->name);
+        i64 func_name_len = string_length(ast_func->name->str);
+        i64 total_len = mod_name_len + 2 + func_name_len;
+
+        func->name = (char *)malloc(total_len + 1);
+
+        string_copy(module->name, func->name, mod_name_len);
+        func->name[mod_name_len] = '_';
+        func->name[mod_name_len + 1] = '_';
+
+        string_copy(ast_func->name->str, func->name + mod_name_len + 2, func_name_len);
+
+        func->name[total_len] = '\0';
+    }
 
     if (ast_func->flags & FUNC_IS_EXTERN)
     {
@@ -1003,7 +1022,7 @@ static void gen_func_prototype(Ir *ir, AstFunc *ast_func)
         IrParam *param = func->params.next();
         param->type = new IrExprType();
         param->type->name = it->type->name->str;
-        param->type->pointer_depth = it->type->pointer_depth;
+        param->type->ptr_depth = it->type->ptr_depth;
 
         // For an external function, just fill out its parameters and return type.
         // Otherwise, generate temporary bindings as well.
@@ -1027,11 +1046,11 @@ static void gen_func_prototype(Ir *ir, AstFunc *ast_func)
     {
         func->ret = new IrExprType();
         func->ret->name = ast_func->ret->name->str;
-        func->ret->pointer_depth = ast_func->ret->pointer_depth;
+        func->ret->ptr_depth = ast_func->ret->ptr_depth;
     }
 }
 
-static void gen_func(Ir *ir, AstFunc *ast_func, i64 func_index)
+static void gen_func(Ir *ir, Module *module, AstFunc *ast_func, i64 func_index)
 {
     IrFunc *func = &ir->funcs[func_index];
 
@@ -1219,7 +1238,7 @@ static void dump_expr(IrExpr *expr)
         {
             auto type = static_cast<IrExprType *>(expr);
 
-            for (i64 i = 0; i < type->pointer_depth; ++i)
+            for (i64 i = 0; i < type->ptr_depth; ++i)
                 fprintf(stderr, "*");
             fprintf(stderr, "%s", type->name);
 
@@ -1242,7 +1261,7 @@ static void dump_ir(Ir *ir)
         {
             auto field_type = struct_.fields[i];
 
-            for (i64 j = 0; j < field_type->pointer_depth; ++j)
+            for (i64 j = 0; j < field_type->ptr_depth; ++j)
                 fprintf(stderr, "*");
             fprintf(stderr, "%s", field_type->name);
 
@@ -1521,10 +1540,10 @@ static void dump_c_expr(IrExpr *expr)
             auto type = static_cast<IrExprType *>(expr);
 
             printf("%s", type->name);
-            if (type->pointer_depth > 0)
+            if (type->ptr_depth > 0)
                 printf(" ");
 
-            for (i64 i = 0; i < type->pointer_depth; ++i)
+            for (i64 i = 0; i < type->ptr_depth; ++i)
                 printf("*");
 
             break;
@@ -1561,7 +1580,7 @@ static void dump_c_func_signature(IrFunc *func)
     if (func->ret)
     {
         dump_c_expr(func->ret);
-        if (func->ret->pointer_depth == 0)
+        if (func->ret->ptr_depth == 0)
             printf(" ");
     }
     else
@@ -1584,7 +1603,7 @@ static void dump_c_func_signature(IrFunc *func)
         // External functions don't have temporary parameter bindings.
         if (!is_extern)
         {
-            if (param->type->pointer_depth == 0)
+            if (param->type->ptr_depth == 0)
                 printf(" ");
             printf("_%ld", param->tmp);
         }
@@ -1627,7 +1646,7 @@ static void dump_c(Ir *ir)
             printf("    ");
 
             dump_c_expr(field);
-            if (field->pointer_depth == 0)
+            if (field->ptr_depth == 0)
                 printf(" ");
 
             printf("_%ld;\n", i);
@@ -1656,7 +1675,7 @@ static void dump_c(Ir *ir)
             printf("    ");
 
             dump_c_expr(decl.type);
-            if (decl.type->pointer_depth == 0)
+            if (decl.type->ptr_depth == 0)
                 printf(" ");
 
             printf("_%ld;", decl.tmp);
@@ -1760,13 +1779,17 @@ void gen_ir(AstRoot *ast)
             gen_struct(&ir, struct_);
     }
 
+    i64 func_index = 0;
     for (auto &mod : ast->modules)
     {
-        // FIXME: mangling
         for (auto &func : mod->funcs)
-            gen_func_prototype(&ir, func);
-        for (i64 i = 0; i < mod->funcs.count; ++i)
-            gen_func(&ir, mod->funcs[i], i);
+            gen_func_prototype(&ir, mod, func);
+
+        for (auto &func : mod->funcs)
+        {
+            gen_func(&ir, mod, func, func_index);
+            ++func_index;
+        }
     }
 
 //    dump_ir(&ir);

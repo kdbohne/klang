@@ -81,11 +81,15 @@ enum AstNodeType : u32
 
 struct Module
 {
+    Module *parent = NULL;
+
     char *name = NULL;
     Array<AstFunc *> funcs;
     Array<AstStruct *> structs;
 
-    Module *parent = NULL;
+    // TODO: Array<TypeDefn>?
+    TypeDefn type_defns[512]; // TODO: size?
+    i64 type_defns_count;
 };
 
 Module *make_module(AstRoot *root, char *name, Module *parent);
@@ -98,7 +102,6 @@ struct AstNode
 
     TypeDefn *type_defn = NULL;
     Scope *scope = NULL;
-    Module *module = NULL;
 
     // Location info for error reporting.
     File file;
@@ -112,8 +115,8 @@ struct AstRoot : AstNode
     AstRoot() : AstNode(AST_ROOT) {}
 
     Array<Module *> modules;
-    i64 global_module = -1;
-    i64 current_module = -1;
+    Module *global_module = NULL;
+    Module *current_module = NULL;
 };
 
 struct AstExpr : AstNode
@@ -244,7 +247,7 @@ struct AstExprType : AstExpr
     AstExprType() : AstExpr(AST_EXPR_TYPE) {}
 
     AstExprIdent *name = NULL;
-    i32 pointer_depth = 0;
+    i32 ptr_depth = 0;
 };
 
 // TODO: is this really an expression? Rename -> AstParam?

@@ -47,8 +47,7 @@ int main(int argc, char *argv[])
     }
 
     AstRoot *root = ast_alloc(AstRoot);
-    make_module(root, NULL, NULL);
-    root->global_module = root->modules.count - 1;
+    root->global_module = make_module(root, NULL, NULL);
 
     char *path = argv[1];
 
