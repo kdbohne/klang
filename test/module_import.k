@@ -2,7 +2,7 @@ import "module.k";
 
 fn main() {
     let x = 4;
-/*
+
     let t0 test::Thing;
     t0.x = 3;
     t0.y = 5;
@@ -13,5 +13,4 @@ fn main() {
     let w = z + test::do_something(&t1);
 
     let a = public_test(8);
-*/
 }

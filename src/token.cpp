@@ -15,6 +15,7 @@ const char *token_type_names[]
     "comma",
     "dot",
     "dot dot",
+    "colon colon",
 
     "plus",
     "minus",

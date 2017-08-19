@@ -174,6 +174,23 @@ static Token get_token(Lexer *lex)
             break;
         }
 
+        case ':':
+        {
+            if (*lex->cur == ':')
+            {
+                tok.type = TOK_COLON_COLON;
+                tok.len = 2;
+
+                advance(lex);
+            }
+            else
+            {
+                assert(false);
+            }
+
+            break;
+        }
+
         case '<':
         {
             if (*lex->cur == '=')
