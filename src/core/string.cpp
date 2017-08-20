@@ -80,6 +80,12 @@ char *string_concatenate(const char *a, const char *b)
 
 void print_line(char *src, int line)
 {
+    if (!src)
+    {
+        fprintf(stderr, "(line info not set)\n");
+        return;
+    }
+
     int cur = 1;
     while (*src)
     {
