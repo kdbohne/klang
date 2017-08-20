@@ -67,6 +67,7 @@ struct IrExprVar : IrExpr
     IrExprVar() : IrExpr(IR_EXPR_VAR) {}
 
     i64 tmp = -1;
+    bool is_ptr = false; // TODO: flags
 };
 
 struct IrExprLit : IrExpr
@@ -537,6 +538,8 @@ static IrExpr *gen_expr(Ir *ir, Module *module, AstExpr *expr)
 
             IrExprVar *ir_var = new IrExprVar();
             ir_var->tmp = var->ir_tmp_index;
+            if (ident->type_defn->ptr)
+                ir_var->is_ptr = true;
 
             return ir_var;
         }
@@ -640,7 +643,6 @@ static IrExpr *gen_expr(Ir *ir, Module *module, AstExpr *expr)
             char *mangled = mangle_call_name(module, ast_call);
             for (auto &func : ir->funcs)
             {
-                fprintf(stderr, "\"%s\" vs \"%s\"\n", func.name, mangled);
                 if (strings_match(func.name, mangled))
                     call->func = &func;
             }
@@ -1053,27 +1055,24 @@ static void gen_func_prototype(Ir *ir, Module *module, AstFunc *ast_func)
             ++ast_func->scope->ir_tmp_counter;
     }
 
-    for (i64 i = 0; i < ast_func->params.count; ++i)
+    for (auto &ast_param : ast_func->params)
     {
-        auto it = ast_func->params[i];
-
         IrParam *param = func->params.next();
         param->type = new IrExprType();
-        // FIXME
-//        param->type->name = it->type->name->str;
-        param->type->ptr_depth = it->type->ptr_depth;
+        param->type->name = mangle_type_defn(ast_param->name->type_defn);
+        param->type->ptr_depth = ast_param->type->ptr_depth;
 
         // For an external function, just fill out its parameters and return type.
         // Otherwise, generate temporary bindings as well.
         if (!(ast_func->flags & FUNC_IS_EXTERN))
         {
-            ScopeVar *var = scope_get_var(it->scope, it->name->str);
+            ScopeVar *var = scope_get_var(ast_param->scope, ast_param->name->str);
             assert(var);
 
             // NOTE: not using alloc_tmp() here because params don't need to be
             // declared. Just get a tmp index directly.
             // TODO: alloc_param_tmp() or something?
-            Scope *top_level = get_top_level_scope(it->scope);
+            Scope *top_level = get_top_level_scope(ast_param->scope);
             var->ir_tmp_index = top_level->ir_tmp_counter++;
 //          var->ir_tmp_index = alloc_tmp(ir, it->name);
 
@@ -1084,8 +1083,7 @@ static void gen_func_prototype(Ir *ir, Module *module, AstFunc *ast_func)
     if (ast_func->ret)
     {
         func->ret = new IrExprType();
-        // FIXME
-//        func->ret->name = ast_func->ret->name->str;
+        func->ret->name = mangle_type_defn(ast_func->ret->type_defn);
         func->ret->ptr_depth = ast_func->ret->ptr_depth;
     }
 }
@@ -1109,6 +1107,8 @@ static void gen_func(Ir *ir, Module *module, AstFunc *ast_func, i64 func_index)
         // Make the return value to be block-assigned.
         IrExprVar *ret_var = new IrExprVar();
         ret_var->tmp = 0; // 0 is always reserved for the return value.
+        if (ast_func->ret->type_defn->ptr)
+            ret_var->is_ptr = true;
         ir->lhs_block_assignment_stack.add(ret_var);
 
         // Declare the return value.
@@ -1561,7 +1561,12 @@ static void dump_c_expr(IrExpr *expr)
             auto field = static_cast<IrExprField *>(expr);
 
             dump_c_expr(field->lhs);
-            printf("._%ld", field->index);
+
+            if (field->lhs->is_ptr)
+                printf("->");
+            else
+                printf(".");
+            printf("_%ld", field->index);
 
             break;
         }
@@ -1814,7 +1819,6 @@ void gen_ir(AstRoot *ast)
 
     for (auto &mod : ast->modules)
     {
-        // FIXME: mangling
         for (auto &struct_ : mod->structs)
             gen_struct(&ir, mod, struct_);
     }

@@ -94,6 +94,7 @@ TypeDefn *get_type_defn(Module *module, const char *name, int ptr_depth)
         defn->alignment = defn->size;
         defn->struct_ = base_type->struct_;
         defn->ptr = parent;
+        defn->module = module;
 
         return defn;
     }
@@ -1117,6 +1118,11 @@ static void register_func(Module *module, AstRoot *root, AstFunc *func)
         param->scope = func->scope;
 
         param->name->type_defn = get_type_defn(module, param->type);
+        if (param->name->type_defn->struct_)
+        {
+            assert(param->name->type_defn->module);
+            assert(param->name->type_defn->module->parent);
+        }
         scope_add_var(param->scope, param->name);
     }
 
