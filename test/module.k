@@ -18,4 +18,18 @@ module test {
     fn do_something(t *Thing) -> i64 {
         t.x + t.y
     }
+
+    module nest {
+        struct Bar {
+            z f32;
+            t Thing;
+        };
+
+        fn make_bar(z f32, t Thing) -> Bar {
+            let b Bar;
+            b.z = z;
+            b.t = t;
+            b
+        }
+    }
 }

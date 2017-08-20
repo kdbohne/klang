@@ -242,10 +242,61 @@ struct Ir
     Array<i64> break_stack;
 };
 
-static void gen_struct(Ir *ir, AstStruct *ast_struct)
+static char *mangle_name(Module *module, char *name)
+{
+    // Mangle the name by prepending the module name plus two underscores.
+    //     e.g. module test { fn foo() {} }      ->    test__foo()
+    //     e.g. module test { struct Foo {} }    ->    test__Foo
+    char *mangled = name;
+    while (module)
+    {
+        if (!module->name)
+            break;
+
+        i64 mod_name_len = string_length(module->name);
+        i64 struct_name_len = string_length(mangled);
+        i64 total_len = mod_name_len + 2 + struct_name_len;
+
+        char *new_mangled = (char *)malloc(total_len + 1);
+
+        string_copy(module->name, new_mangled, mod_name_len);
+        new_mangled[mod_name_len] = '_';
+        new_mangled[mod_name_len + 1] = '_';
+
+        string_copy(mangled, new_mangled + mod_name_len + 2, struct_name_len);
+
+        new_mangled[total_len] = '\0';
+
+        mangled = new_mangled;
+        module = module->parent;
+    }
+
+    return mangled;
+}
+
+char *mangle_type_defn(TypeDefn *defn)
+{
+    return mangle_name(defn->module, defn->name);
+}
+
+static char *mangle_call_name(Module *module, AstExprCall *call)
+{
+    // TODO: leak
+    AstFunc *func = module_get_func(module, call->name);
+
+    if (call->name->type == AST_EXPR_PATH)
+    {
+        auto path = static_cast<AstExprPath *>(call->name);
+        module = resolve_path_into_module(module, path);
+    }
+
+    return mangle_name(module, func->name->str);
+}
+
+static void gen_struct(Ir *ir, Module *module, AstStruct *ast_struct)
 {
     IrStruct *struct_ = ir->structs.next();
-    struct_->name = ast_struct->name->str; // TODO: copy?
+    struct_->name = mangle_name(module, ast_struct->name->str);
 
     // Bleh.
     struct_->fields.data = NULL;
@@ -255,7 +306,7 @@ static void gen_struct(Ir *ir, AstStruct *ast_struct)
     for (auto &field : ast_struct->fields)
     {
         IrExprType *type = new IrExprType();
-        type->name = field->type->name->str;
+        type->name = mangle_type_defn(field->type_defn);
         type->ptr_depth = field->type->ptr_depth;
 
         struct_->fields.add(type);
@@ -368,7 +419,7 @@ static i64 alloc_tmp(Ir *ir, AstExpr *expr, IrExprType *type)
 static i64 alloc_tmp(Ir *ir, AstExpr *expr)
 {
     IrExprType *type = new IrExprType(); // TODO: reduce allocations
-    type->name = expr->type_defn->name;
+    type->name = mangle_type_defn(expr->type_defn);
     type->ptr_depth = get_ptr_depth(expr->type_defn);
 
     return alloc_tmp(ir, expr, type);
@@ -469,7 +520,7 @@ static void debug_validate_func(IrFunc *func)
         debug_validate_bb(&bb);
 }
 
-static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
+static IrExpr *gen_expr(Ir *ir, Module *module, AstExpr *expr)
 {
     switch (expr->type)
     {
@@ -519,8 +570,8 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
             auto ast_bin = static_cast<AstExprBin *>(expr);
 
             IrExprBin *bin = new IrExprBin();
-            bin->lhs = gen_expr(ir, ast_bin->lhs);
-            bin->rhs = gen_expr(ir, ast_bin->rhs);
+            bin->lhs = gen_expr(ir, module, ast_bin->lhs);
+            bin->rhs = gen_expr(ir, module, ast_bin->rhs);
             bin->lhs = flatten_expr(ir, ast_bin->lhs, bin->lhs);
             bin->rhs = flatten_expr(ir, ast_bin->rhs, bin->rhs);
 
@@ -554,7 +605,7 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
             auto ast_un = static_cast<AstExprUn *>(expr);
 
             IrExprUn *un = new IrExprUn();
-            un->expr = gen_expr(ir, ast_un->expr);
+            un->expr = gen_expr(ir, module, ast_un->expr);
             un->expr = flatten_expr(ir, ast_un, un->expr);
 
             // NOTE: this is a straight conversion of UnOp -> IrUnOp. The two
@@ -583,18 +634,21 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
 
             IrExprCall *call = new IrExprCall();
 
+            // TODO: leak
             // TODO: handle overloads if they are added as a feature
             // Find the matching function and cache it for later use.
+            char *mangled = mangle_call_name(module, ast_call);
             for (auto &func : ir->funcs)
             {
-                if (strings_match(func.name, ast_call->name->str))
+                fprintf(stderr, "\"%s\" vs \"%s\"\n", func.name, mangled);
+                if (strings_match(func.name, mangled))
                     call->func = &func;
             }
             assert(call->func);
 
             for (auto &ast_arg : ast_call->args)
             {
-                IrExpr *arg = gen_expr(ir, ast_arg);
+                IrExpr *arg = gen_expr(ir, module, ast_arg);
 
                 IrExpr *tmp = flatten_expr(ir, ast_arg, arg);
                 call->args.add(tmp);
@@ -626,7 +680,7 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
 
             IrExprCast *cast = new IrExprCast();
             cast->type = type;
-            cast->expr = gen_expr(ir, ast_cast->expr);
+            cast->expr = gen_expr(ir, module, ast_cast->expr);
 
             return flatten_expr(ir, ast_cast, cast);
         }
@@ -634,12 +688,12 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
         {
             auto assign = static_cast<AstExprAssign *>(expr);
 
-            IrExpr *lhs = gen_expr(ir, assign->lhs);
+            IrExpr *lhs = gen_expr(ir, module, assign->lhs);
 
             // Store the LHS in case the RHS is a block assignment.
             ir->lhs_block_assignment_stack.add(lhs);
 
-            IrExpr *rhs = gen_expr(ir, assign->rhs);
+            IrExpr *rhs = gen_expr(ir, module, assign->rhs);
             --ir->lhs_block_assignment_stack.count;
 
             if (rhs)
@@ -670,7 +724,7 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
                 else_bb = create_bb(ir);
             i64 merge_bb = create_bb(ir);
 
-            IrExpr *cond = gen_expr(ir, ast_if->cond);
+            IrExpr *cond = gen_expr(ir, module, ast_if->cond);
             cond = flatten_expr(ir, ast_if, cond);
 
             // Make the conditional instruction.
@@ -696,7 +750,7 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
             // Make the 'then' block.
             set_current_bb(ir, then_bb);
 
-            gen_expr(ir, ast_if->block);
+            gen_expr(ir, module, ast_if->block);
 
             // Don't insert a merge block goto if the block already ended with a goto.
             if (!bb_ends_with_goto(get_current_bb(ir)))
@@ -707,7 +761,7 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
             {
                 set_current_bb(ir, else_bb);
 
-                gen_expr(ir, ast_if->else_expr);
+                gen_expr(ir, module, ast_if->else_expr);
 
                 // Don't insert a merge block goto if the block already ended with a goto.
                 if (!bb_ends_with_goto(get_current_bb(ir)))
@@ -734,7 +788,7 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
                     case AST_STMT_SEMI:
                     {
                         auto semi = static_cast<AstStmtSemi *>(stmt);
-                        gen_expr(ir, semi->expr);
+                        gen_expr(ir, module, semi->expr);
                     }
                     case AST_STMT_DECL:
                     {
@@ -751,7 +805,7 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
 
             if (block->expr)
             {
-                IrExpr *ret = gen_expr(ir, block->expr);
+                IrExpr *ret = gen_expr(ir, module, block->expr);
 
                 assert(ir->lhs_block_assignment_stack.count > 0);
 
@@ -786,7 +840,7 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
             }
             assert(index != -1);
 
-            IrExpr *lhs = gen_expr(ir, ast_field->expr);
+            IrExpr *lhs = gen_expr(ir, module, ast_field->expr);
             assert(lhs->type == IR_EXPR_VAR);
 
             IrExprField *field = new IrExprField();
@@ -813,7 +867,7 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
             // Add the block to the break stack to allow breaks to know where to go.
             ir->break_stack.add(merge_bb);
 
-            gen_expr(ir, loop->block);
+            gen_expr(ir, module, loop->block);
 
             IrInstr instr;
             instr.type = IR_INSTR_GOTO;
@@ -911,7 +965,7 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
 
             // The for loop has been fully desugared into a simple loop.
             // Generate that loop now.
-            gen_expr(ir, enclosing_block);
+            gen_expr(ir, module, enclosing_block);
 
             // TODO: should this be assignable?
             return NULL;
@@ -957,7 +1011,7 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
 
             // The while loop has been fully desugared into a simple loop.
             // Generate that loop now.
-            gen_expr(ir, loop);
+            gen_expr(ir, module, loop);
 
             // TODO: should this be assignable?
             return NULL;
@@ -965,7 +1019,7 @@ static IrExpr *gen_expr(Ir *ir, AstExpr *expr)
         case AST_EXPR_PAREN:
         {
             auto paren = static_cast<AstExprParen *>(expr);
-            return gen_expr(ir, paren->expr);
+            return gen_expr(ir, module, paren->expr);
         }
         default:
         {
@@ -984,24 +1038,8 @@ static void gen_func_prototype(Ir *ir, Module *module, AstFunc *ast_func)
     IrFunc *func = &ir->funcs[func_index];
     func->name = ast_func->name->str; // TODO: copy?
 
-    // Mangle the function name by prepending the module name plus two underscores.
-    //     e.g. module test { fn foo() {} }    ->    test__foo()
     if (module->name)
-    {
-        i64 mod_name_len = string_length(module->name);
-        i64 func_name_len = string_length(ast_func->name->str);
-        i64 total_len = mod_name_len + 2 + func_name_len;
-
-        func->name = (char *)malloc(total_len + 1);
-
-        string_copy(module->name, func->name, mod_name_len);
-        func->name[mod_name_len] = '_';
-        func->name[mod_name_len + 1] = '_';
-
-        string_copy(ast_func->name->str, func->name + mod_name_len + 2, func_name_len);
-
-        func->name[total_len] = '\0';
-    }
+        func->name = mangle_name(module, ast_func->name->str);
 
     if (ast_func->flags & FUNC_IS_EXTERN)
     {
@@ -1021,7 +1059,8 @@ static void gen_func_prototype(Ir *ir, Module *module, AstFunc *ast_func)
 
         IrParam *param = func->params.next();
         param->type = new IrExprType();
-        param->type->name = it->type->name->str;
+        // FIXME
+//        param->type->name = it->type->name->str;
         param->type->ptr_depth = it->type->ptr_depth;
 
         // For an external function, just fill out its parameters and return type.
@@ -1045,7 +1084,8 @@ static void gen_func_prototype(Ir *ir, Module *module, AstFunc *ast_func)
     if (ast_func->ret)
     {
         func->ret = new IrExprType();
-        func->ret->name = ast_func->ret->name->str;
+        // FIXME
+//        func->ret->name = ast_func->ret->name->str;
         func->ret->ptr_depth = ast_func->ret->ptr_depth;
     }
 }
@@ -1079,7 +1119,7 @@ static void gen_func(Ir *ir, Module *module, AstFunc *ast_func, i64 func_index)
         func->decls.add(decl);
     }
 
-    gen_expr(ir, ast_func->block);
+    gen_expr(ir, module, ast_func->block);
 
     if (ast_func->ret)
         --ir->lhs_block_assignment_stack.count;
@@ -1776,7 +1816,7 @@ void gen_ir(AstRoot *ast)
     {
         // FIXME: mangling
         for (auto &struct_ : mod->structs)
-            gen_struct(&ir, struct_);
+            gen_struct(&ir, mod, struct_);
     }
 
     i64 func_index = 0;
@@ -1784,7 +1824,10 @@ void gen_ir(AstRoot *ast)
     {
         for (auto &func : mod->funcs)
             gen_func_prototype(&ir, mod, func);
+    }
 
+    for (auto &mod : ast->modules)
+    {
         for (auto &func : mod->funcs)
         {
             gen_func(&ir, mod, func, func_index);

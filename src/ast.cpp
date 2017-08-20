@@ -36,20 +36,6 @@ Scope *make_scope(Scope *parent)
     return scope;
 }
 
-AstFunc *scope_get_func(Scope *scope, const char *name)
-{
-    assert(scope != NULL);
-
-    auto func_ptr = scope->funcs.get(name);
-    if (func_ptr)
-        return *func_ptr;
-
-    if (scope->parent)
-        return scope_get_func(scope->parent, name);
-
-    return NULL;
-}
-
 ScopeVar *scope_get_var(Scope *scope, const char *name)
 {
     assert(scope != NULL);
@@ -62,22 +48,6 @@ ScopeVar *scope_get_var(Scope *scope, const char *name)
         return scope_get_var(scope->parent, name);
 
     return NULL;
-}
-
-void scope_add_func(Scope *scope, const char *name, AstFunc *func)
-{
-    assert(scope != NULL);
-
-    auto existing = scope_get_func(scope, name);
-    if (existing)
-    {
-        report_error("Redeclaring existing function \"%s\".\n",
-                     func,
-                     name);
-        return;
-    }
-
-    scope->funcs.insert(name, func);
 }
 
 void scope_add_var(Scope *scope, AstExprIdent *name)
@@ -110,8 +80,92 @@ Module *make_module(AstRoot *root, char *name, Module *parent)
 
     root->modules.add(mod);
 
+    if (parent)
+        parent->children.add(mod);
+
     return mod;
 }
+
+AstFunc *module_get_func(Module *module, AstExpr *name)
+{
+    assert(module);
+
+    switch (name->type)
+    {
+        case AST_EXPR_IDENT:
+        {
+            auto ident = static_cast<AstExprIdent *>(name);
+            for (auto &func : module->funcs)
+            {
+                if (strings_match(func->name->str, ident->str))
+                    return func;
+            }
+
+            if (module->parent)
+                return module_get_func(module, name);
+
+            return NULL;
+        }
+        case AST_EXPR_PATH:
+        {
+            auto path = static_cast<AstExprPath *>(name);
+            auto mod = resolve_path_into_module(module, path);
+            return module_get_func(mod, path->segments[path->segments.count - 1]);
+        }
+        default:
+        {
+            assert(false);
+            return NULL;
+        }
+    }
+}
+
+Module *resolve_path_into_module(Module *module, AstExprPath *path)
+{
+    auto mod = module;
+
+    for (auto &seg : path->segments)
+    {
+        bool resolved = false;
+        for (auto &child : mod->children)
+        {
+            if (strings_match(child->name, seg->str))
+            {
+                mod = child;
+                resolved = true;
+                break;
+            }
+        }
+
+        if (!resolved)
+        {
+            if (module->parent)
+                return resolve_path_into_module(module->parent, path);
+        }
+    }
+
+    assert(mod);
+    return mod;
+}
+
+#if 0
+// NOTE: Use this as a template for module_add_func() if needed.
+void scope_add_func(Scope *scope, const char *name, AstFunc *func)
+{
+    assert(scope != NULL);
+
+    auto existing = scope_get_func(scope, name);
+    if (existing)
+    {
+        report_error("Redeclaring existing function \"%s\".\n",
+                     func,
+                     name);
+        return;
+    }
+
+    scope->funcs.insert(name, func);
+}
+#endif
 
 const char *bin_op_strings[] =
 {

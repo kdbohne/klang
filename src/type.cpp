@@ -115,7 +115,27 @@ TypeDefn *get_type_defn(Module *module, const char *name, int ptr_depth)
 
 static TypeDefn *get_type_defn(Module *module, AstExprType *type)
 {
-    return get_type_defn(module, type->name->str, type->ptr_depth);
+    switch (type->expr->type)
+    {
+        case AST_EXPR_IDENT:
+        {
+            auto ident = static_cast<AstExprIdent *>(type->expr);
+            return get_type_defn(module, ident->str, type->ptr_depth);
+        }
+        case AST_EXPR_PATH:
+        {
+            auto path = static_cast<AstExprPath *>(type->expr);
+            Module *mod = resolve_path_into_module(module, path);
+            AstExprIdent *name = path->segments[path->segments.count - 1];
+
+            return get_type_defn(mod, name->str, type->ptr_depth);
+        }
+        default:
+        {
+            assert(false);
+            return NULL;
+        }
+    }
 }
 
 TypeDefn *get_global_type_defn(const char *name, int ptr_depth)
@@ -636,14 +656,15 @@ static TypeDefn *determine_expr_type(Module *module, AstExpr *expr)
                 arg->type_defn = determine_expr_type(module, arg);
             }
 
-            auto func = scope_get_func(call->scope, call->name->str);
+            auto func = module_get_func(module, call->name);
             if (!func)
             {
-                // TODO: dependency issue
+                // TODO: dependency issue?
+                // FIXME: print function name or path
                 report_error("Calling undeclared function \"%s\".\n",
                              call->name,
-                             call->name->str);
-                assert(false);
+                             "(FIXME)");
+                return NULL;
             }
 
             if (call->args.count != func->params.count)
@@ -680,7 +701,8 @@ static TypeDefn *determine_expr_type(Module *module, AstExpr *expr)
             if (func->ret)
                 call->type_defn = func->ret->type_defn;
             else
-                call->type_defn = get_type_defn(module, "void");
+                call->type_defn = get_global_type_defn("void");
+
             return call->type_defn;
         }
         case AST_EXPR_CAST:
@@ -708,7 +730,7 @@ static TypeDefn *determine_expr_type(Module *module, AstExpr *expr)
                 rhs->type_defn = determine_expr_type(module, rhs);
 
             // TODO: optimize, don't look up void each time
-            if (rhs->type_defn == get_type_defn(module, "void"))
+            if (rhs->type_defn == get_global_type_defn("void"))
             {
                 // TODO: output lhs expr
                 report_error("Assigning \"%s\" to a block with a void return value.\n",
@@ -725,6 +747,7 @@ static TypeDefn *determine_expr_type(Module *module, AstExpr *expr)
             }
             assign->type_defn = lhs->type_defn;
 
+            // FIXME
 #if 0
             // If the RHS is a function call, make sure the function actually returns a value.
             if (rhs->type == AST_EXPR_CALL)
@@ -762,7 +785,7 @@ static TypeDefn *determine_expr_type(Module *module, AstExpr *expr)
             }
             else
             {
-                block->type_defn = get_type_defn(module, "void");
+                block->type_defn = get_global_type_defn("void");
             }
 
             return block->type_defn;
@@ -844,7 +867,7 @@ static TypeDefn *determine_expr_type(Module *module, AstExpr *expr)
         {
             // TODO: support labels?
             // TODO: optimize, avoid looking up void each time
-            return get_type_defn(module, "void");
+            return get_global_type_defn("void");
         }
         case AST_EXPR_FOR:
         {
@@ -917,6 +940,7 @@ static TypeDefn *determine_expr_type(Module *module, AstExpr *expr)
         }
     }
 
+    assert(false);
     return NULL;
 }
 
@@ -954,7 +978,7 @@ static void determine_stmt_type(Module *module, AstStmt *stmt)
             lhs->scope = decl->scope;
 
             // TODO: avoid looking up void each time
-            lhs->type_defn = get_type_defn(module, "void");
+            lhs->type_defn = get_global_type_defn("void");
 
             if (decl->type)
             {
@@ -966,6 +990,10 @@ static void determine_stmt_type(Module *module, AstStmt *stmt)
                 assert(rhs);
                 rhs->scope = decl->scope;
                 lhs->type_defn = determine_expr_type(module, rhs);
+
+                // TODO: error message?
+                if (!lhs->type_defn)
+                    break;
             }
 
             scope_add_var(lhs->scope, lhs);
@@ -976,37 +1004,6 @@ static void determine_stmt_type(Module *module, AstStmt *stmt)
         {
             assert(false);
             break;
-        }
-    }
-}
-
-static void determine_node_types(AstRoot *root)
-{
-    root->scope = make_scope(NULL);
-
-    for (auto &mod : root->modules)
-    {
-        for (auto &func : mod->funcs)
-        {
-            scope_add_func(root->scope, func->name->str, func);
-            func->scope = make_scope(root->scope);
-
-            for (auto &param : func->params)
-            {
-                param->scope = func->scope;
-
-                param->name->type_defn = get_type_defn(mod, param->type);
-                scope_add_var(param->scope, param->name);
-            }
-
-            if (func->ret)
-                func->ret->type_defn = get_type_defn(mod, func->ret);
-
-            if (func->block)
-            {
-                func->block->scope = func->scope;
-                func->block->type_defn = determine_expr_type(mod, func->block);
-            }
         }
     }
 }
@@ -1111,6 +1108,22 @@ static TypeDefn *register_struct(Module *module, AstStruct *struct_)
     return defn;
 }
 
+static void register_func(Module *module, AstRoot *root, AstFunc *func)
+{
+    func->scope = make_scope(root->scope);
+
+    for (auto &param : func->params)
+    {
+        param->scope = func->scope;
+
+        param->name->type_defn = get_type_defn(module, param->type);
+        scope_add_var(param->scope, param->name);
+    }
+
+    if (func->ret)
+        func->ret->type_defn = get_type_defn(module, func->ret);
+}
+
 bool type_check(AstRoot *root)
 {
     global_module = root->global_module;
@@ -1145,7 +1158,27 @@ bool type_check(AstRoot *root)
         }
     }
 
-    determine_node_types(root);
+    root->scope = make_scope(NULL);
+
+    // Fill out function parameter types and return types.
+    for (auto &mod : root->modules)
+    {
+        for (auto &func : mod->funcs)
+            register_func(mod, root, func);
+    }
+
+    // Fill out function bodies.
+    for (auto &mod : root->modules)
+    {
+        for (auto &func : mod->funcs)
+        {
+            if (func->block)
+            {
+                func->block->scope = func->scope;
+                func->block->type_defn = determine_expr_type(mod, func->block);
+            }
+        }
+    }
 
     for (auto &mod : root->modules)
     {

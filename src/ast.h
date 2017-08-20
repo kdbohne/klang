@@ -6,8 +6,10 @@
 #include "token.h"
 #include "type.h"
 
-struct AstExprBlock;
+struct AstExpr;
 struct AstExprIdent;
+struct AstExprBlock;
+struct AstExprPath;
 struct AstStmt;
 struct AstFunc;
 struct AstStruct;
@@ -24,10 +26,9 @@ struct ScopeVar
 
 struct Scope
 {
-    HashMap<AstFunc *> funcs;
-    HashMap<ScopeVar> vars;
-
     Scope *parent = NULL;
+
+    HashMap<ScopeVar> vars;
 
     i64 ir_tmp_counter = 0;
     i64 ir_bb_counter = 0;
@@ -36,9 +37,7 @@ struct Scope
 // TODO: move to own file?
 // TODO: are all of these needed here? some are probably only used in type.cpp
 Scope *make_scope(Scope *parent);
-AstFunc *scope_get_func(Scope *scope, const char *name);
 ScopeVar *scope_get_var(Scope *scope, const char *name);
-void scope_add_func(Scope *scope, const char *name, AstFunc *func);
 void scope_add_var(Scope *scope, AstExprIdent *name);
 
 enum AstNodeType : u32
@@ -64,6 +63,7 @@ enum AstNodeType : u32
     AST_EXPR_RANGE,
     AST_EXPR_WHILE,
     AST_EXPR_PAREN,
+    AST_EXPR_PATH,
 
     // Stmt
     AST_STMT_EXPR,
@@ -82,6 +82,7 @@ enum AstNodeType : u32
 struct Module
 {
     Module *parent = NULL;
+    Array<Module *> children;
 
     char *name = NULL;
     Array<AstFunc *> funcs;
@@ -93,6 +94,8 @@ struct Module
 };
 
 Module *make_module(AstRoot *root, char *name, Module *parent);
+AstFunc *module_get_func(Module *module, AstExpr *name);
+Module *resolve_path_into_module(Module *module, AstExprPath *path);
 
 struct AstNode
 {
@@ -236,7 +239,7 @@ struct AstExprCall : AstExpr
 {
     AstExprCall() : AstExpr(AST_EXPR_CALL) {}
 
-    AstExprIdent *name = NULL;
+    AstExpr *name = NULL;
     Array<AstExpr *> args;
 
     Array<i64> ir_tmp_indices;
@@ -246,7 +249,7 @@ struct AstExprType : AstExpr
 {
     AstExprType() : AstExpr(AST_EXPR_TYPE) {}
 
-    AstExprIdent *name = NULL;
+    AstExpr *expr = NULL;
     i32 ptr_depth = 0;
 };
 
@@ -356,6 +359,13 @@ struct AstExprParen : AstExpr
     AstExprParen() : AstExpr(AST_EXPR_PAREN) {}
 
     AstExpr *expr = NULL;
+};
+
+struct AstExprPath : AstExpr
+{
+    AstExprPath() : AstExpr(AST_EXPR_PATH) {}
+
+    Array<AstExprIdent *> segments;
 };
 
 struct AstStmt : AstNode

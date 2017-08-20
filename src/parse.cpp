@@ -103,22 +103,20 @@ static UnOp get_un_op(TokenType type)
     }
 }
 
+static AstExpr *parse_expr(Parser *parser, bool is_unary = false);
+
 static AstExprType *parse_type(Parser *parser)
 {
     int ptr_depth = 0;
     while (eat_optional(parser, TOK_ASTERISK))
         ++ptr_depth;
 
-    Token type_tok = expect(parser, TOK_IDENT);
-
     AstExprType *type = ast_alloc(AstExprType);
-    type->name = make_ident(type_tok);
+    type->expr = parse_expr(parser);
     type->ptr_depth = ptr_depth;
 
     return type;
 }
-
-static AstExpr *parse_expr(Parser *parser, bool is_unary = false);
 
 static AstExprBin *parse_cond(Parser *parser)
 {
@@ -164,6 +162,24 @@ static AstExpr *parse_expr(Parser *parser, bool is_unary)
         {
             lhs = make_ident(tok);
 
+            // Double-colon-separated path.
+            if (peek(parser).type == TOK_COLON_COLON)
+            {
+                AstExprPath *path = ast_alloc(AstExprPath);
+                path->segments.add(static_cast<AstExprIdent *>(lhs));
+
+                while (peek(parser).type == TOK_COLON_COLON)
+                {
+                    eat(parser);
+                    tok = expect(parser, TOK_IDENT);
+
+                    AstExprIdent *seg = make_ident(tok);
+                    path->segments.add(seg);
+                }
+
+                lhs = path;
+            }
+
             // Function call.
             if (peek(parser).type == TOK_OPEN_PAREN)
             {
@@ -183,6 +199,7 @@ static AstExpr *parse_expr(Parser *parser, bool is_unary)
                         eat_optional(parser, TOK_COMMA);
 
                         AstExpr *arg = parse_expr(parser);
+//                        assert(arg->file.src);
                         call->args.add(arg);
                     }
                 }
@@ -341,6 +358,7 @@ static AstExpr *parse_expr(Parser *parser, bool is_unary)
         }
     }
 
+    // Parse field expression(s).
     while (true)
     {
         if (peek(parser).type != TOK_DOT)
