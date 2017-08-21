@@ -98,9 +98,18 @@ int main(int argc, char *argv[])
             file = read_file(buf);
             if (!file.src)
             {
-                fprintf(stderr, "Error: couldn't open imported file \"%s\".\n", buf);
-                return 1;
+                // Check the lib directory for a core file.
+                snprintf(buf, sizeof(buf), "lib/%.*s", tok.len, tok.str);
+
+                file = read_file(buf);
+                if (!file.src)
+                {
+                    fprintf(stderr, "Error: couldn't open imported file \"%s\".\n", buf);
+                    return 1;
+                }
             }
+
+            fprintf(stderr, "Importing %s.\n", buf);
 
             Array<Token> import_tokens = lex_file(file);
             parse_file(root, &import_tokens);
