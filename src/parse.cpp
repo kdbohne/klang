@@ -332,6 +332,11 @@ static AstExpr *parse_expr(Parser *parser, bool is_unary)
 
             break;
         }
+        case TOK_KEY_RETURN:
+        {
+            AstExprReturn *ret = ast_alloc(AstExprReturn);
+            return ret;
+        }
 
         // Unary operators.
         // Add more here!

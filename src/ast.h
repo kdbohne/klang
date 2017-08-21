@@ -64,6 +64,7 @@ enum AstNodeType : u32
     AST_EXPR_WHILE,
     AST_EXPR_PAREN,
     AST_EXPR_PATH,
+    AST_EXPR_RETURN,
 
     // Stmt
     AST_STMT_EXPR,
@@ -367,6 +368,13 @@ struct AstExprPath : AstExpr
     AstExprPath() : AstExpr(AST_EXPR_PATH) {}
 
     Array<AstExprIdent *> segments;
+};
+
+struct AstExprReturn : AstExpr
+{
+    AstExprReturn() : AstExpr(AST_EXPR_RETURN) {}
+
+    AstExpr *expr = NULL;
 };
 
 struct AstStmt : AstNode

@@ -500,13 +500,16 @@ static IrExpr *flatten_expr(Ir *ir, AstExpr *ast_expr, IrExpr *expr)
     return var;
 }
 
+// TODO: IR_INSTR_RETURN has been added as a matching condition, so the 'goto'
+// part of the name is not accurate. Rename the function to something more
+// general, like bb_ends_with_jump()? bb_ends_with_control_flow()?
 static bool bb_ends_with_goto(IrBb *bb)
 {
     if (bb->instrs.count == 0)
         return false;
 
     IrInstr last = bb->instrs[bb->instrs.count - 1];
-    return (last.type == IR_INSTR_GOTO) || (last.type == IR_INSTR_GOTOIF);
+    return (last.type == IR_INSTR_GOTO) || (last.type == IR_INSTR_GOTOIF) || (last.type == IR_INSTR_RETURN);
 }
 
 static void debug_validate_bb(IrBb *bb)
@@ -1048,6 +1051,27 @@ static IrExpr *gen_expr(Ir *ir, Module *module, AstExpr *expr)
         {
             auto paren = static_cast<AstExprParen *>(expr);
             return gen_expr(ir, module, paren->expr);
+        }
+        case AST_EXPR_RETURN:
+        {
+            auto ret = static_cast<AstExprReturn *>(expr);
+
+            IrInstr instr;
+            instr.type = IR_INSTR_RETURN;
+
+            if (ret->expr)
+            {
+                instr.arg_count = 1;
+                instr.args[0] = gen_expr(ir, module, ret->expr);
+            }
+            else
+            {
+                instr.arg_count = 0;
+            }
+
+            add_instr(ir, instr);
+
+            return NULL;
         }
         default:
         {

@@ -52,6 +52,7 @@ enum TokenType : u32
     TOK_KEY_WHILE,
     TOK_KEY_IMPORT,
     TOK_KEY_MODULE,
+    TOK_KEY_RETURN,
 
     TOK_EOF,
     TOK_UNKNOWN,

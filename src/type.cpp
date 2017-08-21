@@ -939,6 +939,21 @@ static TypeDefn *determine_expr_type(Module *module, AstExpr *expr)
 
             return paren->type_defn;
         }
+        case AST_EXPR_RETURN:
+        {
+            auto ret = static_cast<AstExprReturn *>(expr);
+
+            // TODO: optimize, avoid looking up void each time
+            ret->type_defn = get_global_type_defn("void");
+
+            if (ret->expr)
+            {
+                ret->expr->scope = ret->scope;
+                ret->expr->type_defn = determine_expr_type(module, ret->expr);
+            }
+
+            return ret->type_defn;
+        }
         default:
         {
             fprintf(stderr, "Internal error: unhandled expression type %d\n", expr->type);

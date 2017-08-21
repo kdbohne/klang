@@ -385,6 +385,8 @@ static Token get_token(Lexer *lex)
                     tok.type = TOK_KEY_IMPORT;
                 else if (token_matches(tok, "module"))
                     tok.type = TOK_KEY_MODULE;
+                else if (token_matches(tok, "return"))
+                    tok.type = TOK_KEY_RETURN;
             }
             else if (is_number(c))
             {
