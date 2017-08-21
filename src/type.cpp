@@ -978,9 +978,6 @@ static void determine_stmt_type(Module *module, AstStmt *stmt)
 
             lhs->scope = decl->scope;
 
-            // TODO: avoid looking up void each time
-            lhs->type_defn = get_global_type_defn("void");
-
             if (decl->type)
             {
                 decl->type->type_defn = get_type_defn(module, decl->type);
