@@ -105,6 +105,34 @@ static UnOp get_un_op(TokenType type)
 
 static AstExpr *parse_expr(Parser *parser, bool is_unary = false);
 
+// Two cases:
+//     1) Single identifier
+//     2) Identifiers separated by double-colons
+static AstExpr *parse_ident_or_path(Parser *parser)
+{
+    Token tok = expect(parser, TOK_IDENT);
+    if (peek(parser).type != TOK_COLON_COLON)
+    {
+        // Just a single identifier; no path.
+        AstExprIdent *ident = make_ident(tok);
+        return ident;
+    }
+
+    AstExprPath *path = ast_alloc(AstExprPath);
+    path->segments.add(make_ident(tok));
+
+    while (peek(parser).type == TOK_COLON_COLON)
+    {
+        eat(parser);
+        tok = expect(parser, TOK_IDENT);
+
+        AstExprIdent *seg = make_ident(tok);
+        path->segments.add(seg);
+    }
+
+    return path;
+}
+
 static AstExprType *parse_type(Parser *parser)
 {
     int ptr_depth = 0;
@@ -112,7 +140,7 @@ static AstExprType *parse_type(Parser *parser)
         ++ptr_depth;
 
     AstExprType *type = ast_alloc(AstExprType);
-    type->expr = parse_expr(parser);
+    type->expr = parse_ident_or_path(parser);
     type->ptr_depth = ptr_depth;
 
     return type;
@@ -160,25 +188,8 @@ static AstExpr *parse_expr(Parser *parser, bool is_unary)
     {
         case TOK_IDENT:
         {
-            lhs = make_ident(tok);
-
-            // Double-colon-separated path.
-            if (peek(parser).type == TOK_COLON_COLON)
-            {
-                AstExprPath *path = ast_alloc(AstExprPath);
-                path->segments.add(static_cast<AstExprIdent *>(lhs));
-
-                while (peek(parser).type == TOK_COLON_COLON)
-                {
-                    eat(parser);
-                    tok = expect(parser, TOK_IDENT);
-
-                    AstExprIdent *seg = make_ident(tok);
-                    path->segments.add(seg);
-                }
-
-                lhs = path;
-            }
+            parser->index -= 1;
+            lhs = parse_ident_or_path(parser);
 
             // Function call.
             if (peek(parser).type == TOK_OPEN_PAREN)
@@ -471,7 +482,7 @@ static void parse_stmt(Parser *parser, AstExprBlock *block)
         block->stmts.add(decl);
 
         // Desugar the assignment into a separate statement.
-        //     e.g. let x = 5    =>    let x;
+        //     e.g. let x = 5    =>    let x i64;
         //                             x = 5;
         if (rhs)
         {
