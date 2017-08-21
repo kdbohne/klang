@@ -114,7 +114,7 @@ TypeDefn *get_type_defn(Module *module, const char *name, int ptr_depth)
     }
 }
 
-static TypeDefn *get_type_defn(Module *module, AstExprType *type)
+static TypeDefn *get_type_defn(Module *module, AstType *type)
 {
     switch (type->expr->type)
     {
@@ -837,7 +837,7 @@ static TypeDefn *determine_expr_type(Module *module, AstExpr *expr)
             TypeDefn *struct_type = get_struct_type(lhs_type);
             assert(struct_type->struct_);
 
-            AstExprType *type = NULL;
+            AstType *type = NULL;
             for (auto &struct_field : struct_type->struct_->fields)
             {
                 if (strings_match(struct_field->name->str, field->name->str))

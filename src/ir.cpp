@@ -43,7 +43,13 @@ static Scope *get_top_level_scope(Scope *scope)
     return NULL;
 }
 
-enum IrExprType_ : u32
+struct IrType
+{
+    char *name = NULL;
+    i64 ptr_depth = 0;
+};
+
+enum IrExprType : u32
 {
     IR_EXPR_VAR,
     IR_EXPR_LIT,
@@ -52,14 +58,13 @@ enum IrExprType_ : u32
     IR_EXPR_UN,
     IR_EXPR_FIELD,
     IR_EXPR_PAREN,
-    IR_EXPR_TYPE,
     IR_EXPR_CAST,
 };
 
 struct IrExpr
 {
-    IrExpr(IrExprType_ type_) : type(type_) {}
-    IrExprType_ type;
+    IrExpr(IrExprType type_) : type(type_) {}
+    IrExprType type;
 };
 
 struct IrExprVar : IrExpr
@@ -153,20 +158,11 @@ struct IrExprParen : IrExpr
     IrExpr *expr = NULL;
 };
 
-// TODO: is this really an expression? Rename to IrType?
-struct IrExprType : IrExpr
-{
-    IrExprType() : IrExpr(IR_EXPR_TYPE) {}
-
-    char *name = NULL;
-    i64 ptr_depth = 0;
-};
-
 struct IrExprCast : IrExpr
 {
     IrExprCast() : IrExpr(IR_EXPR_CAST) {}
 
-    IrExprType *type = NULL;
+    IrType *type = NULL;
     IrExpr *expr = NULL;
 };
 
@@ -196,13 +192,13 @@ struct IrBb
 
 struct IrParam
 {
-    IrExprType *type = NULL;
+    IrType *type = NULL;
     i64 tmp = -1;
 };
 
 struct IrDecl
 {
-    IrExprType *type = NULL;
+    IrType *type = NULL;
     i64 tmp = -1;
 
     char *name = NULL;
@@ -222,7 +218,7 @@ struct IrFunc
 
     char *name = NULL;
     Array<IrParam> params;
-    IrExprType *ret = NULL;
+    IrType *ret = NULL;
 
     Array<IrDecl> decls;
 };
@@ -230,7 +226,7 @@ struct IrFunc
 struct IrStruct
 {
     char *name = NULL;
-    Array<IrExprType *> fields;
+    Array<IrType *> fields;
 };
 
 struct Ir
@@ -311,7 +307,7 @@ static void gen_struct(Ir *ir, Module *module, AstStruct *ast_struct)
 
     for (auto &field : ast_struct->fields)
     {
-        IrExprType *type = new IrExprType();
+        IrType *type = new IrType();
         type->name = mangle_type_defn(field->type_defn);
         type->ptr_depth = field->type->ptr_depth;
 
@@ -401,7 +397,7 @@ static void add_instr(Ir *ir, IrInstr instr)
     bb->instrs.add(instr);
 }
 
-static i64 alloc_tmp(Ir *ir, AstExpr *expr, IrExprType *type)
+static i64 alloc_tmp(Ir *ir, AstExpr *expr, IrType *type)
 {
     Scope *top_level = get_top_level_scope(expr->scope);
     i64 tmp = top_level->ir_tmp_counter++;
@@ -424,7 +420,7 @@ static i64 alloc_tmp(Ir *ir, AstExpr *expr, IrExprType *type)
 
 static i64 alloc_tmp(Ir *ir, AstExpr *expr)
 {
-    IrExprType *type = new IrExprType(); // TODO: reduce allocations
+    IrType *type = new IrType(); // TODO: reduce allocations
     type->name = mangle_type_defn(expr->type_defn);
     type->ptr_depth = get_ptr_depth(expr->type_defn);
 
@@ -478,7 +474,7 @@ static IrExpr *flatten_expr(Ir *ir, AstExpr *ast_expr, IrExpr *expr)
     if (is_comparison(expr))
     {
         // TODO: don't allocate this every time!
-        IrExprType *bool_type = new IrExprType();
+        IrType *bool_type = new IrType();
         bool_type->name = string_duplicate("bool");
         bool_type->ptr_depth = 0;
 
@@ -687,12 +683,6 @@ static IrExpr *gen_expr(Ir *ir, Module *module, AstExpr *expr)
 
             return flatten_expr(ir, ast_call, call);
         }
-        case AST_EXPR_TYPE:
-        {
-            // FIXME
-            assert(false);
-            return NULL;
-        }
         case AST_EXPR_PARAM:
         {
             // FIXME
@@ -704,8 +694,8 @@ static IrExpr *gen_expr(Ir *ir, Module *module, AstExpr *expr)
             auto ast_cast = static_cast<AstExprCast *>(expr);
 
             // TODO: smarter allocation
-            // TODO: TypeDefn -> IrExprType helper function
-            IrExprType *type = new IrExprType();
+            // TODO: TypeDefn -> IrType helper function
+            IrType *type = new IrType();
             type->name = mangle_type_defn(ast_cast->type_defn);
             type->ptr_depth = get_ptr_depth(ast_cast->type_defn);
 
@@ -1108,7 +1098,7 @@ static void gen_func_prototype(Ir *ir, Module *module, AstFunc *ast_func)
     for (auto &ast_param : ast_func->params)
     {
         IrParam *param = func->params.next();
-        param->type = new IrExprType();
+        param->type = new IrType();
         param->type->name = mangle_type_defn(ast_param->name->type_defn);
         param->type->ptr_depth = ast_param->type->ptr_depth;
 
@@ -1132,7 +1122,7 @@ static void gen_func_prototype(Ir *ir, Module *module, AstFunc *ast_func)
 
     if (ast_func->ret)
     {
-        func->ret = new IrExprType();
+        func->ret = new IrType();
         func->ret->name = mangle_type_defn(ast_func->ret->type_defn);
         func->ret->ptr_depth = ast_func->ret->ptr_depth;
     }
@@ -1180,6 +1170,14 @@ static void gen_func(Ir *ir, Module *module, AstFunc *ast_func, i64 func_index)
     add_instr(ir, instr);
 
     debug_validate_func(func);
+}
+
+static void dump_type(IrType *type)
+{
+    for (i64 i = 0; i < type->ptr_depth; ++i)
+        fprintf(stderr, "*");
+
+    fprintf(stderr, "%s", type->name);
 }
 
 static void dump_expr(IrExpr *expr)
@@ -1325,16 +1323,6 @@ static void dump_expr(IrExpr *expr)
 
             break;
         }
-        case IR_EXPR_TYPE:
-        {
-            auto type = static_cast<IrExprType *>(expr);
-
-            for (i64 i = 0; i < type->ptr_depth; ++i)
-                fprintf(stderr, "*");
-            fprintf(stderr, "%s", type->name);
-
-            break;
-        }
         default:
         {
             assert(false);
@@ -1374,7 +1362,7 @@ static void dump_ir(Ir *ir)
             IrParam *param = &func.params[j];
 
             fprintf(stderr, "_%ld ", param->tmp);
-            dump_expr(param->type);
+            dump_type(param->type);
 
             if (j < func.params.count - 1)
                 fprintf(stderr, ", ");
@@ -1384,14 +1372,14 @@ static void dump_ir(Ir *ir)
         if (func.ret)
         {
             fprintf(stderr, " -> ");
-            dump_expr(func.ret);
+            dump_type(func.ret);
         }
         fprintf(stderr, " {\n");
 
         for (auto &decl : func.decls)
         {
             fprintf(stderr, "    let _%ld ", decl.tmp);
-            dump_expr(decl.type);
+            dump_type(decl.type);
             fprintf(stderr, ";");
 
             if (decl.name)
@@ -1470,6 +1458,16 @@ static void dump_ir(Ir *ir)
 
         fprintf(stderr, "}\n\n");
     }
+}
+
+static void dump_c_type(IrType *type)
+{
+    printf("%s", type->name);
+    if (type->ptr_depth > 0)
+        printf(" ");
+
+    for (i64 i = 0; i < type->ptr_depth; ++i)
+        printf("*");
 }
 
 static void dump_c_expr(IrExpr *expr)
@@ -1632,25 +1630,12 @@ static void dump_c_expr(IrExpr *expr)
 
             break;
         }
-        case IR_EXPR_TYPE:
-        {
-            auto type = static_cast<IrExprType *>(expr);
-
-            printf("%s", type->name);
-            if (type->ptr_depth > 0)
-                printf(" ");
-
-            for (i64 i = 0; i < type->ptr_depth; ++i)
-                printf("*");
-
-            break;
-        }
         case IR_EXPR_CAST:
         {
             auto cast = static_cast<IrExprCast *>(expr);
 
             printf("((");
-            dump_c_expr(cast->type);
+            dump_c_type(cast->type);
             printf(")");
             dump_c_expr(cast->expr);
             printf(")");
@@ -1676,7 +1661,7 @@ static void dump_c_func_signature(IrFunc *func)
 
     if (func->ret)
     {
-        dump_c_expr(func->ret);
+        dump_c_type(func->ret);
         if (func->ret->ptr_depth == 0)
             printf(" ");
     }
@@ -1695,7 +1680,7 @@ static void dump_c_func_signature(IrFunc *func)
     {
         IrParam *param = &func->params[i];
 
-        dump_c_expr(param->type);
+        dump_c_type(param->type);
 
         // External functions don't have temporary parameter bindings.
         if (!is_extern)
@@ -1742,7 +1727,7 @@ static void dump_c(Ir *ir)
 
             printf("    ");
 
-            dump_c_expr(field);
+            dump_c_type(field);
             if (field->ptr_depth == 0)
                 printf(" ");
 
@@ -1771,7 +1756,7 @@ static void dump_c(Ir *ir)
         {
             printf("    ");
 
-            dump_c_expr(decl.type);
+            dump_c_type(decl.type);
             if (decl.type->ptr_depth == 0)
                 printf(" ");
 

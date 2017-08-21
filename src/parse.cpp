@@ -134,13 +134,24 @@ static AstExpr *parse_ident_or_path(Parser *parser)
     return path;
 }
 
-static AstExprType *parse_type(Parser *parser)
+static AstType *parse_type(Parser *parser)
 {
+    // Function pointer.
+    if (eat_optional(parser, TOK_KEY_FN))
+    {
+        expect(parser, TOK_OPEN_PAREN);
+        while (peek(parser).type != TOK_CLOSE_PAREN)
+        {
+            parse_type(parser);
+        }
+        expect(parser, TOK_CLOSE_PAREN);
+    }
+
     int ptr_depth = 0;
     while (eat_optional(parser, TOK_ASTERISK))
         ++ptr_depth;
 
-    AstExprType *type = ast_alloc(AstExprType);
+    AstType *type = ast_alloc(AstType);
     type->expr = parse_ident_or_path(parser);
     type->ptr_depth = ptr_depth;
 
@@ -256,7 +267,7 @@ static AstExpr *parse_expr(Parser *parser, bool is_unary)
         case TOK_KEY_CAST:
         {
             expect(parser, TOK_OPEN_PAREN);
-            AstExprType *type = parse_type(parser);
+            AstType *type = parse_type(parser);
             expect(parser, TOK_CLOSE_PAREN);
 
             AstExpr *expr = parse_expr(parser);
@@ -475,7 +486,7 @@ static void parse_stmt(Parser *parser, AstExprBlock *block)
         Token ident = expect(parser, TOK_IDENT);
         AstExpr *bind = make_ident(ident);
 
-        AstExprType *type = NULL;
+        AstType *type = NULL;
         if ((peek(parser).type != TOK_EQ) && (peek(parser).type != TOK_SEMI))
             type = parse_type(parser);
 
