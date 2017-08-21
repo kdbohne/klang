@@ -80,6 +80,7 @@ int main(int argc, char *argv[])
         fprintf(stderr, "%12s: '%.*s'\n", token_type_names[it.type], it.len, it.str);
 #endif
 
+    Array<char *> imports;
     for (i64 i = 0; i < tokens.count; ++i)
     {
         if (tokens[i].type == TOK_KEY_IMPORT)
@@ -109,7 +110,21 @@ int main(int argc, char *argv[])
                 }
             }
 
-            fprintf(stderr, "Importing %s.\n", buf);
+            bool already_imported = false;
+            for (auto import : imports)
+            {
+                if (strings_match(import, buf))
+                {
+                    fprintf(stderr, "Warning: trying to import %s, but it has already been imported previously. Skipping.\n", buf);
+                    already_imported = true;
+                    break;
+                }
+            }
+
+            if (already_imported)
+                continue;
+
+            imports.add(string_duplicate(buf));
 
             Array<Token> import_tokens = lex_file(file);
             parse_file(root, &import_tokens);

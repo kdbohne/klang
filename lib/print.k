@@ -1,5 +1,3 @@
-import "core.k";
-
 extern fn syscall5(num *i64, arg1 *i64, arg2 *i64, arg3 *i64, arg4 *i64, arg5 *i64) -> i64;
 
 fn write(data *u8, len i64) {
