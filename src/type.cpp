@@ -1118,7 +1118,7 @@ static void register_func(Module *module, AstRoot *root, AstFunc *func)
         if (param->name->type_defn->struct_)
         {
             assert(param->name->type_defn->module);
-            assert(param->name->type_defn->module->parent);
+//            assert(param->name->type_defn->module->parent);
         }
         scope_add_var(param->scope, param->name);
     }
