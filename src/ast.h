@@ -456,6 +456,4 @@ AstStmt *make_stmt(AstExpr *expr);
 
 void copy_loc(AstNode *node, Token tok);
 
-bool resolve_imports(AstRoot *root);
-
 void debug_dump(AstRoot *root);
