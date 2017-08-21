@@ -636,6 +636,12 @@ static TypeDefn *determine_expr_type(Module *module, AstExpr *expr)
 
                     break;
                 }
+                case UN_NOT:
+                {
+                    // TODO: global boolean type?
+                    un->expr->type_defn = determine_expr_type(module, un->expr);
+                    break;
+                }
                 default:
                 {
                     // TODO: error message

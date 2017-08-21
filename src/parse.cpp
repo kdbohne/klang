@@ -95,6 +95,7 @@ static UnOp get_un_op(TokenType type)
         case TOK_AND:      return UN_ADDR;
         case TOK_ASTERISK: return UN_DEREF;
         case TOK_MINUS:    return UN_NEG;
+        case TOK_NOT:      return UN_NOT;
         default:
         {
             assert(false);
@@ -156,6 +157,7 @@ static AstExprBin *parse_cond(Parser *parser)
     AstExpr *cond = parse_expr(parser);
     if (cond->type != AST_EXPR_BIN)
     {
+        // TODO: match expression's type
         AstExprLit *zero = ast_alloc(AstExprLit);
         zero->scope = cond->scope;
         zero->lit_type = LIT_INT;
@@ -336,6 +338,7 @@ static AstExpr *parse_expr(Parser *parser, bool is_unary)
         case TOK_AND:
         case TOK_ASTERISK:
         case TOK_MINUS:
+        case TOK_NOT:
         {
             UnOp op = get_un_op(tok.type);
             AstExpr *expr = parse_expr(parser, true);

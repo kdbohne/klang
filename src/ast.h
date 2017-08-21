@@ -222,6 +222,7 @@ enum UnOp : u32
     UN_ADDR,
     UN_DEREF,
     UN_NEG,
+    UN_NOT,
 
     UN_ERR,
 };

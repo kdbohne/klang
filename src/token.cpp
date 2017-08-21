@@ -25,6 +25,7 @@ const char *token_type_names[]
     "percent",
 
     "and",
+    "not",
 
     "lt",
     "le",

@@ -27,6 +27,7 @@ enum TokenType : u32
     TOK_PERCENT,
 
     TOK_AND,
+    TOK_NOT,
 
     TOK_LT,
     TOK_LE,

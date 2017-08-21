@@ -125,6 +125,7 @@ enum IrUnOp : u32
     IR_UN_ADDR,
     IR_UN_DEREF,
     IR_UN_NEG,
+    IR_UN_NOT,
 
     IR_UN_ERR,
 };
@@ -623,6 +624,7 @@ static IrExpr *gen_expr(Ir *ir, Module *module, AstExpr *expr)
                 case UN_ADDR:  { un->op = IR_UN_ADDR;  break; }
                 case UN_DEREF: { un->op = IR_UN_DEREF; break; }
                 case UN_NEG:   { un->op = IR_UN_NEG;   break; }
+                case UN_NOT:   { un->op = IR_UN_NOT;   break; }
                 default:
                 {
                     assert(false);
@@ -1269,6 +1271,7 @@ static void dump_expr(IrExpr *expr)
                 case IR_UN_ADDR:  { fprintf(stderr, "&"); break; }
                 case IR_UN_DEREF: { fprintf(stderr, "*"); break; }
                 case IR_UN_NEG:   { fprintf(stderr, "-"); break; }
+                case IR_UN_NOT:   { fprintf(stderr, "!"); break; }
                 default:
                 {
                     assert(false);
@@ -1570,6 +1573,7 @@ static void dump_c_expr(IrExpr *expr)
                 case IR_UN_ADDR:  { printf("&"); break; }
                 case IR_UN_DEREF: { printf("*"); break; }
                 case IR_UN_NEG:   { printf("-"); break; }
+                case IR_UN_NOT:   { printf("!"); break; }
                 default:
                 {
                     assert(false);

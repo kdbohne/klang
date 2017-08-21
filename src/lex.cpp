@@ -269,7 +269,7 @@ static Token get_token(Lexer *lex)
             }
             else
             {
-                assert(false);
+                tok.type = TOK_NOT;
             }
 
             break;
