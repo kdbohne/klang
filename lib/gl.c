@@ -68,6 +68,8 @@ static void *gl_get_symbol(char *symbol)
     if (!libgl)
         return NULL;
 
+    // TODO: dll_unload?
+
     // @TODO: use dlsym as fallback instead of just failing
     PFNGLXGETPROCADDRESSPROC glx_get_proc_address = (PFNGLXGETPROCADDRESSPROC)dll_get_symbol(libgl, "glXGetProcAddressARB");
     if (!glx_get_proc_address)

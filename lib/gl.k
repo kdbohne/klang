@@ -20,4 +20,16 @@ module gl {
     fn swap_buffers(win *Window) {
         gl_swap_buffers(cast(*c_void) win);
     }
+
+    fn load_funcs() {
+        let dll = dll_load("libGL.so.1");
+        if !dll {
+            print_string_literal("Failed to load libGL.\n");
+            return;
+        };
+
+        print_string_literal("Loading function pointers...\n");
+
+        dll_unload(dll);
+    }
 }
