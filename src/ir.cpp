@@ -268,10 +268,14 @@ static char *mangle_name(Module *module, char *name)
 
         new_mangled[total_len] = '\0';
 
+        if (mangled != name)
+            free(mangled);
         mangled = new_mangled;
         module = module->parent;
     }
 
+    if (mangled == name)
+        mangled = string_duplicate(name);
     return mangled;
 }
 
@@ -637,14 +641,34 @@ static IrExpr *gen_expr(Ir *ir, Module *module, AstExpr *expr)
 
             IrExprCall *call = new IrExprCall();
 
+            // TODO: refactor this mess
+
             // TODO: leak
             // TODO: handle overloads if they are added as a feature
+            // HACK: using mangle_call_name() with the global module to build
+            // a string for the call's path expr.
             // Find the matching function and cache it for later use.
-            char *mangled = mangle_call_name(module, ast_call);
+            Module *global_module = module;
+            while (global_module->parent)
+                global_module = global_module->parent;
+            char *name = mangle_call_name(global_module, ast_call);
             for (auto &func : ir->funcs)
             {
-                if (strings_match(func.name, mangled))
+                if (strings_match(func.name, name))
                     call->func = &func;
+            }
+            free(name);
+
+            // If no match was found, mangle the name and try again.
+            if (!call->func)
+            {
+                char *mangled = mangle_call_name(module, ast_call);
+                for (auto &func : ir->funcs)
+                {
+                    if (strings_match(func.name, mangled))
+                        call->func = &func;
+                }
+                free(mangled);
             }
             assert(call->func);
 
@@ -677,7 +701,7 @@ static IrExpr *gen_expr(Ir *ir, Module *module, AstExpr *expr)
             // TODO: smarter allocation
             // TODO: TypeDefn -> IrExprType helper function
             IrExprType *type = new IrExprType();
-            type->name = ast_cast->type_defn->name; // TODO: copy?
+            type->name = mangle_type_defn(ast_cast->type_defn);
             type->ptr_depth = get_ptr_depth(ast_cast->type_defn);
 
             IrExprCast *cast = new IrExprCast();
