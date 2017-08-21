@@ -102,7 +102,7 @@ AstFunc *module_get_func(Module *module, AstExpr *name)
             }
 
             if (module->parent)
-                return module_get_func(module, name);
+                return module_get_func(module->parent, name);
 
             return NULL;
         }
