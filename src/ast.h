@@ -18,7 +18,7 @@ struct AstStructField;
 struct ScopeVar
 {
     AstExprIdent *name = NULL;
-    TypeDefn *type_defn = NULL;
+    i64 type_id = -1;
 
     i64 register_index = -1;
     i64 ir_tmp_index = -1;
@@ -90,9 +90,11 @@ struct Module
     Array<AstFunc *> funcs;
     Array<AstStruct *> structs;
 
+#if 0
     // TODO: Array<TypeDefn>?
     TypeDefn type_defns[512]; // TODO: size?
     i64 type_defns_count;
+#endif
 };
 
 Module *make_module(AstRoot *root, char *name, Module *parent);
@@ -105,7 +107,7 @@ struct AstNode
 
     AstNodeType type = AST_ERR;
 
-    TypeDefn *type_defn = NULL;
+    i64 type_id = -1;
     Scope *scope = NULL;
 
     // Location info for error reporting.
@@ -254,6 +256,12 @@ struct AstType : AstNode
 
     AstExpr *expr = NULL;
     i32 ptr_depth = 0;
+
+    // Function pointer.
+    // TODO: TypeKind or something?
+    bool is_func_ptr = false;
+    Array<AstType *> args;
+    AstType *ret = NULL;
 };
 
 // TODO: is this really an expression? Rename -> AstParam?

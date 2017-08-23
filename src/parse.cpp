@@ -139,12 +139,21 @@ static AstType *parse_type(Parser *parser)
     // Function pointer.
     if (eat_optional(parser, TOK_KEY_FN))
     {
+        AstType *type = ast_alloc(AstType);
+        type->is_func_ptr = true;
+
         expect(parser, TOK_OPEN_PAREN);
         while (peek(parser).type != TOK_CLOSE_PAREN)
         {
-            parse_type(parser);
+            AstType *arg = parse_type(parser);
+            type->args.add(arg);
         }
         expect(parser, TOK_CLOSE_PAREN);
+
+        if (eat_optional(parser, TOK_R_ARROW))
+            type->ret = parse_type(parser);
+
+        return type;
     }
 
     int ptr_depth = 0;

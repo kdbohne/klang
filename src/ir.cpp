@@ -19,6 +19,7 @@
 //     goto bbX;
 //     gotoif Expr bbX bbY;
 
+#if 0
 static void print_type_defn(TypeDefn *defn)
 {
     int depth = get_ptr_depth(defn);
@@ -27,6 +28,7 @@ static void print_type_defn(TypeDefn *defn)
 
     fprintf(stderr, "%s", defn->name);
 }
+#endif
 
 static Scope *get_top_level_scope(Scope *scope)
 {
@@ -276,10 +278,12 @@ static char *mangle_name(Module *module, char *name)
     return mangled;
 }
 
+#if 0
 char *mangle_type_defn(TypeDefn *defn)
 {
     return mangle_name(defn->module, defn->name);
 }
+#endif
 
 static char *mangle_call_name(Module *module, AstExprCall *call)
 {
@@ -308,7 +312,8 @@ static void gen_struct(Ir *ir, Module *module, AstStruct *ast_struct)
     for (auto &field : ast_struct->fields)
     {
         IrType *type = new IrType();
-        type->name = mangle_type_defn(field->type_defn);
+        // FIXME
+//        type->name = mangle_type_defn(field->type_defn);
         type->ptr_depth = field->type->ptr_depth;
 
         struct_->fields.add(type);
@@ -421,8 +426,9 @@ static i64 alloc_tmp(Ir *ir, AstExpr *expr, IrType *type)
 static i64 alloc_tmp(Ir *ir, AstExpr *expr)
 {
     IrType *type = new IrType(); // TODO: reduce allocations
-    type->name = mangle_type_defn(expr->type_defn);
-    type->ptr_depth = get_ptr_depth(expr->type_defn);
+    // FIXME
+//    type->name = mangle_type_defn(expr->type_defn);
+//    type->ptr_depth = get_ptr_depth(expr->type_defn);
 
     return alloc_tmp(ir, expr, type);
 }
@@ -542,8 +548,11 @@ static IrExpr *gen_expr(Ir *ir, Module *module, AstExpr *expr)
 
             IrExprVar *ir_var = new IrExprVar();
             ir_var->tmp = var->ir_tmp_index;
+            // FIXME
+            /*
             if (ident->type_defn->ptr)
                 ir_var->is_ptr = true;
+            */
 
             return ir_var;
         }
@@ -696,8 +705,9 @@ static IrExpr *gen_expr(Ir *ir, Module *module, AstExpr *expr)
             // TODO: smarter allocation
             // TODO: TypeDefn -> IrType helper function
             IrType *type = new IrType();
-            type->name = mangle_type_defn(ast_cast->type_defn);
-            type->ptr_depth = get_ptr_depth(ast_cast->type_defn);
+            // FIXME
+//            type->name = mangle_type_defn(ast_cast->type_defn);
+//            type->ptr_depth = get_ptr_depth(ast_cast->type_defn);
 
             IrExprCast *cast = new IrExprCast();
             cast->type = type;
@@ -846,6 +856,8 @@ static IrExpr *gen_expr(Ir *ir, Module *module, AstExpr *expr)
         case AST_EXPR_FIELD:
         {
             auto ast_field = static_cast<AstExprField *>(expr);
+            // FIXME
+#if 0
             auto struct_ = ast_field->expr->type_defn->struct_;
 
             // TODO: optimize, store index in field?
@@ -869,6 +881,8 @@ static IrExpr *gen_expr(Ir *ir, Module *module, AstExpr *expr)
             field->index = index;
 
             return field;
+#endif
+            return NULL;
         }
         case AST_EXPR_LOOP:
         {
@@ -945,7 +959,7 @@ static IrExpr *gen_expr(Ir *ir, Module *module, AstExpr *expr)
 
             // Make the comparison.
             auto cond = make_bin(it, range->end, BIN_LT);
-            cond->type_defn = it->type_defn;
+            cond->type_id = it->type_id;
             cond->scope = ast_for->block->scope;
 
             auto if_ = ast_alloc(AstExprIf);
@@ -963,15 +977,21 @@ static IrExpr *gen_expr(Ir *ir, Module *module, AstExpr *expr)
             // TODO: avoid allocating 'one' each time!
             // TODO: match iterator type?
             // Make the increment.
-            auto one = make_lit_int(INT_I64, 0, 1);
+            auto one = ast_alloc(AstExprLit);
+            one->lit_type = LIT_INT;
+            one->value_int.type = INT_I64;
+            one->value_int.flags = 0;
+            one->value_int.value = 1;
+            // FIXME
+//            one->type_id = get_global_type_defn("i64");
             one->scope = ast_for->block->scope;
 
             auto inc_rhs = make_bin(it, one, BIN_ADD);
             inc_rhs->scope = ast_for->block->scope;
-            inc_rhs->type_defn = one->type_defn;
+            inc_rhs->type_id = one->type_id;
 
             auto inc = make_assign(it, inc_rhs);
-            inc->type_defn = one->type_defn;
+            inc->type_id = one->type_id;
 
             if_->block->stmts.add(make_stmt(inc));
 
@@ -1099,7 +1119,8 @@ static void gen_func_prototype(Ir *ir, Module *module, AstFunc *ast_func)
     {
         IrParam *param = func->params.next();
         param->type = new IrType();
-        param->type->name = mangle_type_defn(ast_param->name->type_defn);
+        // FIXME
+//        param->type->name = mangle_type_defn(ast_param->name->type_defn);
         param->type->ptr_depth = ast_param->type->ptr_depth;
 
         // For an external function, just fill out its parameters and return type.
@@ -1123,7 +1144,8 @@ static void gen_func_prototype(Ir *ir, Module *module, AstFunc *ast_func)
     if (ast_func->ret)
     {
         func->ret = new IrType();
-        func->ret->name = mangle_type_defn(ast_func->ret->type_defn);
+        // FIXME
+//        func->ret->name = mangle_type_defn(ast_func->ret->type_defn);
         func->ret->ptr_depth = ast_func->ret->ptr_depth;
     }
 }
@@ -1147,8 +1169,11 @@ static void gen_func(Ir *ir, Module *module, AstFunc *ast_func, i64 func_index)
         // Make the return value to be block-assigned.
         IrExprVar *ret_var = new IrExprVar();
         ret_var->tmp = 0; // 0 is always reserved for the return value.
+        // FIXME
+        /*
         if (ast_func->ret->type_defn->ptr)
             ret_var->is_ptr = true;
+        */
         ir->lhs_block_assignment_stack.add(ret_var);
 
         // Declare the return value.

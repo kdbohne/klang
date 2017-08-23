@@ -53,7 +53,7 @@ ScopeVar *scope_get_var(Scope *scope, const char *name)
 void scope_add_var(Scope *scope, AstExprIdent *name)
 {
     assert(scope != NULL);
-    assert(name->type_defn);
+    assert(name->type_id != -1);
 
     auto existing = scope_get_var(scope, name->str);
     if (existing)
@@ -68,7 +68,7 @@ void scope_add_var(Scope *scope, AstExprIdent *name)
 
     ScopeVar var;
     var.name = name;
-    var.type_defn = name->type_defn;
+    var.type_id = name->type_id;
     scope->vars.insert(name->str, var);
 }
 
@@ -327,21 +327,6 @@ AstExprLit *make_lit_str(Token tok)
     lit->value_str = make_str_from_token(tok);
 
     copy_loc(lit, tok);
-
-    return lit;
-}
-
-AstExprLit *make_lit_int(IntType type, u32 flags, u64 value)
-{
-    AstExprLit *lit = ast_alloc(AstExprLit);
-    lit->lit_type = LIT_INT;
-    lit->value_int.type = type;
-    lit->value_int.flags = flags;
-    lit->value_int.value = value;
-
-    // FIXME: support other types
-    assert(type == INT_I64);
-    lit->type_defn = get_global_type_defn("i64");
 
     return lit;
 }
