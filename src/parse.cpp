@@ -175,7 +175,7 @@ static AstExprBin *parse_cond(Parser *parser)
     // If the condition is a single expression, make an implicit
     // comparison: != 0.
     AstExpr *cond = parse_expr(parser);
-    if (cond->type != AST_EXPR_BIN)
+    if (cond->ast_type != AST_EXPR_BIN)
     {
         // TODO: match expression's type
         AstExprLit *zero = ast_alloc(AstExprLit);
@@ -368,7 +368,7 @@ static AstExpr *parse_expr(Parser *parser, bool is_unary)
             UnOp op = get_un_op(tok.type);
             AstExpr *expr = parse_expr(parser, true);
 
-            if (expr->type == AST_EXPR_LIT)
+            if (expr->ast_type == AST_EXPR_LIT)
             {
                 auto lit = static_cast<AstExprLit *>(expr);
                 lit->value_int.flags |= INT_IS_NEGATIVE;
@@ -564,7 +564,7 @@ static AstExprBlock *parse_block(Parser *parser)
     if (block->stmts.count > 0)
     {
         AstStmt *last = block->stmts[block->stmts.count - 1];
-        if (last->type == AST_STMT_EXPR)
+        if (last->ast_type == AST_STMT_EXPR)
         {
             AstStmtExpr *se = static_cast<AstStmtExpr *>(last);
             block->expr = se->expr;

@@ -290,7 +290,7 @@ static char *mangle_call_name(Module *module, AstExprCall *call)
     // TODO: leak
     AstFunc *func = module_get_func(module, call->name);
 
-    if (call->name->type == AST_EXPR_PATH)
+    if (call->name->ast_type == AST_EXPR_PATH)
     {
         auto path = static_cast<AstExprPath *>(call->name);
         module = resolve_path_into_module(module, path);
@@ -414,7 +414,7 @@ static i64 alloc_tmp(Ir *ir, AstExpr *expr, IrType *type)
     decl->tmp = tmp;
     decl->name = NULL;
 
-    if (expr->type == AST_EXPR_IDENT)
+    if (expr->ast_type == AST_EXPR_IDENT)
     {
         auto ident = static_cast<AstExprIdent *>(expr);
         decl->name = ident->str; // TODO: copy?
@@ -533,7 +533,7 @@ static void debug_validate_func(IrFunc *func)
 
 static IrExpr *gen_expr(Ir *ir, Module *module, AstExpr *expr)
 {
-    switch (expr->type)
+    switch (expr->ast_type)
     {
         case AST_EXPR_IDENT:
         {
@@ -814,7 +814,7 @@ static IrExpr *gen_expr(Ir *ir, Module *module, AstExpr *expr)
             auto block = static_cast<AstExprBlock *>(expr);
             for (auto &stmt : block->stmts)
             {
-                switch (stmt->type)
+                switch (stmt->ast_type)
                 {
                     case AST_STMT_SEMI:
                     {
@@ -959,7 +959,7 @@ static IrExpr *gen_expr(Ir *ir, Module *module, AstExpr *expr)
 
             // Make the comparison.
             auto cond = make_bin(it, range->end, BIN_LT);
-            cond->type_id = it->type_id;
+            cond->type = it->type;
             cond->scope = ast_for->block->scope;
 
             auto if_ = ast_alloc(AstExprIf);
@@ -982,16 +982,15 @@ static IrExpr *gen_expr(Ir *ir, Module *module, AstExpr *expr)
             one->value_int.type = INT_I64;
             one->value_int.flags = 0;
             one->value_int.value = 1;
-            // FIXME
-//            one->type_id = get_global_type_defn("i64");
+            one->type = type_i64;
             one->scope = ast_for->block->scope;
 
             auto inc_rhs = make_bin(it, one, BIN_ADD);
             inc_rhs->scope = ast_for->block->scope;
-            inc_rhs->type_id = one->type_id;
+            inc_rhs->type = one->type;
 
             auto inc = make_assign(it, inc_rhs);
-            inc->type_id = one->type_id;
+            inc->type = one->type;
 
             if_->block->stmts.add(make_stmt(inc));
 

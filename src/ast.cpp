@@ -53,7 +53,7 @@ ScopeVar *scope_get_var(Scope *scope, const char *name)
 void scope_add_var(Scope *scope, AstExprIdent *name)
 {
     assert(scope != NULL);
-    assert(name->type_id != -1);
+    assert(!type_is_void(name->type));
 
     auto existing = scope_get_var(scope, name->str);
     if (existing)
@@ -68,7 +68,7 @@ void scope_add_var(Scope *scope, AstExprIdent *name)
 
     ScopeVar var;
     var.name = name;
-    var.type_id = name->type_id;
+    var.type = name->type;
     scope->vars.insert(name->str, var);
 }
 
@@ -90,7 +90,7 @@ AstFunc *module_get_func(Module *module, AstExpr *name)
 {
     assert(module);
 
-    switch (name->type)
+    switch (name->ast_type)
     {
         case AST_EXPR_IDENT:
         {

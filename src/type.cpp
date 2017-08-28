@@ -1,164 +1,1012 @@
 #include "type.h"
 #include "ast.h"
+#include "string.h"
 
-enum TypeKind : u32
+#define report_error(str, ast, ...) \
+do { \
+    fprintf(stderr, "(%s:%d:%d) " str, ast->file.path, ast->line, ast->col, __VA_ARGS__); \
+    print_line(ast->file.src, ast->line); \
+    ++global_error_count; \
+} while (0)
+
+// Report an error without an associated AstNode.
+#define report_error_anon(str, ...) \
+do { \
+    fprintf(stderr, "Error: " str, __VA_ARGS__); \
+    ++global_error_count; \
+} while (0)
+
+static i64 global_error_count;
+
+static Module *global_module;
+
+static TypeDefn *type_defn_i8;
+static TypeDefn *type_defn_i16;
+static TypeDefn *type_defn_i32;
+static TypeDefn *type_defn_i64;
+static TypeDefn *type_defn_u8;
+static TypeDefn *type_defn_u16;
+static TypeDefn *type_defn_u32;
+static TypeDefn *type_defn_u64;
+static TypeDefn *type_defn_f32;
+static TypeDefn *type_defn_f64;
+static TypeDefn *type_defn_void;
+static TypeDefn *type_defn_c_void;
+
+// These are declared extern in type.h.
+Type type_i8;
+Type type_i16;
+Type type_i32;
+Type type_i64;
+Type type_u8;
+Type type_u16;
+Type type_u32;
+Type type_u64;
+Type type_f32;
+Type type_f64;
+Type type_void;
+Type type_c_void;
+Type type_error;
+
+static Type make_type(TypeDefn *defn, i64 ptr_depth)
 {
-    TYPE_INT,
-    TYPE_FLOAT,
-    TYPE_STR,
+    Type t;
+    t.defn = defn;
+    t.ptr_depth = ptr_depth;
 
-    TYPE_PTR,
+    return t;
+}
 
-    TYPE_STRUCT,
-    TYPE_FN,
-
-    TYPE_NULL,
-};
-
-// TODO: this clashes with IntType in ast.h. Is this okay, or should one of
-// them be renamed?
-/*
-enum IntType : u32
+static TypeDefn *find_type_defn(Module *module, const char *name)
 {
-    INT_I8,
-    INT_I16,
-    INT_I32,
-    INT_I64,
-    INT_U8,
-    INT_U16,
-    INT_U32,
-    INT_U64,
-};
-*/
-
-struct TypeInt
-{
-    IntType type;
-};
-
-enum FloatType : u32
-{
-    FLOAT_F32,
-    FLOAT_F64,
-};
-
-struct TypeFloat
-{
-    FloatType type;
-};
-
-struct TypeStr
-{
-    // FIXME
-    i64 dummy;
-};
-
-struct TypePtr
-{
-    i64 id;
-    i64 depth;
-};
-
-struct TypeStruct
-{
-    // FIXME
-    i64 dummy;
-};
-
-struct TypeFn
-{
-    // FIXME
-    i64 dummy;
-};
-
-struct Type
-{
-    TypeKind kind;
-
-    union
+    for (i64 i = 0; i < module->type_defns_count; ++i)
     {
-        TypeInt int_;
-        TypeFloat float_;
-        TypeStr str;
-        TypePtr ptr;
-        TypeStruct struct_;
-        TypeFn fn;
-    };
-};
+        TypeDefn *defn = &module->type_defns[i];
+        if (strings_match(defn->name, name))
+            return defn;
+    }
 
-static Array<Type> global_types;
+    if (module->parent)
+        return find_type_defn(module->parent, name);
 
-static i64 type_i8;
-static i64 type_i16;
-static i64 type_i32;
-static i64 type_i64;
-static i64 type_u8;
-static i64 type_u16;
-static i64 type_u32;
-static i64 type_u64;
-static i64 type_f32;
-static i64 type_f64;
-static i64 type_void;
-static i64 type_c_void;
-
-static i64 make_int(IntType type)
-{
-    i64 id = global_types.count;
-
-    Type *t = global_types.next();
-    t->kind = TYPE_INT;
-    t->int_.type = type;
-
-    return id;
+    return NULL;
 }
 
-static i64 make_float(FloatType type)
+static TypeDefn *register_global_type_defn(const char *name, i64 size)
 {
-    i64 id = global_types.count;
+    if (find_type_defn(global_module, name))
+    {
+        report_error_anon("registering duplicate global type definition \"%s\".\n", name);
+        return NULL;
+    }
 
-    Type *t = global_types.next();
-    t->kind = TYPE_FLOAT;
-    t->float_.type = type;
+    assert(global_module);
+    assert(global_module->type_defns_count < (sizeof(global_module->type_defns) / sizeof(global_module->type_defns[0])));
 
-    return id;
+    TypeDefn *defn = &global_module->type_defns[global_module->type_defns_count++];
+    defn->name = string_duplicate(name);
+    defn->module = NULL;
+    defn->size = size;
+    defn->alignment = defn->size;
+    
+    return defn;
 }
 
-static i64 make_void()
+static Type type_from_ast_type(Module *module, AstType *ast_type)
 {
-    i64 id = global_types.count;
+    if (ast_type->is_func_ptr)
+    {
+        // FIXME
+        assert(false);
+        return type_error;
+    }
 
-    Type *t = global_types.next();
-    t->kind = TYPE_NULL;
+    switch (ast_type->expr->ast_type)
+    {
+        case AST_EXPR_IDENT:
+        {
+            auto ident = static_cast<AstExprIdent *>(ast_type->expr);
 
-    return id;
+            Type type;
+            type.defn = find_type_defn(module, ident->str);
+            type.ptr_depth = ast_type->ptr_depth;
+            return type;
+        }
+        case AST_EXPR_PATH:
+        {
+            auto path = static_cast<AstExprPath *>(ast_type->expr);
+
+            Module *mod = resolve_path_into_module(module, path);
+            AstExprIdent *name = path->segments[path->segments.count - 1];
+
+            Type type;
+            type.defn = find_type_defn(module, name->str);
+            type.ptr_depth = ast_type->ptr_depth;
+            return type;
+        }
+        default:
+        {
+            assert(false);
+            return type_error;
+        }
+    }
 }
 
-static i64 make_ptr(i64 type_id, i64 depth)
+static TypeDefn *register_struct(Module *module, AstStruct *struct_)
 {
-    i64 id = global_types.count;
+    if (find_type_defn(module, struct_->name->str))
+    {
+        report_error("Internal error: registering duplicate struct type definition \"%s\".\n",
+                     struct_,
+                     struct_->name->str);
+        return NULL;
+    }
 
-    Type *t = global_types.next();
-    t->kind = TYPE_PTR;
-    t->ptr.id = type_id;
-    t->ptr.depth = depth;
+    assert(module->type_defns_count < (sizeof(module->type_defns) / sizeof(module->type_defns[0])));
+    // TODO: allow reordering of fields based on size and alignment
 
-    return id;
+    TypeDefn *defn = &module->type_defns[module->type_defns_count++];
+    defn->name = struct_->name->str; // TODO: duplicate?
+    defn->module = module;
+
+    // TODO: check this
+    // Determine field offsets and alignment, then use that to determine
+    // the struct's size and alignment.
+    defn->size = 0;
+    defn->alignment = 0;
+    for (auto &field : struct_->fields)
+    {
+        field->offset = defn->size;
+
+        Type t = type_from_ast_type(module, field->type);
+        assert(!type_is_void(t));
+        defn->struct_fields.add(t);
+
+        i64 field_size = 0;
+        i64 field_alignment = 0;
+        if (t.ptr_depth > 0)
+        {
+            field_size = 8; // 64-bit pointer size.
+            field_alignment = field_size;
+        }
+        else
+        {
+            field_size = t.defn->size;
+            field_alignment = t.defn->alignment;
+        }
+
+        // Pad the field to satisfy its own alignment.
+        if (defn->size % field_alignment > 0)
+            field->offset += field_alignment - (field->offset % field_alignment);
+
+        defn->size = field->offset + field_size;
+
+        // The struct's alignment is the maximum alignment of its fields.
+        if (field_alignment > defn->alignment)
+            defn->alignment = field_alignment;
+    }
+
+    defn->size += defn->size % defn->alignment;
+
+    return defn;
+}
+
+static void assign_scopes(AstNode *node, Scope *enclosing)
+{
+    switch (node->ast_type)
+    {
+        case AST_ROOT:
+        {
+            auto root = static_cast<AstRoot *>(node);
+            root->scope = make_scope(NULL); // NOTE: Could pass 'enclosing' here but it should be NULL anyway.
+
+            for (auto &mod : root->modules)
+            {
+                for (auto &func : mod->funcs)
+                    assign_scopes(func, root->scope);
+            }
+
+            break;
+        }
+        case AST_EXPR_IDENT:
+        {
+            auto ident = static_cast<AstExprIdent *>(node);
+            ident->scope = enclosing;
+
+            break;
+        }
+        case AST_EXPR_LIT:
+        {
+            auto lit = static_cast<AstExprLit *>(node);
+            lit->scope = enclosing;
+
+            break;
+        }
+        case AST_EXPR_BIN:
+        {
+            auto bin = static_cast<AstExprBin *>(node);
+            bin->scope = enclosing;
+
+            assign_scopes(bin->lhs, enclosing);
+            assign_scopes(bin->rhs, enclosing);
+
+            break;
+        }
+        case AST_EXPR_UN:
+        {
+            auto un = static_cast<AstExprUn *>(node);
+            un->scope = enclosing;
+
+            assign_scopes(un->expr, enclosing);
+
+            break;
+        }
+        case AST_EXPR_PARAM:
+        {
+            auto param = static_cast<AstExprParam *>(node);
+            param->scope = enclosing;
+
+            assign_scopes(param->name, enclosing);
+            assign_scopes(param->type, enclosing);
+
+            break;
+        }
+        case AST_EXPR_CALL:
+        {
+            auto call = static_cast<AstExprCall *>(node);
+            call->scope = enclosing;
+
+            assign_scopes(call->name, enclosing);
+
+            for (auto &arg : call->args)
+                assign_scopes(arg, enclosing);
+
+            break;
+        }
+        case AST_EXPR_CAST:
+        {
+            auto cast = static_cast<AstExprCast *>(node);
+            cast->scope = enclosing;
+
+            assign_scopes(cast->type, enclosing);
+            assign_scopes(cast->expr, enclosing);
+
+            break;
+        }
+        case AST_EXPR_ASSIGN:
+        {
+            auto assign = static_cast<AstExprAssign *>(node);
+            assign->scope = enclosing;
+
+            assign_scopes(assign->lhs, enclosing);
+            assign_scopes(assign->rhs, enclosing);
+
+            break;
+        }
+        case AST_EXPR_IF:
+        {
+            auto if_ = static_cast<AstExprIf *>(node);
+            if_->scope = enclosing;
+
+            assign_scopes(if_->cond, enclosing);
+            assign_scopes(if_->block, enclosing);
+            if (if_->else_expr)
+                assign_scopes(if_->else_expr, enclosing);
+
+            break;
+        }
+        case AST_EXPR_BLOCK:
+        {
+            auto block = static_cast<AstExprBlock *>(node);
+            block->scope = make_scope(enclosing);
+
+            for (auto &stmt : block->stmts)
+                assign_scopes(stmt, block->scope);
+
+            if (block->expr)
+                assign_scopes(block->expr, block->scope);
+
+            break;
+        }
+        case AST_EXPR_FIELD:
+        {
+            auto field = static_cast<AstExprField *>(node);
+            field->scope = enclosing;
+
+            assign_scopes(field->expr, enclosing);
+            assign_scopes(field->name, enclosing);
+
+            break;
+        }
+        case AST_EXPR_LOOP:
+        {
+            auto loop = static_cast<AstExprLoop *>(node);
+            loop->scope = enclosing;
+
+            assign_scopes(loop->block, enclosing);
+
+            break;
+        }
+        case AST_EXPR_BREAK:
+        {
+            auto break_ = static_cast<AstExprBreak *>(node);
+            break_->scope = enclosing;
+
+            break;
+        }
+        case AST_EXPR_FOR:
+        {
+            auto for_ = static_cast<AstExprFor *>(node);
+            for_->scope = enclosing;
+
+            assign_scopes(for_->it, enclosing);
+            assign_scopes(for_->range, enclosing);
+            assign_scopes(for_->block, enclosing);
+
+            break;
+        }
+        case AST_EXPR_RANGE:
+        {
+            auto range = static_cast<AstExprRange *>(node);
+            range->scope = enclosing;
+
+            assign_scopes(range->start, enclosing);
+            assign_scopes(range->end, enclosing);
+
+            break;
+        }
+        case AST_EXPR_WHILE:
+        {
+            auto while_ = static_cast<AstExprWhile *>(node);
+            while_->scope = enclosing;
+
+            assign_scopes(while_->cond, enclosing);
+            assign_scopes(while_->block, enclosing);
+
+            break;
+        }
+        case AST_EXPR_PAREN:
+        {
+            auto paren = static_cast<AstExprParen *>(node);
+            paren->scope = enclosing;
+
+            assign_scopes(paren->expr, enclosing);
+
+            break;
+        }
+        case AST_EXPR_PATH:
+        {
+            auto path = static_cast<AstExprPath *>(node);
+            path->scope = enclosing;
+
+            for (auto &seg : path->segments)
+                assign_scopes(seg, enclosing);
+
+            break;
+        }
+        case AST_EXPR_RETURN:
+        {
+            auto ret = static_cast<AstExprReturn *>(node);
+            ret->scope = enclosing;
+
+            if (ret->expr)
+                assign_scopes(ret->expr, enclosing);
+
+            break;
+        }
+        case AST_STMT_EXPR:
+        {
+            auto expr = static_cast<AstStmtExpr *>(node);
+            expr->scope = enclosing;
+
+            assign_scopes(expr->expr, enclosing);
+
+            break;
+        }
+        case AST_STMT_SEMI:
+        {
+            auto semi = static_cast<AstStmtSemi *>(node);
+            semi->scope = enclosing;
+
+            assign_scopes(semi->expr, enclosing);
+
+            break;
+        }
+        case AST_STMT_DECL:
+        {
+            auto decl = static_cast<AstStmtDecl *>(node);
+            decl->scope = enclosing;
+
+            assign_scopes(decl->bind, enclosing);
+
+            if (decl->type)
+                assign_scopes(decl->type, enclosing);
+            if (decl->desugared_rhs)
+                assign_scopes(decl->desugared_rhs, enclosing);
+
+            break;
+        }
+        case AST_FUNC:
+        {
+            auto func = static_cast<AstFunc *>(node);
+            func->scope = make_scope(enclosing);
+
+            for (auto &param : func->params)
+                assign_scopes(param, func->scope);
+
+            if (func->block)
+                assign_scopes(func->block, func->scope);
+
+            break;
+        }
+        case AST_STRUCT:
+        case AST_STRUCT_FIELD:
+        case AST_TYPE:
+        case AST_IMPORT:
+        {
+            // Do nothing.
+            break;
+        }
+        default:
+        {
+            assert(false);
+            break;
+        }
+    }
+}
+
+static Type infer_types(AstNode *node)
+{
+    switch (node->ast_type)
+    {
+        case AST_ROOT:
+        {
+            auto root = static_cast<AstRoot *>(node);
+
+            for (auto &mod : root->modules)
+            {
+                for (auto &func : mod->funcs)
+                    infer_types(func);
+            }
+
+            root->type = type_error;
+
+            break;
+        }
+        case AST_EXPR_IDENT:
+        {
+            auto ident = static_cast<AstExprIdent *>(node);
+
+            // FIXME
+            assert(false);
+            ident->type = type_error;
+
+            break;
+        }
+        case AST_EXPR_LIT:
+        {
+            auto lit = static_cast<AstExprLit *>(node);
+
+            // FIXME
+            assert(false);
+            lit->type = type_error;
+
+            break;
+        }
+        case AST_EXPR_BIN:
+        {
+            auto bin = static_cast<AstExprBin *>(node);
+
+            Type lhs = infer_types(bin->lhs);
+            Type rhs = infer_types(bin->lhs);
+
+            if (!types_match(lhs, rhs))
+            {
+                if (type_is_ptr(lhs) && !type_is_ptr(rhs) && type_is_int(rhs))
+                {
+                    // Pointer arithmetic.
+                    // TODO: does anything need to be checked here?
+                }
+                else
+                {
+                    // TODO: literal narrowing
+
+                    report_error("Type mismatch in binary operation.%s\n", bin, "");
+                    // FIXME: print_type_string()
+#if 0
+                    report_error("Type mismatch in binary operation:\n    %s %s %s\n",
+                                 bin,
+                                 get_type_string(lhs->type_defn),
+                                 bin_op_strings[bin->op],
+                                 get_type_string(rhs->type_defn));
+#endif
+                }
+            }
+
+            // NOTE: setting the node type to the lhs type regardless of
+            // whether the types actually matched.
+            bin->type = lhs;
+
+            break;
+        }
+        case AST_EXPR_UN:
+        {
+            auto un = static_cast<AstExprUn *>(node);
+
+            switch (un->op)
+            {
+                case UN_ADDR:
+                {
+                    ++un->expr->type.ptr_depth;
+                    break;
+                }
+                case UN_DEREF:
+                {
+                    if (un->expr->type.ptr_depth > 0)
+                    {
+                        --un->expr->type.ptr_depth;
+                    }
+                    else
+                    {
+                        report_error("Dereferencing non-pointer type \"%s\".\n",
+                                     node,
+                                     un->expr->type.defn->name);
+
+                        un->expr->type = type_error;
+                    }
+
+                    break;
+                }
+                case UN_NEG:
+                {
+                    // TODO: signed vs unsigned check?
+                    break;
+                }
+                case UN_NOT:
+                {
+                    break;
+                }
+                default:
+                {
+                    assert(false);
+                    break;
+                }
+            }
+
+            un->type = un->expr->type;
+
+            break;
+        }
+        case AST_EXPR_PARAM:
+        {
+            auto param = static_cast<AstExprParam *>(node);
+
+            // FIXME
+            assert(false);
+            node->type = type_error;
+//            param->type = type_error; // FIXME
+
+            break;
+        }
+        case AST_EXPR_CALL:
+        {
+            auto call = static_cast<AstExprCall *>(node);
+
+            // FIXME
+            assert(false);
+            call->type = type_error;
+
+            for (auto &arg : call->args)
+                infer_types(arg);
+
+            break;
+        }
+        case AST_EXPR_CAST:
+        {
+            auto cast = static_cast<AstExprCast *>(node);
+
+//            cast->type = infer_types(cast->expr); // FIXME
+            node->type = infer_types(cast->expr);
+
+            break;
+        }
+        case AST_EXPR_ASSIGN:
+        {
+            auto assign = static_cast<AstExprAssign *>(node);
+
+            Type lhs = infer_types(assign->lhs);
+            Type rhs = infer_types(assign->rhs);
+            if (!types_match(lhs, rhs))
+            {
+                report_error("Type mismatch in assignment. Assigning rvalue \"%s\" to lvalue \"%s\".\n",
+                             assign,
+                             "(FIXME)",
+                             "(FIXME)");
+            }
+
+            assign->type = lhs;
+
+            break;
+        }
+        case AST_EXPR_IF:
+        {
+            auto if_ = static_cast<AstExprIf *>(node);
+
+            // FIXME: check if condition is a boolean expression
+            infer_types(if_->cond);
+
+            if_->type = infer_types(if_->block);
+            if (if_->else_expr)
+            {
+                infer_types(if_->else_expr);
+
+                if (!types_match(if_->block->type, if_->else_expr->type))
+                {
+                    report_error("Type mismatch between if-block and else-block: \"%s\" vs \"%s\".\n",
+                                 if_,
+                                 "(FIXME)",
+                                 "(FIXME)");
+                }
+            }
+
+            break;
+        }
+        case AST_EXPR_BLOCK:
+        {
+            auto block = static_cast<AstExprBlock *>(node);
+
+            for (auto &stmt : block->stmts)
+                infer_types(stmt);
+
+            if (block->expr)
+                block->type = infer_types(block->expr);
+            else
+                block->type = type_void;
+
+            break;
+        }
+        case AST_EXPR_FIELD:
+        {
+            auto field = static_cast<AstExprField *>(node);
+
+            // FIXME
+            assert(false);
+            field->type = type_error;
+
+            break;
+        }
+        case AST_EXPR_LOOP:
+        {
+            auto loop = static_cast<AstExprLoop *>(node);
+
+            loop->type = infer_types(loop->block);
+
+            break;
+        }
+        case AST_EXPR_BREAK:
+        {
+            auto break_ = static_cast<AstExprBreak *>(node);
+
+            break_->type = type_void;
+
+            break;
+        }
+        case AST_EXPR_FOR:
+        {
+            auto for_ = static_cast<AstExprFor *>(node);
+
+            // FIXME
+            assert(false);
+            for_->type = type_error;
+
+            break;
+        }
+        case AST_EXPR_RANGE:
+        {
+            auto range = static_cast<AstExprRange *>(node);
+
+            // FIXME
+            assert(false);
+            range->type = type_error;
+
+            break;
+        }
+        case AST_EXPR_WHILE:
+        {
+            auto while_ = static_cast<AstExprWhile *>(node);
+
+            // FIXME
+            assert(false);
+            while_->type = type_error;
+
+            break;
+        }
+        case AST_EXPR_PAREN:
+        {
+            auto paren = static_cast<AstExprParen *>(node);
+
+            paren->type = infer_types(paren->expr);
+
+            break;
+        }
+        case AST_EXPR_PATH:
+        {
+            auto path = static_cast<AstExprPath *>(node);
+
+            // FIXME
+            assert(false);
+            path->type = type_error;
+
+            break;
+        }
+        case AST_EXPR_RETURN:
+        {
+            auto ret = static_cast<AstExprReturn *>(node);
+
+            if (ret->expr)
+                infer_types(ret->expr);
+
+            ret->type = type_void;
+
+            break;
+        }
+        case AST_STMT_EXPR:
+        {
+            auto expr = static_cast<AstStmtExpr *>(node);
+
+            expr->type = infer_types(expr->expr);
+
+            break;
+        }
+        case AST_STMT_SEMI:
+        {
+            auto semi = static_cast<AstStmtSemi *>(node);
+
+            infer_types(semi->expr);
+
+            semi->type = type_void;
+
+            break;
+        }
+        case AST_STMT_DECL:
+        {
+            auto decl = static_cast<AstStmtDecl *>(node);
+
+            // FIXME
+            assert(false);
+            node->type = type_error;
+//            decl->type = type_error; // FIXME
+
+            break;
+        }
+        case AST_FUNC:
+        {
+            auto func = static_cast<AstFunc *>(node);
+
+            for (auto &param : func->params)
+                infer_types(param);
+
+            if (func->block)
+                infer_types(func->block);
+
+            break;
+        }
+        case AST_TYPE:
+        {
+            auto type = static_cast<AstType *>(node);
+
+            // FIXME
+            assert(false);
+            type->type = type_error;
+
+            break;
+        }
+        case AST_STRUCT:
+        case AST_STRUCT_FIELD:
+        case AST_IMPORT:
+        {
+            node->type = type_error;
+            break;
+        }
+        default:
+        {
+            assert(false);
+            break;
+        }
+    }
+
+    return node->type;
+}
+
+static void declare_vars(AstNode *node)
+{
+    switch (node->ast_type)
+    {
+        case AST_ROOT:
+        {
+            auto root = static_cast<AstRoot *>(node);
+
+            for (auto &mod : root->modules)
+            {
+                for (auto &func : mod->funcs)
+                    declare_vars(func);
+            }
+
+            break;
+        }
+        case AST_EXPR_IDENT:
+        {
+            auto ident = static_cast<AstExprIdent *>(node);
+
+            scope_add_var(ident->scope, ident);
+
+            break;
+        }
+        case AST_EXPR_PARAM:
+        {
+            auto param = static_cast<AstExprParam *>(node);
+
+            // FIXME
+
+            break;
+        }
+        case AST_EXPR_BLOCK:
+        {
+            auto block = static_cast<AstExprBlock *>(node);
+
+            for (auto &stmt : block->stmts)
+                declare_vars(stmt);
+
+            break;
+        }
+        case AST_EXPR_FOR:
+        {
+            auto for_ = static_cast<AstExprFor *>(node);
+
+            // FIXME
+
+            break;
+        }
+        case AST_STMT_DECL:
+        {
+            auto decl = static_cast<AstStmtDecl *>(node);
+
+            // FIXME
+#if 0
+            // TODO: multiple decls, patterns, etc.
+            assert(decl->bind->type == AST_EXPR_IDENT);
+            auto lhs = static_cast<AstExprIdent *>(decl->bind);
+            auto rhs = decl->desugared_rhs;
+
+            if (decl->type)
+            {
+            }
+            else
+            {
+            }
+#endif
+
+            break;
+        }
+        case AST_FUNC:
+        {
+            auto func = static_cast<AstFunc *>(node);
+
+            for (auto &param : func->params)
+                declare_vars(param);
+
+            break;
+        }
+        case AST_EXPR_LIT:
+        case AST_EXPR_BIN:
+        case AST_EXPR_UN:
+        case AST_EXPR_CALL:
+        case AST_EXPR_CAST:
+        case AST_EXPR_ASSIGN:
+        case AST_EXPR_IF:
+        case AST_EXPR_FIELD:
+        case AST_EXPR_LOOP:
+        case AST_EXPR_BREAK:
+        case AST_EXPR_RANGE:
+        case AST_EXPR_WHILE:
+        case AST_EXPR_PAREN:
+        case AST_EXPR_PATH:
+        case AST_EXPR_RETURN:
+        case AST_STMT_EXPR:
+        case AST_STMT_SEMI:
+        case AST_STRUCT:
+        case AST_STRUCT_FIELD:
+        case AST_TYPE:
+        case AST_IMPORT:
+        {
+            // Do nothing.
+            break;
+        }
+        default:
+        {
+            assert(false);
+            break;
+        }
+    }
+}
+
+static void type_check_func(Module *module, AstFunc *func)
+{
+}
+
+bool type_is_void(Type type)
+{
+    return types_match(type, type_void);
+}
+
+bool type_is_int(Type type)
+{
+    return (types_match(type, type_i8)  ||
+            types_match(type, type_i16) ||
+            types_match(type, type_i32) ||
+            types_match(type, type_i64) ||
+            types_match(type, type_u8)  ||
+            types_match(type, type_u16) ||
+            types_match(type, type_u32) ||
+            types_match(type, type_u64));
+}
+
+bool type_is_ptr(Type type)
+{
+    return (type.ptr_depth > 0);
+}
+
+bool types_match(Type a, Type b)
+{
+    return (a.defn == b.defn) && (a.ptr_depth == b.ptr_depth);
 }
 
 bool type_check(AstRoot *ast)
 {
-    type_i8 = make_int(INT_I8);
-    type_i16 = make_int(INT_I16);
-    type_i32 = make_int(INT_I32);
-    type_i64 = make_int(INT_I64);
-    type_u8 = make_int(INT_U8);
-    type_u16 = make_int(INT_U16);
-    type_u32 = make_int(INT_U32);
-    type_u64 = make_int(INT_U64);
-    type_f32 = make_float(FLOAT_F32);
-    type_f64 = make_float(FLOAT_F64);
-    type_void = make_void();
-    type_c_void = make_ptr(type_void, 1);
+    global_module = ast->global_module;
 
-    return true;
+    type_defn_i8  = register_global_type_defn("i8",  1);
+    type_defn_i16 = register_global_type_defn("i16", 2);
+    type_defn_i32 = register_global_type_defn("i32", 4);
+    type_defn_i64 = register_global_type_defn("i64", 8);
+    type_defn_u8  = register_global_type_defn("u8",  1);
+    type_defn_u16 = register_global_type_defn("u16", 2);
+    type_defn_u32 = register_global_type_defn("u32", 4);
+    type_defn_u64 = register_global_type_defn("u64", 8);
+    type_defn_f32 = register_global_type_defn("f32", 4);
+    type_defn_f64 = register_global_type_defn("f64", 8);
+    type_defn_void = register_global_type_defn("void", -1);
+    type_defn_c_void = register_global_type_defn("c_void", -1);
+
+    type_i8  = make_type(type_defn_i8,  0);
+    type_i16 = make_type(type_defn_i16, 0);
+    type_i32 = make_type(type_defn_i32, 0);
+    type_i64 = make_type(type_defn_i64, 0);
+    type_u8  = make_type(type_defn_u8,  0);
+    type_u16 = make_type(type_defn_u16, 0);
+    type_u32 = make_type(type_defn_u32, 0);
+    type_u64 = make_type(type_defn_u64, 0);
+    type_f32 = make_type(type_defn_f32, 0);
+    type_f64 = make_type(type_defn_f64, 0);
+    type_void = make_type(type_defn_void, 0);
+    type_c_void = make_type(type_defn_c_void, 0);
+    type_error = make_type(NULL, -1);
+
+    for (auto &mod : ast->modules)
+    {
+        for (auto &struct_ : mod->structs)
+            register_struct(mod, struct_);
+    }
+
+    assign_scopes(ast, NULL);
+    infer_types(ast);
+    declare_vars(ast);
+
+    for (auto &mod : ast->modules)
+    {
+        for (auto &func : mod->funcs)
+            type_check_func(mod, func);
+    }
+
+    return (global_error_count == 0);
 }

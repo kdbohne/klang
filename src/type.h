@@ -1,5 +1,49 @@
 #pragma once
 
+#include "core/common.h"
+#include "core/array.h"
+
 struct AstRoot;
+struct Module;
+struct TypeDefn;
+
+struct Type
+{
+    TypeDefn *defn = NULL;
+    i64 ptr_depth = -1;
+};
+
+struct TypeDefn
+{
+    char *name = NULL;
+    Module *module = NULL;
+
+    i64 size = -1;
+    i64 alignment = -1;
+
+    Array<Type> struct_fields;
+
+    Array<Type> func_args;
+    Type func_ret;
+};
+
+extern Type type_i8;
+extern Type type_i16;
+extern Type type_i32;
+extern Type type_i64;
+extern Type type_u8;
+extern Type type_u16;
+extern Type type_u32;
+extern Type type_u64;
+extern Type type_f32;
+extern Type type_f64;
+extern Type type_void;
+extern Type type_c_void;
+extern Type type_error;
+
+bool type_is_void(Type type);
+bool type_is_int(Type type);
+bool type_is_ptr(Type type);
+bool types_match(Type a, Type b);
 
 bool type_check(AstRoot *ast);

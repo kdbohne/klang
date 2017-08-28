@@ -18,9 +18,9 @@ struct AstStructField;
 struct ScopeVar
 {
     AstExprIdent *name = NULL;
-    i64 type_id = -1;
+    Type type = type_error;
 
-    i64 register_index = -1;
+    i64 register_index = -1; // TODO: remove
     i64 ir_tmp_index = -1;
 };
 
@@ -62,7 +62,7 @@ enum AstNodeType : u32
     AST_EXPR_RANGE,
     AST_EXPR_WHILE,
     AST_EXPR_PAREN,
-    AST_EXPR_PATH,
+    AST_EXPR_PATH, // TODO: move this up below IDENT
     AST_EXPR_RETURN,
 
     // Stmt
@@ -90,11 +90,8 @@ struct Module
     Array<AstFunc *> funcs;
     Array<AstStruct *> structs;
 
-#if 0
-    // TODO: Array<TypeDefn>?
     TypeDefn type_defns[512]; // TODO: size?
     i64 type_defns_count;
-#endif
 };
 
 Module *make_module(AstRoot *root, char *name, Module *parent);
@@ -103,11 +100,11 @@ Module *resolve_path_into_module(Module *module, AstExprPath *path);
 
 struct AstNode
 {
-    AstNode(AstNodeType type_) : type(type_) {}
+    AstNode(AstNodeType type) : ast_type(type) {}
 
-    AstNodeType type = AST_ERR;
+    AstNodeType ast_type = AST_ERR;
 
-    i64 type_id = -1;
+    Type type = type_error;
     Scope *scope = NULL;
 
     // Location info for error reporting.
@@ -255,7 +252,7 @@ struct AstType : AstNode
     AstType() : AstNode(AST_TYPE) {}
 
     AstExpr *expr = NULL;
-    i32 ptr_depth = 0;
+    i64 ptr_depth = 0;
 
     // Function pointer.
     // TODO: TypeKind or something?
@@ -412,6 +409,7 @@ struct AstStmtDecl : AstStmt
     AstExpr *bind = NULL;
     AstType *type = NULL;
 
+    // TODO: is this used? remove?
     AstExpr *desugared_rhs = NULL;
 };
 
