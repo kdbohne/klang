@@ -191,6 +191,269 @@ static TypeDefn *register_struct(Module *module, AstStruct *struct_)
     return defn;
 }
 
+static void flatten_ast_visit(Array<AstNode *> *nodes, AstNode *node)
+{
+    // Always add the current node.
+    nodes->add(node);
+
+    // Recurse into child nodes.
+    switch (node->ast_type)
+    {
+        case AST_ROOT:
+        {
+            auto root = static_cast<AstRoot *>(node);
+
+            for (auto &mod : root->modules)
+            {
+                for (auto &func : mod->funcs)
+                    flatten_ast_visit(nodes, func);
+            }
+
+            break;
+        }
+        case AST_EXPR_IDENT:
+        {
+            break;
+        }
+        case AST_EXPR_LIT:
+        {
+            break;
+        }
+        case AST_EXPR_BIN:
+        {
+            auto bin = static_cast<AstExprBin *>(node);
+
+            flatten_ast_visit(nodes, bin->lhs);
+            flatten_ast_visit(nodes, bin->rhs);
+
+            break;
+        }
+        case AST_EXPR_UN:
+        {
+            auto un = static_cast<AstExprUn *>(node);
+
+            flatten_ast_visit(nodes, un->expr);
+
+            break;
+        }
+        case AST_EXPR_PARAM:
+        {
+            auto param = static_cast<AstExprParam *>(node);
+
+            flatten_ast_visit(nodes, param->name);
+            flatten_ast_visit(nodes, param->type);
+
+            break;
+        }
+        case AST_EXPR_CALL:
+        {
+            auto call = static_cast<AstExprCall *>(node);
+
+            flatten_ast_visit(nodes, call->name);
+
+            for (auto &arg : call->args)
+                flatten_ast_visit(nodes, arg);
+
+            break;
+        }
+        case AST_EXPR_CAST:
+        {
+            auto cast = static_cast<AstExprCast *>(node);
+
+            flatten_ast_visit(nodes, cast->type);
+            flatten_ast_visit(nodes, cast->expr);
+
+            break;
+        }
+        case AST_EXPR_ASSIGN:
+        {
+            auto assign = static_cast<AstExprAssign *>(node);
+
+            flatten_ast_visit(nodes, assign->lhs);
+            flatten_ast_visit(nodes, assign->rhs);
+
+            break;
+        }
+        case AST_EXPR_IF:
+        {
+            auto if_ = static_cast<AstExprIf *>(node);
+
+            flatten_ast_visit(nodes, if_->cond);
+            flatten_ast_visit(nodes, if_->block);
+            if (if_->else_expr)
+                flatten_ast_visit(nodes, if_->else_expr);
+
+            break;
+        }
+        case AST_EXPR_BLOCK:
+        {
+            auto block = static_cast<AstExprBlock *>(node);
+
+            for (auto &stmt : block->stmts)
+                flatten_ast_visit(nodes, stmt);
+
+            if (block->expr)
+                flatten_ast_visit(nodes, block->expr);
+
+            break;
+        }
+        case AST_EXPR_FIELD:
+        {
+            auto field = static_cast<AstExprField *>(node);
+
+            flatten_ast_visit(nodes, field->expr);
+            flatten_ast_visit(nodes, field->name);
+
+            break;
+        }
+        case AST_EXPR_LOOP:
+        {
+            auto loop = static_cast<AstExprLoop *>(node);
+
+            flatten_ast_visit(nodes, loop->block);
+
+            break;
+        }
+        case AST_EXPR_BREAK:
+        {
+            break;
+        }
+        case AST_EXPR_FOR:
+        {
+            auto for_ = static_cast<AstExprFor *>(node);
+
+            flatten_ast_visit(nodes, for_->it);
+            flatten_ast_visit(nodes, for_->range);
+            flatten_ast_visit(nodes, for_->block);
+
+            break;
+        }
+        case AST_EXPR_RANGE:
+        {
+            auto range = static_cast<AstExprRange *>(node);
+
+            flatten_ast_visit(nodes, range->start);
+            flatten_ast_visit(nodes, range->end);
+
+            break;
+        }
+        case AST_EXPR_WHILE:
+        {
+            auto while_ = static_cast<AstExprWhile *>(node);
+
+            flatten_ast_visit(nodes, while_->cond);
+            flatten_ast_visit(nodes, while_->block);
+
+            break;
+        }
+        case AST_EXPR_PAREN:
+        {
+            auto paren = static_cast<AstExprParen *>(node);
+
+            flatten_ast_visit(nodes, paren->expr);
+
+            break;
+        }
+        case AST_EXPR_PATH:
+        {
+            auto path = static_cast<AstExprPath *>(node);
+
+            for (auto &seg : path->segments)
+                flatten_ast_visit(nodes, seg);
+
+            break;
+        }
+        case AST_EXPR_RETURN:
+        {
+            auto ret = static_cast<AstExprReturn *>(node);
+
+            if (ret->expr)
+                flatten_ast_visit(nodes, ret->expr);
+
+            break;
+        }
+        case AST_STMT_EXPR:
+        {
+            auto expr = static_cast<AstStmtExpr *>(node);
+
+            flatten_ast_visit(nodes, expr->expr);
+
+            break;
+        }
+        case AST_STMT_SEMI:
+        {
+            auto semi = static_cast<AstStmtSemi *>(node);
+
+            flatten_ast_visit(nodes, semi->expr);
+
+            break;
+        }
+        case AST_STMT_DECL:
+        {
+            auto decl = static_cast<AstStmtDecl *>(node);
+
+            flatten_ast_visit(nodes, decl->bind);
+
+            if (decl->type)
+                flatten_ast_visit(nodes, decl->type);
+            if (decl->desugared_rhs)
+                flatten_ast_visit(nodes, decl->desugared_rhs);
+
+            break;
+        }
+        case AST_FUNC:
+        {
+            auto func = static_cast<AstFunc *>(node);
+
+            for (auto &param : func->params)
+                flatten_ast_visit(nodes, param);
+
+            if (func->block)
+                flatten_ast_visit(nodes, func->block);
+
+            break;
+        }
+        case AST_STRUCT:
+        {
+            // TODO?
+            break;
+        }
+        case AST_STRUCT_FIELD:
+        {
+            // TODO?
+            break;
+        }
+        case AST_TYPE:
+        {
+            auto type = static_cast<AstType *>(node);
+
+            flatten_ast_visit(nodes, type->expr);
+
+            // TODO: not sure if function pointers should be flattened here,
+            // since they're just AstTypes that shouldn't need further flattening...
+
+            break;
+        }
+        case AST_IMPORT:
+        {
+            break;
+        }
+        default:
+        {
+            assert(false);
+            break;
+        }
+    }
+}
+
+static Array<AstNode *> flatten_ast(AstRoot *ast)
+{
+    Array<AstNode *> nodes;
+    flatten_ast_visit(&nodes, ast);
+
+    return nodes;
+}
+
 static void assign_scopes(AstNode *node, Scope *enclosing)
 {
     switch (node->ast_type)
@@ -997,6 +1260,9 @@ bool type_check(AstRoot *ast)
         for (auto &struct_ : mod->structs)
             register_struct(mod, struct_);
     }
+
+    Array<AstNode *> nodes = flatten_ast(ast);
+    fprintf(stderr, "Flattened AST into %d nodes.\n", nodes.count);
 
     assign_scopes(ast, NULL);
     infer_types(ast);
