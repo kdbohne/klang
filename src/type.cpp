@@ -454,7 +454,29 @@ static Array<AstNode *> flatten_ast(AstRoot *ast)
     return nodes;
 }
 
-static void assign_scopes(AstNode *node, Scope *enclosing)
+static void resolve_calls(Array<AstNode *> ast)
+{
+    assert(ast.count > 0);
+    AstRoot *root = static_cast<AstRoot *>(ast.data[0]);
+    assert(root);
+
+    for (auto &node : ast)
+    {
+        if (node->ast_type != AST_EXPR_CALL)
+            continue;
+
+        auto call = static_cast<AstExprCall *>(node);
+        assert(!call->func);
+
+        // FIXME
+#if 0
+        resolve_path_into_module();
+        call->func = ;
+#endif
+    }
+}
+
+static void assign_scopes(AstNode *node, Scope *enclosing, Module *module)
 {
     switch (node->ast_type)
     {
@@ -462,11 +484,12 @@ static void assign_scopes(AstNode *node, Scope *enclosing)
         {
             auto root = static_cast<AstRoot *>(node);
             root->scope = make_scope(NULL); // NOTE: Could pass 'enclosing' here but it should be NULL anyway.
+            root->scope->module = root->global_module;
 
             for (auto &mod : root->modules)
             {
                 for (auto &func : mod->funcs)
-                    assign_scopes(func, root->scope);
+                    assign_scopes(func, root->scope, mod);
             }
 
             break;
@@ -490,8 +513,8 @@ static void assign_scopes(AstNode *node, Scope *enclosing)
             auto bin = static_cast<AstExprBin *>(node);
             bin->scope = enclosing;
 
-            assign_scopes(bin->lhs, enclosing);
-            assign_scopes(bin->rhs, enclosing);
+            assign_scopes(bin->lhs, enclosing, module);
+            assign_scopes(bin->rhs, enclosing, module);
 
             break;
         }
@@ -500,7 +523,7 @@ static void assign_scopes(AstNode *node, Scope *enclosing)
             auto un = static_cast<AstExprUn *>(node);
             un->scope = enclosing;
 
-            assign_scopes(un->expr, enclosing);
+            assign_scopes(un->expr, enclosing, module);
 
             break;
         }
@@ -509,8 +532,8 @@ static void assign_scopes(AstNode *node, Scope *enclosing)
             auto param = static_cast<AstExprParam *>(node);
             param->scope = enclosing;
 
-            assign_scopes(param->name, enclosing);
-            assign_scopes(param->type, enclosing);
+            assign_scopes(param->name, enclosing, module);
+            assign_scopes(param->type, enclosing, module);
 
             break;
         }
@@ -519,10 +542,10 @@ static void assign_scopes(AstNode *node, Scope *enclosing)
             auto call = static_cast<AstExprCall *>(node);
             call->scope = enclosing;
 
-            assign_scopes(call->name, enclosing);
+            assign_scopes(call->name, enclosing, module);
 
             for (auto &arg : call->args)
-                assign_scopes(arg, enclosing);
+                assign_scopes(arg, enclosing, module);
 
             break;
         }
@@ -531,8 +554,8 @@ static void assign_scopes(AstNode *node, Scope *enclosing)
             auto cast = static_cast<AstExprCast *>(node);
             cast->scope = enclosing;
 
-            assign_scopes(cast->type, enclosing);
-            assign_scopes(cast->expr, enclosing);
+            assign_scopes(cast->type, enclosing, module);
+            assign_scopes(cast->expr, enclosing, module);
 
             break;
         }
@@ -541,8 +564,8 @@ static void assign_scopes(AstNode *node, Scope *enclosing)
             auto assign = static_cast<AstExprAssign *>(node);
             assign->scope = enclosing;
 
-            assign_scopes(assign->lhs, enclosing);
-            assign_scopes(assign->rhs, enclosing);
+            assign_scopes(assign->lhs, enclosing, module);
+            assign_scopes(assign->rhs, enclosing, module);
 
             break;
         }
@@ -551,10 +574,10 @@ static void assign_scopes(AstNode *node, Scope *enclosing)
             auto if_ = static_cast<AstExprIf *>(node);
             if_->scope = enclosing;
 
-            assign_scopes(if_->cond, enclosing);
-            assign_scopes(if_->block, enclosing);
+            assign_scopes(if_->cond, enclosing, module);
+            assign_scopes(if_->block, enclosing, module);
             if (if_->else_expr)
-                assign_scopes(if_->else_expr, enclosing);
+                assign_scopes(if_->else_expr, enclosing, module);
 
             break;
         }
@@ -562,12 +585,13 @@ static void assign_scopes(AstNode *node, Scope *enclosing)
         {
             auto block = static_cast<AstExprBlock *>(node);
             block->scope = make_scope(enclosing);
+            block->scope->module = module;
 
             for (auto &stmt : block->stmts)
-                assign_scopes(stmt, block->scope);
+                assign_scopes(stmt, block->scope, module);
 
             if (block->expr)
-                assign_scopes(block->expr, block->scope);
+                assign_scopes(block->expr, block->scope, module);
 
             break;
         }
@@ -576,8 +600,8 @@ static void assign_scopes(AstNode *node, Scope *enclosing)
             auto field = static_cast<AstExprField *>(node);
             field->scope = enclosing;
 
-            assign_scopes(field->expr, enclosing);
-            assign_scopes(field->name, enclosing);
+            assign_scopes(field->expr, enclosing, module);
+            assign_scopes(field->name, enclosing, module);
 
             break;
         }
@@ -586,7 +610,7 @@ static void assign_scopes(AstNode *node, Scope *enclosing)
             auto loop = static_cast<AstExprLoop *>(node);
             loop->scope = enclosing;
 
-            assign_scopes(loop->block, enclosing);
+            assign_scopes(loop->block, enclosing, module);
 
             break;
         }
@@ -602,9 +626,9 @@ static void assign_scopes(AstNode *node, Scope *enclosing)
             auto for_ = static_cast<AstExprFor *>(node);
             for_->scope = enclosing;
 
-            assign_scopes(for_->it, enclosing);
-            assign_scopes(for_->range, enclosing);
-            assign_scopes(for_->block, enclosing);
+            assign_scopes(for_->it, enclosing, module);
+            assign_scopes(for_->range, enclosing, module);
+            assign_scopes(for_->block, enclosing, module);
 
             break;
         }
@@ -613,8 +637,8 @@ static void assign_scopes(AstNode *node, Scope *enclosing)
             auto range = static_cast<AstExprRange *>(node);
             range->scope = enclosing;
 
-            assign_scopes(range->start, enclosing);
-            assign_scopes(range->end, enclosing);
+            assign_scopes(range->start, enclosing, module);
+            assign_scopes(range->end, enclosing, module);
 
             break;
         }
@@ -623,8 +647,8 @@ static void assign_scopes(AstNode *node, Scope *enclosing)
             auto while_ = static_cast<AstExprWhile *>(node);
             while_->scope = enclosing;
 
-            assign_scopes(while_->cond, enclosing);
-            assign_scopes(while_->block, enclosing);
+            assign_scopes(while_->cond, enclosing, module);
+            assign_scopes(while_->block, enclosing, module);
 
             break;
         }
@@ -633,7 +657,7 @@ static void assign_scopes(AstNode *node, Scope *enclosing)
             auto paren = static_cast<AstExprParen *>(node);
             paren->scope = enclosing;
 
-            assign_scopes(paren->expr, enclosing);
+            assign_scopes(paren->expr, enclosing, module);
 
             break;
         }
@@ -643,7 +667,7 @@ static void assign_scopes(AstNode *node, Scope *enclosing)
             path->scope = enclosing;
 
             for (auto &seg : path->segments)
-                assign_scopes(seg, enclosing);
+                assign_scopes(seg, enclosing, module);
 
             break;
         }
@@ -653,7 +677,7 @@ static void assign_scopes(AstNode *node, Scope *enclosing)
             ret->scope = enclosing;
 
             if (ret->expr)
-                assign_scopes(ret->expr, enclosing);
+                assign_scopes(ret->expr, enclosing, module);
 
             break;
         }
@@ -662,7 +686,7 @@ static void assign_scopes(AstNode *node, Scope *enclosing)
             auto expr = static_cast<AstStmtExpr *>(node);
             expr->scope = enclosing;
 
-            assign_scopes(expr->expr, enclosing);
+            assign_scopes(expr->expr, enclosing, module);
 
             break;
         }
@@ -671,7 +695,7 @@ static void assign_scopes(AstNode *node, Scope *enclosing)
             auto semi = static_cast<AstStmtSemi *>(node);
             semi->scope = enclosing;
 
-            assign_scopes(semi->expr, enclosing);
+            assign_scopes(semi->expr, enclosing, module);
 
             break;
         }
@@ -680,12 +704,12 @@ static void assign_scopes(AstNode *node, Scope *enclosing)
             auto decl = static_cast<AstStmtDecl *>(node);
             decl->scope = enclosing;
 
-            assign_scopes(decl->bind, enclosing);
+            assign_scopes(decl->bind, enclosing, module);
 
             if (decl->type)
-                assign_scopes(decl->type, enclosing);
+                assign_scopes(decl->type, enclosing, module);
             if (decl->desugared_rhs)
-                assign_scopes(decl->desugared_rhs, enclosing);
+                assign_scopes(decl->desugared_rhs, enclosing, module);
 
             break;
         }
@@ -693,12 +717,13 @@ static void assign_scopes(AstNode *node, Scope *enclosing)
         {
             auto func = static_cast<AstFunc *>(node);
             func->scope = make_scope(enclosing);
+            func->scope->module = module;
 
             for (auto &param : func->params)
-                assign_scopes(param, func->scope);
+                assign_scopes(param, func->scope, module);
 
             if (func->block)
-                assign_scopes(func->block, func->scope);
+                assign_scopes(func->block, func->scope, module);
 
             break;
         }
@@ -750,9 +775,46 @@ static Type infer_types(AstNode *node)
         {
             auto lit = static_cast<AstExprLit *>(node);
 
-            // FIXME
-            assert(false);
-            lit->type = type_error;
+            switch (lit->lit_type)
+            {
+                case LIT_INT:
+                {
+                    switch (lit->value_int.type)
+                    {
+                        case INT_I8:  { lit->type = type_i8;  break; }
+                        case INT_I16: { lit->type = type_i16; break; }
+                        case INT_I32: { lit->type = type_i32; break; }
+                        case INT_I64: { lit->type = type_i64; break; }
+                        case INT_U8:  { lit->type = type_u8;  break; }
+                        case INT_U16: { lit->type = type_u16; break; }
+                        case INT_U32: { lit->type = type_u32; break; }
+                        case INT_U64: { lit->type = type_u64; break; }
+                        default:
+                        {
+                            assert(false);
+                            break;
+                        }
+                    }
+
+                    break;
+                }
+                case LIT_FLOAT:
+                {
+                    lit->type = type_f32;
+                    break;
+                }
+                case LIT_STR:
+                {
+                    // TODO: primitive str type?
+                    lit->type = make_type(type_defn_u8, 1);
+                    break;
+                }
+                default:
+                {
+                    assert(false);
+                    break;
+                }
+            }
 
             break;
         }
@@ -1262,9 +1324,11 @@ bool type_check(AstRoot *ast)
     }
 
     Array<AstNode *> nodes = flatten_ast(ast);
-    fprintf(stderr, "Flattened AST into %d nodes.\n", nodes.count);
+//    fprintf(stderr, "Flattened AST into %d nodes.\n", nodes.count);
 
-    assign_scopes(ast, NULL);
+    resolve_calls(nodes);
+
+    assign_scopes(ast, NULL, ast->global_module);
     infer_types(ast);
     declare_vars(ast);
 

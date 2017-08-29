@@ -14,6 +14,7 @@ struct AstStmt;
 struct AstFunc;
 struct AstStruct;
 struct AstStructField;
+struct Module;
 
 struct ScopeVar
 {
@@ -26,6 +27,7 @@ struct ScopeVar
 
 struct Scope
 {
+    Module *module = NULL;
     Scope *parent = NULL;
 
     HashMap<ScopeVar> vars;
@@ -243,6 +245,9 @@ struct AstExprCall : AstExpr
 
     AstExpr *name = NULL;
     Array<AstExpr *> args;
+
+    // Resolved during type checking by resolve_calls().
+    AstFunc *func = NULL;
 
     Array<i64> ir_tmp_indices;
 };

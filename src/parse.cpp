@@ -712,6 +712,7 @@ void parse_file(AstRoot *root, Array<Token> *tokens)
             string_copy(tok.str, name, tok.len);
             name[tok.len] = '\0';
 
+            // TODO: move module creation into type checking phase?
             mod = make_module(root, name, mod);
             root->current_module = mod;
 
