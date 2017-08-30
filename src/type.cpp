@@ -466,13 +466,14 @@ static void resolve_calls(Array<AstNode *> ast)
             continue;
 
         auto call = static_cast<AstExprCall *>(node);
-        assert(!call->func);
+        if (call->func)
+            continue;
+//        assert(!call->func);
 
-        // FIXME
-#if 0
-        resolve_path_into_module();
-        call->func = ;
-#endif
+        assert(call->scope);
+
+        call->func = module_get_func(call->scope->module, call->name);
+        assert(call->func);
     }
 }
 
@@ -917,12 +918,14 @@ static Type infer_types(AstNode *node)
         {
             auto call = static_cast<AstExprCall *>(node);
 
-            // FIXME
-            assert(false);
-            call->type = type_error;
-
             for (auto &arg : call->args)
                 infer_types(arg);
+
+            assert(call->func);
+            if (call->func->ret)
+                call->type = type_from_ast_type(call->scope->module, call->func->ret);
+            else
+                call->type = type_void;
 
             break;
         }
@@ -1326,9 +1329,10 @@ bool type_check(AstRoot *ast)
     Array<AstNode *> nodes = flatten_ast(ast);
 //    fprintf(stderr, "Flattened AST into %d nodes.\n", nodes.count);
 
+    assign_scopes(ast, NULL, ast->global_module);
+
     resolve_calls(nodes);
 
-    assign_scopes(ast, NULL, ast->global_module);
     infer_types(ast);
     declare_vars(ast);
 
