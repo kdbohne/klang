@@ -473,6 +473,18 @@ static void resolve_calls(Array<AstNode *> &ast)
     }
 }
 
+static void declare_params(Array<AstNode *> ast)
+{
+    for (auto &node : ast)
+    {
+        if (node->ast_type != AST_PARAM)
+            continue;
+
+        auto param = static_cast<AstParam *>(node);
+        scope_add_var(param->scope, param->name);
+    }
+}
+
 static void assign_scopes(AstNode *node, Scope *enclosing, Module *module)
 {
     switch (node->ast_type)
@@ -762,11 +774,10 @@ static Type infer_types(AstNode *node)
         {
             auto ident = static_cast<AstExprIdent *>(node);
 
-            // FIXME
-            assert(false);
-            ident->type = type_error;
+            ScopeVar *var = scope_get_var(ident->scope, ident->str);
+            assert(var);
 
-            break;
+            return var->type;
         }
         case AST_EXPR_LIT:
         {
@@ -1324,6 +1335,8 @@ bool type_check(AstRoot *ast)
     assign_scopes(ast, NULL, ast->global_module);
 
     resolve_calls(nodes);
+
+    declare_params(nodes);
 
     infer_types(ast);
     declare_vars(ast);
