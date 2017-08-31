@@ -11,7 +11,9 @@ struct AstExprIdent;
 struct AstExprBlock;
 struct AstExprPath;
 struct AstStmt;
+struct AstType;
 struct AstFunc;
+struct AstParam;
 struct AstStruct;
 struct AstStructField;
 struct Module;
@@ -52,7 +54,6 @@ enum AstNodeType : u32
     AST_EXPR_BIN,
     AST_EXPR_UN,
     AST_EXPR_CALL,
-    AST_EXPR_PARAM,
     AST_EXPR_CAST,
     AST_EXPR_ASSIGN,
     AST_EXPR_IF,
@@ -72,11 +73,13 @@ enum AstNodeType : u32
     AST_STMT_SEMI,
     AST_STMT_DECL,
 
+    AST_TYPE,
+
     AST_FUNC,
+    AST_PARAM,
+
     AST_STRUCT,
     AST_STRUCT_FIELD,
-
-    AST_TYPE,
 
     AST_IMPORT,
 
@@ -252,29 +255,6 @@ struct AstExprCall : AstExpr
     Array<i64> ir_tmp_indices;
 };
 
-struct AstType : AstNode
-{
-    AstType() : AstNode(AST_TYPE) {}
-
-    AstExpr *expr = NULL;
-    i64 ptr_depth = 0;
-
-    // Function pointer.
-    // TODO: TypeKind or something?
-    bool is_func_ptr = false;
-    Array<AstType *> args;
-    AstType *ret = NULL;
-};
-
-// TODO: is this really an expression? Rename -> AstParam?
-struct AstExprParam : AstExpr
-{
-    AstExprParam() : AstExpr(AST_EXPR_PARAM) {}
-
-    AstExprIdent *name = NULL;
-    AstType *type = NULL;
-};
-
 struct AstExprCast : AstExpr
 {
     AstExprCast() : AstExpr(AST_EXPR_CAST) {}
@@ -423,6 +403,20 @@ enum AstFuncFlags
     FUNC_IS_EXTERN = 0x1,
 };
 
+struct AstType : AstNode
+{
+    AstType() : AstNode(AST_TYPE) {}
+
+    AstExpr *expr = NULL;
+    i64 ptr_depth = 0;
+
+    // Function pointer.
+    // TODO: TypeKind or something?
+    bool is_func_ptr = false;
+    Array<AstType *> args;
+    AstType *ret = NULL;
+};
+
 struct AstFunc : AstNode
 {
     AstFunc() : AstNode(AST_FUNC) {}
@@ -430,10 +424,18 @@ struct AstFunc : AstNode
     u32 flags = 0;
 
     AstExprIdent *name = NULL;
-    Array<AstExprParam *> params;
+    Array<AstParam *> params;
     AstType *ret = NULL;
 
     AstExprBlock *block = NULL;
+};
+
+struct AstParam : AstExpr
+{
+    AstParam() : AstExpr(AST_PARAM) {}
+
+    AstExprIdent *name = NULL;
+    AstType *type = NULL;
 };
 
 struct AstStruct : AstNode

@@ -692,12 +692,6 @@ static IrExpr *gen_expr(Ir *ir, Module *module, AstExpr *expr)
 
             return flatten_expr(ir, ast_call, call);
         }
-        case AST_EXPR_PARAM:
-        {
-            // FIXME
-            assert(false);
-            return NULL;
-        }
         case AST_EXPR_CAST:
         {
             auto ast_cast = static_cast<AstExprCast *>(expr);

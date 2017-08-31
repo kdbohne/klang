@@ -576,11 +576,11 @@ static AstExprBlock *parse_block(Parser *parser)
     return block;
 }
 
-static AstExprParam *parse_param(Parser *parser)
+static AstParam *parse_param(Parser *parser)
 {
     Token name_tok = expect(parser, TOK_IDENT);
 
-    AstExprParam *param = ast_alloc(AstExprParam);
+    AstParam *param = ast_alloc(AstParam);
     param->name = make_ident(name_tok);
     param->type = parse_type(parser);
 
@@ -605,7 +605,7 @@ static AstFunc *parse_func(Parser *parser)
         if (peek(parser).type == TOK_CLOSE_PAREN)
             break;
 
-        AstExprParam *param = parse_param(parser);
+        AstParam *param = parse_param(parser);
         func->params.add(param);
 
         eat_optional(parser, TOK_COMMA);

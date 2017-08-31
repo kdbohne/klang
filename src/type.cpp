@@ -236,15 +236,6 @@ static void flatten_ast_visit(Array<AstNode *> *nodes, AstNode *node)
 
             break;
         }
-        case AST_EXPR_PARAM:
-        {
-            auto param = static_cast<AstExprParam *>(node);
-
-            flatten_ast_visit(nodes, param->name);
-            flatten_ast_visit(nodes, param->type);
-
-            break;
-        }
         case AST_EXPR_CALL:
         {
             auto call = static_cast<AstExprCall *>(node);
@@ -401,6 +392,17 @@ static void flatten_ast_visit(Array<AstNode *> *nodes, AstNode *node)
 
             break;
         }
+        case AST_TYPE:
+        {
+            auto type = static_cast<AstType *>(node);
+
+            flatten_ast_visit(nodes, type->expr);
+
+            // TODO: not sure if function pointers should be flattened here,
+            // since they're just AstTypes that shouldn't need further flattening...
+
+            break;
+        }
         case AST_FUNC:
         {
             auto func = static_cast<AstFunc *>(node);
@@ -413,6 +415,15 @@ static void flatten_ast_visit(Array<AstNode *> *nodes, AstNode *node)
 
             break;
         }
+        case AST_PARAM:
+        {
+            auto param = static_cast<AstParam *>(node);
+
+            flatten_ast_visit(nodes, param->name);
+            flatten_ast_visit(nodes, param->type);
+
+            break;
+        }
         case AST_STRUCT:
         {
             // TODO?
@@ -421,17 +432,6 @@ static void flatten_ast_visit(Array<AstNode *> *nodes, AstNode *node)
         case AST_STRUCT_FIELD:
         {
             // TODO?
-            break;
-        }
-        case AST_TYPE:
-        {
-            auto type = static_cast<AstType *>(node);
-
-            flatten_ast_visit(nodes, type->expr);
-
-            // TODO: not sure if function pointers should be flattened here,
-            // since they're just AstTypes that shouldn't need further flattening...
-
             break;
         }
         case AST_IMPORT:
@@ -525,16 +525,6 @@ static void assign_scopes(AstNode *node, Scope *enclosing, Module *module)
             un->scope = enclosing;
 
             assign_scopes(un->expr, enclosing, module);
-
-            break;
-        }
-        case AST_EXPR_PARAM:
-        {
-            auto param = static_cast<AstExprParam *>(node);
-            param->scope = enclosing;
-
-            assign_scopes(param->name, enclosing, module);
-            assign_scopes(param->type, enclosing, module);
 
             break;
         }
@@ -728,6 +718,16 @@ static void assign_scopes(AstNode *node, Scope *enclosing, Module *module)
 
             break;
         }
+        case AST_PARAM:
+        {
+            auto param = static_cast<AstParam *>(node);
+            param->scope = enclosing;
+
+            assign_scopes(param->name, enclosing, module);
+            assign_scopes(param->type, enclosing, module);
+
+            break;
+        }
         case AST_STRUCT:
         case AST_STRUCT_FIELD:
         case AST_TYPE:
@@ -900,17 +900,6 @@ static Type infer_types(AstNode *node)
             }
 
             un->type = un->expr->type;
-
-            break;
-        }
-        case AST_EXPR_PARAM:
-        {
-            auto param = static_cast<AstExprParam *>(node);
-
-            // FIXME
-            assert(false);
-            node->type = type_error;
-//            param->type = type_error; // FIXME
 
             break;
         }
@@ -1107,6 +1096,16 @@ static Type infer_types(AstNode *node)
 
             break;
         }
+        case AST_TYPE:
+        {
+            auto type = static_cast<AstType *>(node);
+
+            // FIXME
+            assert(false);
+            type->type = type_error;
+
+            break;
+        }
         case AST_FUNC:
         {
             auto func = static_cast<AstFunc *>(node);
@@ -1119,13 +1118,14 @@ static Type infer_types(AstNode *node)
 
             break;
         }
-        case AST_TYPE:
+        case AST_PARAM:
         {
-            auto type = static_cast<AstType *>(node);
+            auto param = static_cast<AstParam *>(node);
 
             // FIXME
             assert(false);
-            type->type = type_error;
+            node->type = type_error;
+//            param->type = type_error; // FIXME
 
             break;
         }
@@ -1167,14 +1167,6 @@ static void declare_vars(AstNode *node)
             auto ident = static_cast<AstExprIdent *>(node);
 
             scope_add_var(ident->scope, ident);
-
-            break;
-        }
-        case AST_EXPR_PARAM:
-        {
-            auto param = static_cast<AstExprParam *>(node);
-
-            // FIXME
 
             break;
         }
@@ -1222,6 +1214,14 @@ static void declare_vars(AstNode *node)
 
             for (auto &param : func->params)
                 declare_vars(param);
+
+            break;
+        }
+        case AST_PARAM:
+        {
+            auto param = static_cast<AstParam *>(node);
+
+            // FIXME
 
             break;
         }
