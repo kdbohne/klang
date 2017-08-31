@@ -454,7 +454,7 @@ static Array<AstNode *> flatten_ast(AstRoot *ast)
     return nodes;
 }
 
-static void resolve_calls(Array<AstNode *> ast)
+static void resolve_calls(Array<AstNode *> &ast)
 {
     assert(ast.count > 0);
     AstRoot *root = static_cast<AstRoot *>(ast.data[0]);
