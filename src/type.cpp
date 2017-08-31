@@ -456,10 +456,6 @@ static Array<AstNode *> flatten_ast(AstRoot *ast)
 
 static void resolve_calls(Array<AstNode *> &ast)
 {
-    assert(ast.count > 0);
-    AstRoot *root = static_cast<AstRoot *>(ast.data[0]);
-    assert(root);
-
     for (auto &node : ast)
     {
         if (node->ast_type != AST_EXPR_CALL)
