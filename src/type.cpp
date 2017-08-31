@@ -1100,9 +1100,7 @@ static Type infer_types(AstNode *node)
         {
             auto type = static_cast<AstType *>(node);
 
-            // FIXME
-            assert(false);
-            type->type = type_error;
+            type->type = type_from_ast_type(type->scope->module, type);
 
             break;
         }
@@ -1122,10 +1120,8 @@ static Type infer_types(AstNode *node)
         {
             auto param = static_cast<AstParam *>(node);
 
-            // FIXME
-            assert(false);
-            node->type = type_error;
-//            param->type = type_error; // FIXME
+            // FIXME: use param->type without shadowing
+            node->type = type_from_ast_type(param->scope->module, param->type);
 
             break;
         }
