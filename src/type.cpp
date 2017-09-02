@@ -48,6 +48,29 @@ Type type_void;
 Type type_c_void;
 Type type_error;
 
+// This is a ring buffer used for allocating type strings with get_type_string()
+// for error messages without needing to free them afterward.
+static char type_string_buffers[16][256]; // TODO: size?
+static i64 type_string_buffer_count = 16;
+static i64 type_string_buffer_index;
+
+static char *get_type_string(Type type)
+{
+    if (!type.defn)
+        return NULL;
+
+    char *buf = type_string_buffers[type_string_buffer_index];
+    type_string_buffer_index = (type_string_buffer_index + 1) % type_string_buffer_count;
+
+    char *c = buf;
+    for (i64 i = 0; i < type.ptr_depth; ++i)
+        *c++ = '*';
+
+    string_copy(type.defn->name, c);
+
+    return buf;
+}
+
 static Type make_type(TypeDefn *defn, i64 ptr_depth)
 {
     Type t;
@@ -844,15 +867,11 @@ static Type infer_types(AstNode *node)
                 {
                     // TODO: literal narrowing
 
-                    report_error("Type mismatch in binary operation.%s\n", bin, "");
-                    // FIXME: print_type_string()
-#if 0
                     report_error("Type mismatch in binary operation:\n    %s %s %s\n",
                                  bin,
-                                 get_type_string(lhs->type_defn),
+                                 get_type_string(lhs),
                                  bin_op_strings[bin->op],
-                                 get_type_string(rhs->type_defn));
-#endif
+                                 get_type_string(rhs));
                 }
             }
 
@@ -944,8 +963,8 @@ static Type infer_types(AstNode *node)
             {
                 report_error("Type mismatch in assignment. Assigning rvalue \"%s\" to lvalue \"%s\".\n",
                              assign,
-                             "(FIXME)",
-                             "(FIXME)");
+                             get_type_string(lhs),
+                             get_type_string(rhs));
             }
 
             assign->type = lhs;
@@ -968,8 +987,8 @@ static Type infer_types(AstNode *node)
                 {
                     report_error("Type mismatch between if-block and else-block: \"%s\" vs \"%s\".\n",
                                  if_,
-                                 "(FIXME)",
-                                 "(FIXME)");
+                                 get_type_string(if_->block->type),
+                                 get_type_string(if_->else_expr->type));
                 }
             }
 
