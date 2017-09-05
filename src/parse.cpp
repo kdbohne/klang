@@ -522,8 +522,12 @@ static void parse_stmt(Parser *parser, AstExprBlock *block)
             assign->lhs = bind;
             assign->rhs = rhs;
 
+            copy_loc(assign, ident);
+
             AstStmtSemi *semi = ast_alloc(AstStmtSemi);
             semi->expr = assign;
+
+            // TODO: copy_loc for statement?
 
             block->stmts.add(semi);
         }
