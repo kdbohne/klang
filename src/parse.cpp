@@ -383,6 +383,8 @@ static AstExpr *parse_expr(Parser *parser, bool is_unary)
             un->op = op;
             un->expr = expr;
 
+            copy_loc(un, tok);
+
             lhs = un;
 
             break;
