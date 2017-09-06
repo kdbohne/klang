@@ -884,19 +884,22 @@ static Type infer_types(AstNode *node)
         case AST_EXPR_UN:
         {
             auto un = static_cast<AstExprUn *>(node);
+            infer_types(un->expr);
+
+            un->type = un->expr->type;
 
             switch (un->op)
             {
                 case UN_ADDR:
                 {
-                    ++un->expr->type.ptr_depth;
+                    ++un->type.ptr_depth;
                     break;
                 }
                 case UN_DEREF:
                 {
                     if (un->expr->type.ptr_depth > 0)
                     {
-                        --un->expr->type.ptr_depth;
+                        --un->type.ptr_depth;
                     }
                     else
                     {
@@ -904,7 +907,7 @@ static Type infer_types(AstNode *node)
                                      node,
                                      un->expr->type.defn->name);
 
-                        un->expr->type = type_error;
+                        un->type = type_error;
                     }
 
                     break;
@@ -924,8 +927,6 @@ static Type infer_types(AstNode *node)
                     break;
                 }
             }
-
-            un->type = un->expr->type;
 
             break;
         }
