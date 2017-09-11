@@ -68,6 +68,8 @@ static char *get_type_string(Type type)
 
     string_copy(type.defn->name, c);
 
+    // FIXME: null terminate?!
+
     return buf;
 }
 
@@ -99,7 +101,7 @@ static TypeDefn *register_global_type_defn(const char *name, i64 size)
 {
     if (find_type_defn(global_module, name))
     {
-        report_error_anon("registering duplicate global type definition \"%s\".\n", name);
+        report_error_anon("Registering duplicate global type definition \"%s\".\n", name);
         return NULL;
     }
 
@@ -183,7 +185,8 @@ static TypeDefn *register_struct(Module *module, AstStruct *struct_)
 
         Type t = type_from_ast_type(module, field->type);
         assert(!type_is_void(t));
-        defn->struct_fields.add(t);
+        defn->struct_field_names.add(field->name->str);
+        defn->struct_field_types.add(t);
 
         i64 field_size = 0;
         i64 field_alignment = 0;
@@ -214,10 +217,10 @@ static TypeDefn *register_struct(Module *module, AstStruct *struct_)
     return defn;
 }
 
-static void flatten_ast_visit(Array<AstNode *> *nodes, AstNode *node)
+static void flatten_ast_visit(Array<AstNode *> *ast, AstNode *node)
 {
     // Always add the current node.
-    nodes->add(node);
+    ast->add(node);
 
     // Recurse into child nodes.
     switch (node->ast_type)
@@ -229,7 +232,7 @@ static void flatten_ast_visit(Array<AstNode *> *nodes, AstNode *node)
             for (auto &mod : root->modules)
             {
                 for (auto &func : mod->funcs)
-                    flatten_ast_visit(nodes, func);
+                    flatten_ast_visit(ast, func);
             }
 
             break;
@@ -246,8 +249,8 @@ static void flatten_ast_visit(Array<AstNode *> *nodes, AstNode *node)
         {
             auto bin = static_cast<AstExprBin *>(node);
 
-            flatten_ast_visit(nodes, bin->lhs);
-            flatten_ast_visit(nodes, bin->rhs);
+            flatten_ast_visit(ast, bin->lhs);
+            flatten_ast_visit(ast, bin->rhs);
 
             break;
         }
@@ -255,7 +258,7 @@ static void flatten_ast_visit(Array<AstNode *> *nodes, AstNode *node)
         {
             auto un = static_cast<AstExprUn *>(node);
 
-            flatten_ast_visit(nodes, un->expr);
+            flatten_ast_visit(ast, un->expr);
 
             break;
         }
@@ -263,10 +266,10 @@ static void flatten_ast_visit(Array<AstNode *> *nodes, AstNode *node)
         {
             auto call = static_cast<AstExprCall *>(node);
 
-            flatten_ast_visit(nodes, call->name);
+            flatten_ast_visit(ast, call->name);
 
             for (auto &arg : call->args)
-                flatten_ast_visit(nodes, arg);
+                flatten_ast_visit(ast, arg);
 
             break;
         }
@@ -274,8 +277,8 @@ static void flatten_ast_visit(Array<AstNode *> *nodes, AstNode *node)
         {
             auto cast = static_cast<AstExprCast *>(node);
 
-            flatten_ast_visit(nodes, cast->type);
-            flatten_ast_visit(nodes, cast->expr);
+            flatten_ast_visit(ast, cast->type);
+            flatten_ast_visit(ast, cast->expr);
 
             break;
         }
@@ -283,8 +286,8 @@ static void flatten_ast_visit(Array<AstNode *> *nodes, AstNode *node)
         {
             auto assign = static_cast<AstExprAssign *>(node);
 
-            flatten_ast_visit(nodes, assign->lhs);
-            flatten_ast_visit(nodes, assign->rhs);
+            flatten_ast_visit(ast, assign->lhs);
+            flatten_ast_visit(ast, assign->rhs);
 
             break;
         }
@@ -292,10 +295,10 @@ static void flatten_ast_visit(Array<AstNode *> *nodes, AstNode *node)
         {
             auto if_ = static_cast<AstExprIf *>(node);
 
-            flatten_ast_visit(nodes, if_->cond);
-            flatten_ast_visit(nodes, if_->block);
+            flatten_ast_visit(ast, if_->cond);
+            flatten_ast_visit(ast, if_->block);
             if (if_->else_expr)
-                flatten_ast_visit(nodes, if_->else_expr);
+                flatten_ast_visit(ast, if_->else_expr);
 
             break;
         }
@@ -304,10 +307,10 @@ static void flatten_ast_visit(Array<AstNode *> *nodes, AstNode *node)
             auto block = static_cast<AstExprBlock *>(node);
 
             for (auto &stmt : block->stmts)
-                flatten_ast_visit(nodes, stmt);
+                flatten_ast_visit(ast, stmt);
 
             if (block->expr)
-                flatten_ast_visit(nodes, block->expr);
+                flatten_ast_visit(ast, block->expr);
 
             break;
         }
@@ -315,8 +318,8 @@ static void flatten_ast_visit(Array<AstNode *> *nodes, AstNode *node)
         {
             auto field = static_cast<AstExprField *>(node);
 
-            flatten_ast_visit(nodes, field->expr);
-            flatten_ast_visit(nodes, field->name);
+            flatten_ast_visit(ast, field->expr);
+            flatten_ast_visit(ast, field->name);
 
             break;
         }
@@ -324,7 +327,7 @@ static void flatten_ast_visit(Array<AstNode *> *nodes, AstNode *node)
         {
             auto loop = static_cast<AstExprLoop *>(node);
 
-            flatten_ast_visit(nodes, loop->block);
+            flatten_ast_visit(ast, loop->block);
 
             break;
         }
@@ -336,9 +339,9 @@ static void flatten_ast_visit(Array<AstNode *> *nodes, AstNode *node)
         {
             auto for_ = static_cast<AstExprFor *>(node);
 
-            flatten_ast_visit(nodes, for_->it);
-            flatten_ast_visit(nodes, for_->range);
-            flatten_ast_visit(nodes, for_->block);
+            flatten_ast_visit(ast, for_->it);
+            flatten_ast_visit(ast, for_->range);
+            flatten_ast_visit(ast, for_->block);
 
             break;
         }
@@ -346,8 +349,8 @@ static void flatten_ast_visit(Array<AstNode *> *nodes, AstNode *node)
         {
             auto range = static_cast<AstExprRange *>(node);
 
-            flatten_ast_visit(nodes, range->start);
-            flatten_ast_visit(nodes, range->end);
+            flatten_ast_visit(ast, range->start);
+            flatten_ast_visit(ast, range->end);
 
             break;
         }
@@ -355,8 +358,8 @@ static void flatten_ast_visit(Array<AstNode *> *nodes, AstNode *node)
         {
             auto while_ = static_cast<AstExprWhile *>(node);
 
-            flatten_ast_visit(nodes, while_->cond);
-            flatten_ast_visit(nodes, while_->block);
+            flatten_ast_visit(ast, while_->cond);
+            flatten_ast_visit(ast, while_->block);
 
             break;
         }
@@ -364,7 +367,7 @@ static void flatten_ast_visit(Array<AstNode *> *nodes, AstNode *node)
         {
             auto paren = static_cast<AstExprParen *>(node);
 
-            flatten_ast_visit(nodes, paren->expr);
+            flatten_ast_visit(ast, paren->expr);
 
             break;
         }
@@ -373,7 +376,7 @@ static void flatten_ast_visit(Array<AstNode *> *nodes, AstNode *node)
             auto path = static_cast<AstExprPath *>(node);
 
             for (auto &seg : path->segments)
-                flatten_ast_visit(nodes, seg);
+                flatten_ast_visit(ast, seg);
 
             break;
         }
@@ -382,7 +385,7 @@ static void flatten_ast_visit(Array<AstNode *> *nodes, AstNode *node)
             auto ret = static_cast<AstExprReturn *>(node);
 
             if (ret->expr)
-                flatten_ast_visit(nodes, ret->expr);
+                flatten_ast_visit(ast, ret->expr);
 
             break;
         }
@@ -390,7 +393,7 @@ static void flatten_ast_visit(Array<AstNode *> *nodes, AstNode *node)
         {
             auto expr = static_cast<AstStmtExpr *>(node);
 
-            flatten_ast_visit(nodes, expr->expr);
+            flatten_ast_visit(ast, expr->expr);
 
             break;
         }
@@ -398,7 +401,7 @@ static void flatten_ast_visit(Array<AstNode *> *nodes, AstNode *node)
         {
             auto semi = static_cast<AstStmtSemi *>(node);
 
-            flatten_ast_visit(nodes, semi->expr);
+            flatten_ast_visit(ast, semi->expr);
 
             break;
         }
@@ -406,12 +409,12 @@ static void flatten_ast_visit(Array<AstNode *> *nodes, AstNode *node)
         {
             auto decl = static_cast<AstStmtDecl *>(node);
 
-            flatten_ast_visit(nodes, decl->bind);
+            flatten_ast_visit(ast, decl->bind);
 
             if (decl->type)
-                flatten_ast_visit(nodes, decl->type);
+                flatten_ast_visit(ast, decl->type);
             if (decl->desugared_rhs)
-                flatten_ast_visit(nodes, decl->desugared_rhs);
+                flatten_ast_visit(ast, decl->desugared_rhs);
 
             break;
         }
@@ -419,7 +422,7 @@ static void flatten_ast_visit(Array<AstNode *> *nodes, AstNode *node)
         {
             auto type = static_cast<AstType *>(node);
 
-            flatten_ast_visit(nodes, type->expr);
+            flatten_ast_visit(ast, type->expr);
 
             // TODO: not sure if function pointers should be flattened here,
             // since they're just AstTypes that shouldn't need further flattening...
@@ -431,10 +434,10 @@ static void flatten_ast_visit(Array<AstNode *> *nodes, AstNode *node)
             auto func = static_cast<AstFunc *>(node);
 
             for (auto &param : func->params)
-                flatten_ast_visit(nodes, param);
+                flatten_ast_visit(ast, param);
 
             if (func->block)
-                flatten_ast_visit(nodes, func->block);
+                flatten_ast_visit(ast, func->block);
 
             break;
         }
@@ -442,8 +445,8 @@ static void flatten_ast_visit(Array<AstNode *> *nodes, AstNode *node)
         {
             auto param = static_cast<AstParam *>(node);
 
-            flatten_ast_visit(nodes, param->name);
-            flatten_ast_visit(nodes, param->type);
+            flatten_ast_visit(ast, param->name);
+            flatten_ast_visit(ast, param->type);
 
             break;
         }
@@ -471,10 +474,10 @@ static void flatten_ast_visit(Array<AstNode *> *nodes, AstNode *node)
 
 static Array<AstNode *> flatten_ast(AstRoot *ast)
 {
-    Array<AstNode *> nodes;
-    flatten_ast_visit(&nodes, ast);
+    Array<AstNode *> flat;
+    flatten_ast_visit(&flat, ast);
 
-    return nodes;
+    return flat;
 }
 
 static void resolve_calls(Array<AstNode *> &ast)
@@ -496,7 +499,31 @@ static void resolve_calls(Array<AstNode *> &ast)
     }
 }
 
-static void declare_params(Array<AstNode *> ast)
+#if 0
+static void resolve_fields(Array<AstNode *> &ast)
+{
+    for (auto &node : ast)
+    {
+        if (node->ast_type != AST_EXPR_FIELD)
+            continue;
+
+        auto field = static_cast<AstExprField *>(node);
+#if 0
+        if (field->field)
+            continue;
+#endif
+        assert(!field->field);
+
+        assert(call->scope);
+
+        call->func = module_get_func(call->scope->module, call->name);
+        assert(call->func);
+    }
+}
+#endif
+
+#if 0
+static void declare_params(Array<AstNode *> &ast)
 {
     for (auto &node : ast)
     {
@@ -504,9 +531,12 @@ static void declare_params(Array<AstNode *> ast)
             continue;
 
         auto param = static_cast<AstParam *>(node);
+        node->type = type_from_ast_type(param->scope->module, param->type); // FIXME
+
         scope_add_var(param->scope, param->name);
     }
 }
+#endif
 
 static void assign_scopes(AstNode *node, Scope *enclosing, Module *module)
 {
@@ -735,6 +765,15 @@ static void assign_scopes(AstNode *node, Scope *enclosing, Module *module)
 
             break;
         }
+        case AST_TYPE:
+        {
+            auto type = static_cast<AstType *>(node);
+            type->scope = enclosing;
+
+            assign_scopes(type->expr, enclosing, module);
+
+            break;
+        }
         case AST_FUNC:
         {
             auto func = static_cast<AstFunc *>(node);
@@ -761,7 +800,6 @@ static void assign_scopes(AstNode *node, Scope *enclosing, Module *module)
         }
         case AST_STRUCT:
         case AST_STRUCT_FIELD:
-        case AST_TYPE:
         case AST_IMPORT:
         {
             // Do nothing.
@@ -799,6 +837,10 @@ static Type infer_types(AstNode *node)
 
             ScopeVar *var = scope_get_var(ident->scope, ident->str);
             assert(var);
+
+            // TODO: should this be done here?
+            if (types_match(ident->type, type_error))
+                ident->type = var->type;
 
             return var->type;
         }
@@ -854,7 +896,7 @@ static Type infer_types(AstNode *node)
             auto bin = static_cast<AstExprBin *>(node);
 
             Type lhs = infer_types(bin->lhs);
-            Type rhs = infer_types(bin->lhs);
+            Type rhs = infer_types(bin->rhs);
 
             if (!types_match(lhs, rhs))
             {
@@ -1013,9 +1055,24 @@ static Type infer_types(AstNode *node)
         {
             auto field = static_cast<AstExprField *>(node);
 
-            // FIXME
-            assert(false);
-            field->type = type_error;
+            Type struct_type = infer_types(field->expr);
+
+            TypeDefn *defn = struct_type.defn;
+            assert(defn);
+            assert(defn->struct_field_names.count == defn->struct_field_types.count);
+            assert(defn->struct_field_names.count > 0);
+
+            Type type = type_error;
+            for (i64 i = 0; i < defn->struct_field_names.count; ++i)
+            {
+                char *name = defn->struct_field_names[i];
+                if (strings_match(name, field->name->str))
+                {
+                    field->type = defn->struct_field_types[i];
+                    break;
+                }
+            }
+            assert(!types_match(field->type, type_error));
 
             break;
         }
@@ -1116,10 +1173,39 @@ static Type infer_types(AstNode *node)
         {
             auto decl = static_cast<AstStmtDecl *>(node);
 
-            // FIXME
-            assert(false);
-            node->type = type_error;
-//            decl->type = type_error; // FIXME
+            if (decl->type)
+            {
+                Type lhs = infer_types(decl->type);
+
+                // If an explicit type is given, make sure the optional assignment
+                // expression matches matches that type.
+                if (decl->desugared_rhs)
+                {
+                    Type rhs = infer_types(decl->desugared_rhs);
+                    if (!types_match(lhs, rhs))
+                    {
+                        report_error("Type mismatch in declaration. Assigning rvalue \"%s\" to lvalue \"%s\".\n",
+                                    decl,
+                                    get_type_string(lhs),
+                                    get_type_string(rhs));
+                    }
+                }
+
+                node->type = lhs; // FIXME
+            }
+            else
+            {
+                // Infer the type from the rhs of the assignment expression.
+                assert(decl->desugared_rhs);
+                node->type = infer_types(decl->desugared_rhs); // FIXME
+            }
+
+            // TODO: multiple decls, patterns, etc.
+            assert(decl->bind->ast_type == AST_EXPR_IDENT);
+            auto ident = static_cast<AstExprIdent *>(decl->bind);
+            ident->type = node->type; // FIXME
+
+            scope_add_var(decl->scope, ident);
 
             break;
         }
@@ -1150,6 +1236,8 @@ static Type infer_types(AstNode *node)
             // FIXME: use param->type without shadowing
             node->type = type_from_ast_type(param->scope->module, param->type);
 
+            scope_add_var(param->scope, param->name);
+
             break;
         }
         case AST_STRUCT:
@@ -1169,6 +1257,7 @@ static Type infer_types(AstNode *node)
     return node->type;
 }
 
+#if 0
 static void declare_vars(AstNode *node)
 {
     switch (node->ast_type)
@@ -1280,10 +1369,7 @@ static void declare_vars(AstNode *node)
         }
     }
 }
-
-static void type_check_func(Module *module, AstFunc *func)
-{
-}
+#endif
 
 bool type_is_void(Type type)
 {
@@ -1349,23 +1435,25 @@ bool type_check(AstRoot *ast)
             register_struct(mod, struct_);
     }
 
-    Array<AstNode *> nodes = flatten_ast(ast);
-//    fprintf(stderr, "Flattened AST into %d nodes.\n", nodes.count);
+    Array<AstNode *> flat = flatten_ast(ast);
+//    fprintf(stderr, "Flattened AST into %d nodes.\n", flat.count);
 
     assign_scopes(ast, NULL, ast->global_module);
 
-    resolve_calls(nodes);
+    resolve_calls(flat);
 
-    declare_params(nodes);
+//    declare_params(flat);
 
     infer_types(ast);
-    declare_vars(ast);
+//    declare_vars(ast);
 
+#if 0
     for (auto &mod : ast->modules)
     {
         for (auto &func : mod->funcs)
             type_check_func(mod, func);
     }
+#endif
 
     return (global_error_count == 0);
 }

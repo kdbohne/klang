@@ -21,7 +21,10 @@ struct TypeDefn
     i64 size = -1;
     i64 alignment = -1;
 
-    Array<Type> struct_fields;
+    // TODO: combine these two arrays somehow? Need a way to look up fields by
+    // name and type for resolving AstExprField types during type checking.
+    Array<char *> struct_field_names;
+    Array<Type> struct_field_types;
 
     Array<Type> func_args;
     Type func_ret;

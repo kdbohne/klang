@@ -850,16 +850,20 @@ static IrExpr *gen_expr(Ir *ir, Module *module, AstExpr *expr)
         case AST_EXPR_FIELD:
         {
             auto ast_field = static_cast<AstExprField *>(expr);
-            // FIXME
-#if 0
-            auto struct_ = ast_field->expr->type_defn->struct_;
+
+            Type struct_type = ast_field->expr->type;
+
+            auto defn = struct_type.defn;
+            assert(defn);
+            assert(defn->struct_field_names.count == defn->struct_field_types.count);
+            assert(defn->struct_field_names.count > 0);
 
             // TODO: optimize, store index in field?
             i64 index = -1;
-            for (i64 i = 0; i < struct_->fields.count; ++i)
+            for (i64 i = 0; i < defn->struct_field_names.count; ++i)
             {
-                auto it = struct_->fields[i];
-                if (strings_match(it->name->str, ast_field->name->str))
+                char *name = defn->struct_field_names[i];
+                if (strings_match(name, ast_field->name->str))
                 {
                     index = i;
                     break;
@@ -875,8 +879,6 @@ static IrExpr *gen_expr(Ir *ir, Module *module, AstExpr *expr)
             field->index = index;
 
             return field;
-#endif
-            return NULL;
         }
         case AST_EXPR_LOOP:
         {

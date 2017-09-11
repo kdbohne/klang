@@ -1,3 +1,8 @@
+struct Test {
+    id i64;
+    t *Test;
+};
+
 struct Foo {
     p *i64;
 };
@@ -23,6 +28,20 @@ fn add_three(a i64) -> i64 {
 fn add(a i64, b i64) -> i64 {
     a + b
 }
+
+/*
+fn main() {
+    let x = 3;
+    let c = x + 2;
+
+    let d = if c == 5 {
+        let m = 4 + 2;
+        m * 2
+    } else {
+        5
+    };
+}
+*/
 
 fn main() {
     let x = 3;
@@ -72,8 +91,11 @@ fn main() {
     };
 
     let d = if c == 5 {
+        /*
         let m = 4 + 2;
         m * 2
+        */
+        3
     } else {
         5
     };
