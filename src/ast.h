@@ -42,7 +42,7 @@ struct Scope
 // TODO: are all of these needed here? some are probably only used in type.cpp
 Scope *make_scope(Scope *parent);
 ScopeVar *scope_get_var(Scope *scope, const char *name);
-void scope_add_var(Scope *scope, AstExprIdent *name);
+bool scope_add_var(Scope *scope, AstExprIdent *name);
 
 enum AstNodeType : u32
 {

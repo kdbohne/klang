@@ -1205,7 +1205,12 @@ static Type infer_types(AstNode *node)
             auto ident = static_cast<AstExprIdent *>(decl->bind);
             ident->type = node->type; // FIXME
 
-            scope_add_var(decl->scope, ident);
+            if (!scope_add_var(decl->scope, ident))
+            {
+                report_error("Redeclaring existing identifier \"%s\".\n",
+                             ident,
+                             ident->str);
+            }
 
             break;
         }

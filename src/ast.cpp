@@ -18,14 +18,6 @@ extern "C"
     float strtof(const char *nptr, char **endptr);
 }
 
-// TODO: this is copy-pasted from type.cpp. Unify?
-#include <stdio.h>
-#define report_error(str, ast, ...) \
-do { \
-    fprintf(stderr, "(%s:%d:%d) " str, ast->file.path, ast->line, ast->col, __VA_ARGS__); \
-    print_line(ast->file.src, ast->line); \
-} while (0)
-
 Scope *make_scope(Scope *parent)
 {
     assert(scope_pool_count < (i32)(sizeof(scope_pool) / sizeof(scope_pool[0])));
@@ -50,19 +42,14 @@ ScopeVar *scope_get_var(Scope *scope, const char *name)
     return NULL;
 }
 
-void scope_add_var(Scope *scope, AstExprIdent *name)
+bool scope_add_var(Scope *scope, AstExprIdent *name)
 {
     assert(scope != NULL);
     assert(!type_is_void(name->type));
 
     auto existing = scope_get_var(scope, name->str);
     if (existing)
-    {
-        report_error("Redeclaring existing identifier \"%s\".\n",
-                     name,
-                     name->str);
-        return;
-    }
+        return false;
 
     name->scope = scope;
 
@@ -70,6 +57,8 @@ void scope_add_var(Scope *scope, AstExprIdent *name)
     var.name = name;
     var.type = name->type;
     scope->vars.insert(name->str, var);
+
+    return true;
 }
 
 Module *make_module(AstRoot *root, char *name, Module *parent)
