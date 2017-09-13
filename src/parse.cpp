@@ -521,6 +521,7 @@ static void parse_stmt(Parser *parser, AstExprBlock *block)
             AstExprAssign *assign = ast_alloc(AstExprAssign);
             assign->lhs = bind;
             assign->rhs = rhs;
+            assign->flags |= ASSIGN_IS_DECL_DESUGARED_RHS;
 
             copy_loc(assign, ident);
 

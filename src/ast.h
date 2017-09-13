@@ -263,12 +263,19 @@ struct AstExprCast : AstExpr
     AstExpr *expr = NULL;
 };
 
+enum AstAssignFlags
+{
+    ASSIGN_IS_DECL_DESUGARED_RHS = 0x1,
+};
+
 struct AstExprAssign : AstExpr
 {
     AstExprAssign() : AstExpr(AST_EXPR_ASSIGN) {}
 
     AstExpr *lhs = NULL;
     AstExpr *rhs = NULL;
+
+    u32 flags = 0;
 };
 
 struct AstExprIf : AstExpr

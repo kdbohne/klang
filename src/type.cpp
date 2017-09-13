@@ -1000,6 +1000,11 @@ static Type infer_types(AstNode *node)
         {
             auto assign = static_cast<AstExprAssign *>(node);
 
+            // The type of the desugared RHS has already been determined
+            // by the AST_STMT_DECL case, so don't do anything here.
+            if (assign->flags & ASSIGN_IS_DECL_DESUGARED_RHS)
+                break;
+
             Type lhs = infer_types(assign->lhs);
             Type rhs = infer_types(assign->rhs);
             if (!types_match(lhs, rhs))
