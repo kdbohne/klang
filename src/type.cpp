@@ -926,9 +926,7 @@ static Type infer_types(AstNode *node)
         case AST_EXPR_UN:
         {
             auto un = static_cast<AstExprUn *>(node);
-            infer_types(un->expr);
-
-            un->type = un->expr->type;
+            un->type = infer_types(un->expr);
 
             switch (un->op)
             {
