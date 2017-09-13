@@ -1246,7 +1246,16 @@ static Type infer_types(AstNode *node)
             // FIXME: use param->type without shadowing
             node->type = type_from_ast_type(param->scope->module, param->type);
 
-            scope_add_var(param->scope, param->name);
+            // NOTE: This variable binding uses the type from param->name,
+            // not from param itself, so it must be copied here.
+            param->name->type = node->type;
+
+            if (!scope_add_var(param->scope, param->name))
+            {
+                report_error("Multiple parameters have the same name: \"%s\".\n",
+                             param->name,
+                             param->name->str);
+            }
 
             break;
         }

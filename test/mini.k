@@ -30,16 +30,8 @@ fn add(a i64, b i64) -> i64 {
 }
 
 /*
-fn main() {
-    let x = 3;
-    let c = x + 2;
-
-    let d = if c == 5 {
-        let m = 4 + 2;
-        m * 2
-    } else {
-        5
-    };
+fn bad(a i64, b i64, c i64, a i64) -> i64 {
+    4
 }
 */
 
@@ -91,11 +83,8 @@ fn main() {
     };
 
     let d = if c == 5 {
-        /*
         let m = 4 + 2;
         m * 2
-        */
-        3
     } else {
         5
     };
