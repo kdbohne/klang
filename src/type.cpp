@@ -947,7 +947,7 @@ static Type infer_types(AstNode *node)
                     {
                         report_error("Dereferencing non-pointer type \"%s\".\n",
                                      node,
-                                     un->expr->type.defn->name);
+                                     un->expr->type.defn ? un->expr->type.defn->name : "(null)");
 
                         un->type = type_error;
                     }
