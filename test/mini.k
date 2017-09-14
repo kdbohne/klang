@@ -36,6 +36,8 @@ fn bad(a i64, b i64, c i64, a i64) -> i64 {
 */
 
 fn main() {
+    let i i8 = 15;
+
     let x = 3;
     let y = 4;
     let z = add(x, y);

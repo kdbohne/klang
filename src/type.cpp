@@ -1150,8 +1150,8 @@ static Type infer_types(AstNode *node)
                     {
                         report_error("Type mismatch in declaration. Assigning rvalue \"%s\" to lvalue \"%s\".\n",
                                     decl,
-                                    get_type_string(lhs),
-                                    get_type_string(rhs));
+                                    get_type_string(rhs),
+                                    get_type_string(lhs));
                     }
                 }
 
