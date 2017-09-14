@@ -774,6 +774,166 @@ static void assign_scopes(AstNode *node, Scope *enclosing, Module *module)
     }
 }
 
+static void check_int_overflow(AstExprLit *lit)
+{
+    LitInt *i = &lit->value_int;
+    bool neg = i->flags & INT_IS_NEGATIVE;
+
+    bool overflow = false;
+
+    // TODO: clean this up
+
+    // Don't check hex or binary literals for overflows based on their value.
+    // Just use the exact representation as it was given; check for 'unsigned'
+    // overflow, i.e. values that are too big to fit in the specified number of
+    // bits.
+    if ((i->flags & INT_IS_HEX) || (i->flags & INT_IS_BINARY))
+    {
+        switch (i->type)
+        {
+            case INT_I8:
+            case INT_U8:
+            {
+                overflow = i->value > 255;
+                break;
+            }
+            case INT_I16:
+            case INT_U16:
+            {
+                overflow = i->value > 65535;
+                break;
+            }
+            case INT_I32:
+            case INT_U32:
+            {
+                overflow = i->value > 4294967295;
+                break;
+            }
+            case INT_I64:
+            case INT_U64:
+            {
+                // FIXME: this fails... how to check this?
+                overflow = i->value > 18446744073709551615ull;
+                break;
+            }
+            default:
+            {
+                assert(false);
+                break;
+            }
+        }
+    }
+    else
+    {
+        switch (i->type)
+        {
+            case INT_I8:
+            {
+                overflow = i->value > (127 + (neg ? 1 : 0));
+                break;
+            }
+            case INT_I16:
+            {
+                overflow = i->value > (32767 + (neg ? 1 : 0));
+                break;
+            }
+            case INT_I32:
+            {
+                overflow = i->value > (2147483647 + (neg ? 1 : 0));
+                break;
+            }
+            case INT_I64:
+            {
+                overflow = i->value > (9223372036854775807 + (neg ? 1 : 0));
+                break;
+            }
+            case INT_U8:
+            {
+                overflow = i->value > 255;
+                break;
+            }
+            case INT_U16:
+            {
+                overflow = i->value > 65535;
+                break;
+            }
+            case INT_U32:
+            {
+                overflow = i->value > 4294967295;
+                break;
+            }
+            case INT_U64:
+            {
+                // FIXME: this fails... how to check this?
+                overflow = i->value > 18446744073709551615ull;
+                break;
+            }
+            default:
+            {
+                assert(false);
+                break;
+            }
+        }
+    }
+
+    if (overflow)
+    {
+        report_error("Integer literal %s%lu overflows %s.\n",
+                     lit,
+                     neg ? "-" : "",
+                     i->value,
+                     i->type == INT_I8  ? "i8"  :
+                     i->type == INT_I16 ? "i16" :
+                     i->type == INT_I32 ? "i32" :
+                     i->type == INT_I64 ? "i64" :
+                     i->type == INT_U8  ? "u8"  :
+                     i->type == INT_U16 ? "u16" :
+                     i->type == INT_U32 ? "u32" :
+                     i->type == INT_U64 ? "u64" :
+                     "(error)");
+    }
+}
+
+static Type narrow_type(Type target, AstExpr *expr)
+{
+    if (expr->ast_type == AST_EXPR_LIT)
+    {
+        auto lit = static_cast<AstExprLit *>(expr);
+
+        // TODO: do other types need to be narrowed?
+        // TODO: f32/f64?
+        // Do nothing for non-integers.
+        if (lit->lit_type != LIT_INT)
+            return expr->type;
+
+        // TODO: optimize
+        if (types_match(target, type_i8))
+            lit->value_int.type = INT_I8;
+        else if (types_match(target, type_i16))
+            lit->value_int.type = INT_I16;
+        else if (types_match(target, type_i32))
+            lit->value_int.type = INT_I32;
+        else if (types_match(target, type_i64))
+            lit->value_int.type = INT_I64;
+        else if (types_match(target, type_u8))
+            lit->value_int.type = INT_U8;
+        else if (types_match(target, type_u16))
+            lit->value_int.type = INT_U16;
+        else if (types_match(target, type_u32))
+            lit->value_int.type = INT_U32;
+        else if (types_match(target, type_u64))
+            lit->value_int.type = INT_U64;
+        else
+            assert(false);
+
+        check_int_overflow(lit);
+
+        expr->type = target;
+    }
+
+    return expr->type;
+}
+
 static Type infer_types(AstNode *node)
 {
     switch (node->ast_type)
@@ -1148,10 +1308,14 @@ static Type infer_types(AstNode *node)
                     Type rhs = infer_types(decl->desugared_rhs);
                     if (!types_match(lhs, rhs))
                     {
-                        report_error("Type mismatch in declaration. Assigning rvalue \"%s\" to lvalue \"%s\".\n",
-                                    decl,
-                                    get_type_string(rhs),
-                                    get_type_string(lhs));
+                        rhs = narrow_type(lhs, decl->desugared_rhs);
+                        if (!types_match(lhs, rhs))
+                        {
+                            report_error("Type mismatch in declaration. Assigning rvalue \"%s\" to lvalue \"%s\".\n",
+                                        decl,
+                                        get_type_string(rhs),
+                                        get_type_string(lhs));
+                        }
                     }
                 }
 
