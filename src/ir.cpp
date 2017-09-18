@@ -318,7 +318,7 @@ static void gen_struct(Ir *ir, Module *module, AstStruct *ast_struct)
         Type type = defn->struct_field_types[i];
         assert(type.defn);
 
-        IrType *t = new IrType();
+        IrType *t = new IrType(); // TODO: reduce allocations
         t->name = mangle_type_defn(type.defn);
         t->ptr_depth = type.ptr_depth;
 
@@ -432,9 +432,8 @@ static i64 alloc_tmp(Ir *ir, AstExpr *expr, IrType *type)
 static i64 alloc_tmp(Ir *ir, AstExpr *expr)
 {
     IrType *type = new IrType(); // TODO: reduce allocations
-    // FIXME
-//    type->name = mangle_type_defn(expr->type_defn);
-//    type->ptr_depth = get_ptr_depth(expr->type_defn);
+    type->name = mangle_type_defn(expr->type.defn);
+    type->ptr_depth = expr->type.ptr_depth;
 
     return alloc_tmp(ir, expr, type);
 }
