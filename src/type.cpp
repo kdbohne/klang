@@ -1116,8 +1116,12 @@ static Type infer_types(AstNode *node)
         {
             auto cast = static_cast<AstExprCast *>(node);
 
-//            cast->type = infer_types(cast->expr); // FIXME
-            node->type = infer_types(cast->expr);
+            Type lhs = infer_types(cast->type);
+            Type rhs = infer_types(cast->expr);
+
+            // TODO: check if this is a valid cast?
+
+            node->type = lhs; // FIXME
 
             break;
         }
