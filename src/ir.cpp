@@ -1116,9 +1116,12 @@ static void gen_func_prototype(Ir *ir, Module *module, AstFunc *ast_func)
     {
         IrParam *param = func->params.next();
 
+        // NOTE: this uses the Type tag on the AstType node, so the indirection
+        // is a bit confusing. The type system and IR generator only work with
+        // Type, not the AstType itself, so they use that instead.
         param->type = new IrType();
-        param->type->name = mangle_type_defn(((AstNode *)ast_param)->type.defn); // FIXME: dumb hack to work around 'type' field shadowing between AstNode and AstParam
-        param->type->ptr_depth = ((AstNode *)ast_param)->type.ptr_depth; // FIXME: dumb hack to work around 'type' field shadowing between AstNode and AstParam
+        param->type->name = mangle_type_defn(ast_param->type->type.defn);
+        param->type->ptr_depth = ast_param->type->type.ptr_depth;
 
         // For an external function, just fill out its parameters and return type.
         // Otherwise, generate temporary bindings as well.
@@ -1140,10 +1143,12 @@ static void gen_func_prototype(Ir *ir, Module *module, AstFunc *ast_func)
 
     if (ast_func->ret)
     {
+        // NOTE: this uses the Type tag on the AstType node, so the indirection
+        // is a bit confusing. The type system and IR generator only work with
+        // Type, not the AstType itself, so they use that instead.
         func->ret = new IrType();
-        // FIXME
-//        func->ret->name = mangle_type_defn(ast_func->ret->type_defn);
-        func->ret->ptr_depth = ast_func->ret->ptr_depth;
+        func->ret->name = mangle_type_defn(ast_func->ret->type.defn);
+        func->ret->ptr_depth = ast_func->ret->type.ptr_depth;
     }
 }
 

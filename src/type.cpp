@@ -746,6 +746,8 @@ static void assign_scopes(AstNode *node, Scope *enclosing, Module *module)
 
             if (func->block)
                 assign_scopes(func->block, func->scope, module);
+            if (func->ret)
+                assign_scopes(func->ret, func->scope, module);
 
             break;
         }
@@ -1398,6 +1400,10 @@ static Type infer_types(AstNode *node)
 
             if (func->block)
                 infer_types(func->block);
+            if (func->ret)
+                infer_types(func->ret);
+
+            // TODO: check if function block type matches function return type
 
             break;
         }
@@ -1406,11 +1412,14 @@ static Type infer_types(AstNode *node)
             auto param = static_cast<AstParam *>(node);
 
             // FIXME: use param->type without shadowing
-            node->type = type_from_ast_type(param->scope->module, param->type);
+            Type type = type_from_ast_type(param->scope->module, param->type);
 
             // NOTE: This variable binding uses the type from param->name,
             // not from param itself, so it must be copied here.
-            param->name->type = node->type;
+            param->name->type = type;
+
+            // Also copy the Type to the AstType node to help during IR generation.
+            param->type->type = type;
 
             if (!scope_add_var(param->scope, param->name))
             {
