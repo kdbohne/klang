@@ -1255,9 +1255,20 @@ static Type infer_types(AstNode *node)
         {
             auto range = static_cast<AstExprRange *>(node);
 
-            // FIXME
-            assert(false);
-            range->type = type_error;
+            Type start = infer_types(range->start);
+            Type end = infer_types(range->end);
+
+            if (!types_match(start, end))
+            {
+                report_error("Type mismatch between start and end of range: \"%s\" vs \"%s\".\n",
+                             range,
+                             get_type_string(start),
+                             get_type_string(end));
+            }
+
+            // NOTE: setting the node type to the start type regardless of
+            // whether the types actually matched.
+            range->type = start;
 
             break;
         }
