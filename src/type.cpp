@@ -1028,13 +1028,19 @@ static Type infer_types(AstNode *node)
                 }
                 else
                 {
-                    // TODO: literal narrowing
+                    // TODO: smarter way of doing this; actually check if/which ones
+                    // are literals and only try to narrow those
+                    lhs = narrow_type(lhs, bin->rhs);
+                    rhs = narrow_type(rhs, bin->lhs);
 
-                    report_error("Type mismatch in binary operation:\n    %s %s %s\n",
-                                 bin,
-                                 get_type_string(lhs),
-                                 bin_op_strings[bin->op],
-                                 get_type_string(rhs));
+                    if (!types_match(lhs, rhs))
+                    {
+                        report_error("Type mismatch in binary operation:\n    %s %s %s\n",
+                                     bin,
+                                     get_type_string(lhs),
+                                     bin_op_strings[bin->op],
+                                     get_type_string(rhs));
+                    }
                 }
             }
 
