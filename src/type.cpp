@@ -135,6 +135,10 @@ static Type type_from_ast_type(Module *module, AstType *ast_type)
             Type type;
             type.defn = find_type_defn(module, ident->str);
             type.ptr_depth = ast_type->ptr_depth;
+
+            // TODO: dependency?
+            assert(type.defn);
+
             return type;
         }
         case AST_EXPR_PATH:

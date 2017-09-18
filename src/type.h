@@ -47,6 +47,7 @@ extern Type type_error;
 bool type_is_void(Type type);
 bool type_is_int(Type type);
 bool type_is_ptr(Type type);
+
 bool types_match(Type a, Type b);
 
 bool type_check(AstRoot *ast);

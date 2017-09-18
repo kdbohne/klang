@@ -46,6 +46,7 @@ bool scope_add_var(Scope *scope, AstExprIdent *name)
 {
     assert(scope != NULL);
     assert(!type_is_void(name->type));
+    assert(name->type.defn);
 
     auto existing = scope_get_var(scope, name->str);
     if (existing)

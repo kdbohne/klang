@@ -135,6 +135,16 @@ int main(int argc, char *argv[])
 
     parse_file(root, &tokens);
 
+#if 0
+    for (auto &mod : root->modules)
+    {
+        fprintf(stderr, "Module %s\n", mod->name);
+        for (auto &func : mod->funcs)
+            fprintf(stderr, "    %s\n", func->name->str);
+        fprintf(stderr, "\n");
+    }
+#endif
+
     if (!type_check(root))
     {
         fprintf(stderr, "There were errors. Exiting.\n");
