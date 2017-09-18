@@ -701,9 +701,8 @@ static IrExpr *gen_expr(Ir *ir, Module *module, AstExpr *expr)
             // TODO: smarter allocation
             // TODO: TypeDefn -> IrType helper function
             IrType *type = new IrType();
-            // FIXME
-//            type->name = mangle_type_defn(ast_cast->type_defn);
-//            type->ptr_depth = get_ptr_depth(ast_cast->type_defn);
+            type->name = mangle_type_defn(((AstNode *)ast_cast)->type.defn); // FIXME: dumb hack to work around 'type' field shadowing between AstNode and AstExprCast
+            type->ptr_depth = ((AstNode *)ast_cast)->type.ptr_depth; // FIXME: dumb hack to work around 'type' field shadowing between AstNode and AstExprCast
 
             IrExprCast *cast = new IrExprCast();
             cast->type = type;
