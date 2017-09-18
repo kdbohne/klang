@@ -1276,9 +1276,12 @@ static Type infer_types(AstNode *node)
         {
             auto while_ = static_cast<AstExprWhile *>(node);
 
-            // FIXME
-            assert(false);
-            while_->type = type_error;
+            // TODO: check if condition is actually a boolean expression?
+            infer_types(while_->cond);
+            infer_types(while_->block);
+
+            // TODO: should while loops be assignable?
+            while_->type = type_void;
 
             break;
         }
