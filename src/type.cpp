@@ -1230,9 +1230,24 @@ static Type infer_types(AstNode *node)
         {
             auto for_ = static_cast<AstExprFor *>(node);
 
-            // FIXME
-            assert(false);
-            for_->type = type_error;
+            // TODO: multiple decls, patterns, etc.
+            // Declare the iterator.
+            assert(for_->it->ast_type == AST_EXPR_IDENT);
+            auto it = static_cast<AstExprIdent *>(for_->it);
+
+            it->type = infer_types(for_->range);
+
+            if (!scope_add_var(it->scope, it))
+            {
+                report_error("Redeclaring existing identifier \"%s\".\n",
+                             it,
+                             it->str);
+            }
+
+            infer_types(for_->block);
+
+            // TODO: should for loops be assignable?
+            for_->type = type_void;
 
             break;
         }
