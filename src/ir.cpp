@@ -553,11 +553,8 @@ static IrExpr *gen_expr(Ir *ir, Module *module, AstExpr *expr)
 
             IrExprVar *ir_var = new IrExprVar();
             ir_var->tmp = var->ir_tmp_index;
-            // FIXME
-            /*
-            if (ident->type_defn->ptr)
+            if (ident->type.ptr_depth > 0)
                 ir_var->is_ptr = true;
-            */
 
             return ir_var;
         }
