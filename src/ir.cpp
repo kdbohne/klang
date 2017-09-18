@@ -278,12 +278,11 @@ static char *mangle_name(Module *module, char *name)
     return mangled;
 }
 
-#if 0
 char *mangle_type_defn(TypeDefn *defn)
 {
+    assert(defn);
     return mangle_name(defn->module, defn->name);
 }
-#endif
 
 static char *mangle_call_name(Module *module, AstExprCall *call)
 {
@@ -309,14 +308,21 @@ static void gen_struct(Ir *ir, Module *module, AstStruct *ast_struct)
     struct_->fields.count = 0;
     struct_->fields.capacity = 0;
 
-    for (auto &field : ast_struct->fields)
+    // TODO: is there a better way of doing this?
+    TypeDefn *defn = ast_struct->type.defn;
+    assert(defn);
+    assert(defn->struct_field_names.count == defn->struct_field_types.count);
+    for (i64 i = 0; i < defn->struct_field_names.count; ++i)
     {
-        IrType *type = new IrType();
-        // FIXME
-//        type->name = mangle_type_defn(field->type_defn);
-        type->ptr_depth = field->type->ptr_depth;
+//        char *name = defn->struct_field_names[i];
+        Type type = defn->struct_field_types[i];
+        assert(type.defn);
 
-        struct_->fields.add(type);
+        IrType *t = new IrType();
+        t->name = mangle_type_defn(type.defn);
+        t->ptr_depth = type.ptr_depth;
+
+        struct_->fields.add(t);
     }
 }
 

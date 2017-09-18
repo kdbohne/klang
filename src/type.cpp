@@ -1499,7 +1499,10 @@ bool type_check(AstRoot *ast)
     for (auto &mod : ast->modules)
     {
         for (auto &struct_ : mod->structs)
-            register_struct(mod, struct_);
+        {
+            struct_->type.defn = register_struct(mod, struct_);
+            struct_->type.ptr_depth = 0;
+        }
     }
 
     Array<AstNode *> flat = flatten_ast(ast);
