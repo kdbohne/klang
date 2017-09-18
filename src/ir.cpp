@@ -45,6 +45,7 @@ static Scope *get_top_level_scope(Scope *scope)
     return NULL;
 }
 
+// TODO: could this be merged with Type in type.h?
 struct IrType
 {
     char *name = NULL;
@@ -1114,10 +1115,10 @@ static void gen_func_prototype(Ir *ir, Module *module, AstFunc *ast_func)
     for (auto &ast_param : ast_func->params)
     {
         IrParam *param = func->params.next();
+
         param->type = new IrType();
-        // FIXME
-//        param->type->name = mangle_type_defn(ast_param->name->type_defn);
-        param->type->ptr_depth = ast_param->type->ptr_depth;
+        param->type->name = mangle_type_defn(((AstNode *)ast_param)->type.defn); // FIXME: dumb hack to work around 'type' field shadowing between AstNode and AstParam
+        param->type->ptr_depth = ((AstNode *)ast_param)->type.ptr_depth; // FIXME: dumb hack to work around 'type' field shadowing between AstNode and AstParam
 
         // For an external function, just fill out its parameters and return type.
         // Otherwise, generate temporary bindings as well.
