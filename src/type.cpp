@@ -66,7 +66,15 @@ static char *get_type_string(Type type)
     for (i64 i = 0; i < type.ptr_depth; ++i)
         *c++ = '*';
 
-    string_copy(type.defn->name, c);
+    if (type.defn->name)
+    {
+        string_copy(type.defn->name, c);
+    }
+    else
+    {
+        // Function pointer.
+        string_copy("fn(FIXME) -> FIXME", c);
+    }
 
     // FIXME: null terminate?!
 
