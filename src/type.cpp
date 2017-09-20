@@ -121,9 +121,61 @@ static Type type_from_ast_type(Module *module, AstType *ast_type)
 {
     if (ast_type->is_func_ptr)
     {
-        // FIXME
-        assert(false);
-        return type_error;
+        TypeDefn *defn = NULL;
+        for (i64 i = 0; i < global_module->type_defns_count; ++i)
+        {
+            TypeDefn *cand = &global_module->type_defns[i];
+            
+            // TODO: more thorough check here? This is just assuming that any
+            // type definition without a name is a function pointer. We can't
+            // just check if there are args or a return type set in the type
+            // definition, because fn(void) -> void is a valid function pointer.
+            if (cand->name)
+                continue;
+
+            if (cand->func_params.count != ast_type->params.count)
+                continue;
+            if ((ast_type->ret && type_is_void(cand->func_ret)) || (!ast_type->ret && !type_is_void(cand->func_ret)))
+                continue;
+
+            bool match = true;
+            for (i64 j = 0; j < cand->func_params.count; ++j)
+            {
+                Type ta = cand->func_params[j];
+                Type tb = type_from_ast_type(module, ast_type->params[j]);
+                if (!types_match(ta, tb))
+                {
+                    match = false;
+                    break;
+                }
+            }
+            if (!match)
+                continue;
+
+            defn = cand;
+        }
+
+        // TODO: is there a way to avoid having to register these at all?
+        // No match was found, so register the function pointer.
+        if (!defn)
+        {
+            assert(global_module);
+            assert(global_module->type_defns_count < (sizeof(global_module->type_defns) / sizeof(global_module->type_defns[0])));
+            defn = &global_module->type_defns[global_module->type_defns_count++];
+
+            for (i64 i = 0; i < ast_type->params.count; ++i)
+            {
+                Type t = type_from_ast_type(module, ast_type->params[i]);
+                defn->func_params.add(t);
+            }
+
+            defn->func_ret = type_from_ast_type(module, ast_type->ret);
+        }
+
+        Type type;
+        type.defn = defn;
+        type.ptr_depth = ast_type->ptr_depth;
+        return type;
     }
 
     switch (ast_type->expr->ast_type)
@@ -217,6 +269,45 @@ static TypeDefn *register_struct(Module *module, AstStruct *struct_)
     }
 
     defn->size += defn->size % defn->alignment;
+
+    return defn;
+}
+
+static TypeDefn *register_func(Module *module, AstFunc *func)
+{
+    if (find_type_defn(module, func->name->str))
+    {
+        report_error("Internal error: registering duplicate function type definition \"%s\".\n",
+                     func,
+                     func->name->str);
+        return NULL;
+    }
+
+    assert(module->type_defns_count < (sizeof(module->type_defns) / sizeof(module->type_defns[0])));
+
+    TypeDefn *defn = &module->type_defns[module->type_defns_count++];
+    defn->name = func->name->str; // TODO: duplicate?
+    defn->module = module;
+
+    for (auto &param : func->params)
+    {
+        Type t = type_from_ast_type(module, param->type);
+        assert(!type_is_void(t));
+
+        defn->func_params.add(t);
+    }
+
+    if (func->ret)
+    {
+        Type t = type_from_ast_type(module, func->ret);
+        assert(!type_is_void(t));
+
+        defn->func_ret = t;
+    }
+    else
+    {
+        defn->func_ret = type_void;
+    }
 
     return defn;
 }
@@ -426,7 +517,9 @@ static void flatten_ast_visit(Array<AstNode *> *ast, AstNode *node)
         {
             auto type = static_cast<AstType *>(node);
 
-            flatten_ast_visit(ast, type->expr);
+            // NOTE: this could also be !type->is_func_ptr
+            if (type->expr)
+                flatten_ast_visit(ast, type->expr);
 
             // TODO: not sure if function pointers should be flattened here,
             // since they're just AstTypes that shouldn't need further flattening...
@@ -515,8 +608,13 @@ static void assign_scopes(AstNode *node, Scope *enclosing, Module *module)
 
             for (auto &mod : root->modules)
             {
+                mod->scope = make_scope(root->scope);
+                mod->scope->module = mod;
+
+                for (auto &var : mod->vars)
+                    assign_scopes(var, mod->scope, mod);
                 for (auto &func : mod->funcs)
-                    assign_scopes(func, root->scope, mod);
+                    assign_scopes(func, mod->scope, mod);
             }
 
             break;
@@ -735,7 +833,8 @@ static void assign_scopes(AstNode *node, Scope *enclosing, Module *module)
             auto type = static_cast<AstType *>(node);
             type->scope = enclosing;
 
-            assign_scopes(type->expr, enclosing, module);
+            if (type->expr)
+                assign_scopes(type->expr, enclosing, module);
 
             break;
         }
@@ -950,6 +1049,8 @@ static Type infer_types(AstNode *node)
 
             for (auto &mod : root->modules)
             {
+                for (auto &var : mod->vars)
+                    infer_types(var);
                 for (auto &func : mod->funcs)
                     infer_types(func);
             }
@@ -1398,6 +1499,19 @@ static Type infer_types(AstNode *node)
         case AST_FUNC:
         {
             auto func = static_cast<AstFunc *>(node);
+
+            func->type.defn = register_func(func->scope->module, func);
+            func->type.ptr_depth = 0;
+
+            func->name->type = func->type;
+
+            // TODO: rename to scope_add_symbol()?
+            if (!scope_add_var(func->scope, func->name))
+            {
+                report_error("Redeclaring existing function \"%s\".\n",
+                             func->name,
+                             func->name->str);
+            }
 
             for (auto &param : func->params)
                 infer_types(param);

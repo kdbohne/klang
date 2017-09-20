@@ -239,6 +239,8 @@ struct Ir
     Array<IrFunc> funcs;
     i64 current_func = -1;
 
+    Array<IrDecl> vars;
+
     Array<IrExpr *> lhs_block_assignment_stack;
     Array<i64> break_stack;
 };
@@ -1773,6 +1775,21 @@ static void dump_c(Ir *ir)
     if (ir->funcs.count > 0)
         printf("\n");
 
+    for (auto &var : ir->vars)
+    {
+        printf("    ");
+
+        dump_c_type(var.type);
+        if (var.type->ptr_depth == 0)
+            printf(" ");
+
+        printf("_%ld;", var.tmp);
+
+        if (var.name)
+            printf(" // %s", var.name);
+        printf("\n");
+    }
+
     for (auto &func : ir->funcs)
     {
         if (func.flags & IR_FUNC_IS_EXTERN)
@@ -1887,6 +1904,33 @@ void gen_ir(AstRoot *ast)
     {
         for (auto &struct_ : mod->structs)
             gen_struct(&ir, mod, struct_);
+
+        // TODO: multiple decls, patterns, etc.
+        // Declare global variables.
+        for (auto &var : mod->vars)
+        {
+            IrType *type = new IrType(); // TODO: reduce allocations
+            type->name = mangle_type_defn(((AstNode *)var)->type.defn); // FIXME: dumb hack to work around 'type' field shadowing between AstNode and AstStmtDecl
+            type->ptr_depth = ((AstNode *)var)->type.ptr_depth; // FIXME: dumb hack to work around 'type' field shadowing between AstNode and AstStmtDecl
+
+            i64 tmp = mod->scope->ir_tmp_counter++;
+
+            IrDecl *decl = ir.vars.next();
+            decl->type = type;
+            decl->tmp = tmp;
+
+            if (var->bind->ast_type == AST_EXPR_IDENT)
+            {
+                auto ident = static_cast<AstExprIdent *>(var->bind);
+                decl->name = ident->str; // TODO: copy?
+            }
+
+            assert(var->bind->ast_type == AST_EXPR_IDENT);
+            auto ident = static_cast<AstExprIdent *>(var->bind);
+
+            ScopeVar *sv = scope_get_var(ident->scope, ident->str);
+            sv->ir_tmp_index = tmp;
+        }
     }
 
     i64 func_index = 0;

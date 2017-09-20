@@ -145,8 +145,8 @@ static AstType *parse_type(Parser *parser)
         expect(parser, TOK_OPEN_PAREN);
         while (peek(parser).type != TOK_CLOSE_PAREN)
         {
-            AstType *arg = parse_type(parser);
-            type->args.add(arg);
+            AstType *param = parse_type(parser);
+            type->params.add(param);
         }
         expect(parser, TOK_CLOSE_PAREN);
 
@@ -699,6 +699,28 @@ void parse_file(AstRoot *root, Array<Token> *tokens)
         {
             AstStruct *struct_ = parse_struct(&parser);
             mod->structs.add(struct_);
+        }
+        else if (tok.type == TOK_KEY_LET)
+        {
+            eat(&parser);
+
+            // TODO: this is mostly copy-pasted from parse_stmt(). Factor out
+            // into parse_decl() or something?
+            // TODO: multiple decls, patterns, etc.
+            Token ident = expect(&parser, TOK_IDENT);
+            AstExpr *bind = make_ident(ident);
+
+            AstType *type = parse_type(&parser);
+
+            // TODO: static assignment?
+
+            AstStmtDecl *decl = ast_alloc(AstStmtDecl);
+            decl->bind = bind;
+            decl->type = type;
+
+            mod->vars.add(decl);
+
+            expect(&parser, TOK_SEMI);
         }
         else if (tok.type == TOK_KEY_IMPORT)
         {

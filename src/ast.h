@@ -11,6 +11,7 @@ struct AstExprIdent;
 struct AstExprBlock;
 struct AstExprPath;
 struct AstStmt;
+struct AstStmtDecl;
 struct AstType;
 struct AstFunc;
 struct AstParam;
@@ -94,6 +95,13 @@ struct Module
     char *name = NULL;
     Array<AstFunc *> funcs;
     Array<AstStruct *> structs;
+    
+    // TODO: using AstStmtDecl because it is convenient at pairing a global
+    // variable's name and type... could maybe use ScopeVar instead? Except
+    // it uses Type instead of AstType.
+    // Global variables.
+    Array<AstStmtDecl *> vars;
+    Scope *scope = NULL; // This is sort of a hack to allow vars to be looked up.
 
     TypeDefn type_defns[512]; // TODO: size?
     i64 type_defns_count;
@@ -420,7 +428,7 @@ struct AstType : AstNode
     // Function pointer.
     // TODO: TypeKind or something?
     bool is_func_ptr = false;
-    Array<AstType *> args;
+    Array<AstType *> params;
     AstType *ret = NULL;
 };
 

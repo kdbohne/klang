@@ -8,6 +8,10 @@ module gl {
         height i64;
     };
 
+    struct Funcs {
+        Clear fn(u32);
+    };
+
     fn create_window(title *u8, width i64, height i64) -> *Window {
         let win = cast(*Window) gl_create_window(title, width, height);
         win
