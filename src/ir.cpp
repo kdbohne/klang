@@ -816,6 +816,8 @@ static IrExpr *gen_expr(Ir *ir, Module *module, AstExpr *expr)
                     {
                         auto semi = static_cast<AstStmtSemi *>(stmt);
                         gen_expr(ir, module, semi->expr);
+
+                        break;
                     }
                     case AST_STMT_DECL:
                     {
