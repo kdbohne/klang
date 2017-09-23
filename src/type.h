@@ -42,8 +42,9 @@ extern Type type_f32;
 extern Type type_f64;
 extern Type type_void;
 extern Type type_c_void;
-extern Type type_error;
+extern Type type_null;
 
+bool type_is_null(Type type);
 bool type_is_void(Type type);
 bool type_is_int(Type type);
 bool type_is_ptr(Type type);

@@ -22,7 +22,7 @@ struct Module;
 struct ScopeVar
 {
     AstExprIdent *name = NULL;
-    Type type = type_error;
+    Type type = type_null;
 
     i64 register_index = -1; // TODO: remove
     i64 ir_tmp_index = -1;
@@ -117,7 +117,7 @@ struct AstNode
 
     AstNodeType ast_type = AST_ERR;
 
-    Type type = type_error;
+    Type type = type_null;
     Scope *scope = NULL;
 
     // Location info for error reporting.

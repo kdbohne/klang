@@ -27,8 +27,9 @@ struct Array
     {
         if (data)
         {
+            // FIXME
 //            free(data);
-            delete[] data;
+//            delete[] data;
         }
     }
 

@@ -46,7 +46,7 @@ Type type_f32;
 Type type_f64;
 Type type_void;
 Type type_c_void;
-Type type_error;
+Type type_null;
 
 // This is a ring buffer used for allocating type strings with get_type_string()
 // for error messages without needing to free them afterward.
@@ -216,7 +216,7 @@ static Type type_from_ast_type(Module *module, AstType *ast_type)
         default:
         {
             assert(false);
-            return type_error;
+            return type_null;
         }
     }
 }
@@ -1063,7 +1063,7 @@ static Type infer_types(AstNode *node)
                     infer_types(var);
             }
 
-            root->type = type_error;
+            root->type = type_null;
 
             break;
         }
@@ -1075,7 +1075,7 @@ static Type infer_types(AstNode *node)
             if (var)
             {
                 // TODO: should this be done here?
-                if (types_match(ident->type, type_error))
+                if (type_is_null(ident->type))
                     ident->type = var->type;
 
                 return var->type;
@@ -1087,7 +1087,7 @@ static Type infer_types(AstNode *node)
                 if (strings_match(func->name->str, ident->str))
                 {
                     // TODO: should this be done here?
-                    if (types_match(ident->type, type_error))
+                    if (type_is_null(ident->type))
                         ident->type = func->type;
 
                     return func->type;
@@ -1098,7 +1098,7 @@ static Type infer_types(AstNode *node)
                             ident,
                             ident->str,
                             ident->scope->module->name);
-            return type_error;
+            return type_null;
         }
         case AST_EXPR_LIT:
         {
@@ -1209,7 +1209,7 @@ static Type infer_types(AstNode *node)
                                      node,
                                      un->expr->type.defn ? un->expr->type.defn->name : "(null)");
 
-                        un->type = type_error;
+                        un->type = type_null;
                     }
 
                     break;
@@ -1331,7 +1331,7 @@ static Type infer_types(AstNode *node)
             assert(defn->struct_field_names.count == defn->struct_field_types.count);
             assert(defn->struct_field_names.count > 0);
 
-            Type type = type_error;
+            Type type = type_null;
             for (i64 i = 0; i < defn->struct_field_names.count; ++i)
             {
                 char *name = defn->struct_field_names[i];
@@ -1341,7 +1341,7 @@ static Type infer_types(AstNode *node)
                     break;
                 }
             }
-            assert(!types_match(field->type, type_error));
+            assert(!type_is_null(field->type));
 
             break;
         }
@@ -1434,7 +1434,7 @@ static Type infer_types(AstNode *node)
 
             // FIXME
             assert(false);
-            path->type = type_error;
+            path->type = type_null;
 
             break;
         }
@@ -1569,7 +1569,7 @@ static Type infer_types(AstNode *node)
         case AST_STRUCT_FIELD:
         case AST_IMPORT:
         {
-            node->type = type_error;
+            node->type = type_null;
             break;
         }
         default:
@@ -1580,6 +1580,11 @@ static Type infer_types(AstNode *node)
     }
 
     return node->type;
+}
+
+bool type_is_null(Type type)
+{
+    return !type.defn && (type.ptr_depth == -1);
 }
 
 bool type_is_void(Type type)
@@ -1661,7 +1666,7 @@ bool type_check(AstRoot *ast)
     type_f64 = make_type(type_defn_f64, 0);
     type_void = make_type(type_defn_void, 0);
     type_c_void = make_type(type_defn_c_void, 0);
-    type_error = make_type(NULL, -1);
+    type_null = make_type(NULL, -1);
 
     for (auto &mod : ast->modules)
     {
