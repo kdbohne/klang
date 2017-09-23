@@ -1072,20 +1072,33 @@ static Type infer_types(AstNode *node)
             auto ident = static_cast<AstExprIdent *>(node);
 
             ScopeVar *var = scope_get_var(ident->scope, ident->str);
-            if (!var)
+            if (var)
             {
-                report_error("Internal error: scope_get_var() failed for \"%s\" in module \"%s\".\n",
-                             ident,
-                             ident->str,
-                             ident->scope->module->name);
-                return type_error;
+                // TODO: should this be done here?
+                if (types_match(ident->type, type_error))
+                    ident->type = var->type;
+
+                return var->type;
             }
 
-            // TODO: should this be done here?
-            if (types_match(ident->type, type_error))
-                ident->type = var->type;
+            // No matching variable, so check if it's the name of a function.
+            for (auto &func : ident->scope->module->funcs)
+            {
+                if (strings_match(func->name->str, ident->str))
+                {
+                    // TODO: should this be done here?
+                    if (types_match(ident->type, type_error))
+                        ident->type = func->type;
 
-            return var->type;
+                    return func->type;
+                }
+            }
+
+            report_error("Internal error: scope_get_var() failed for \"%s\" in module \"%s\".\n",
+                            ident,
+                            ident->str,
+                            ident->scope->module->name);
+            return type_error;
         }
         case AST_EXPR_LIT:
         {
@@ -1516,17 +1529,6 @@ static Type infer_types(AstNode *node)
             auto func = static_cast<AstFunc *>(node);
 
             func->name->type = func->type;
-
-            // TODO: rename to scope_add_symbol()?
-            // Use func->scope->module to get the module the function
-            // belongs to, then use that to get the module's global scope.
-            Scope *mod_scope = func->scope->module->scope;
-            if (!scope_add_var(mod_scope, func->name))
-            {
-                report_error("Redeclaring existing function \"%s\".\n",
-                             func->name,
-                             func->name->str);
-            }
 
             for (auto &param : func->params)
                 infer_types(param);

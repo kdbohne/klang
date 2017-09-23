@@ -62,6 +62,7 @@ enum IrExprType : u32
     IR_EXPR_FIELD,
     IR_EXPR_PAREN,
     IR_EXPR_CAST,
+    IR_EXPR_FUNC_PTR,
 };
 
 struct IrExpr
@@ -167,6 +168,13 @@ struct IrExprCast : IrExpr
 
     IrType type;
     IrExpr *expr = NULL;
+};
+
+struct IrExprFuncPtr : IrExpr
+{
+    IrExprFuncPtr() : IrExpr(IR_EXPR_FUNC_PTR) {}
+
+    char *name = NULL;
 };
 
 enum IrInstrType : u32
@@ -556,18 +564,33 @@ static IrExpr *gen_expr(Ir *ir, Module *module, AstExpr *expr)
             auto ident = static_cast<AstExprIdent *>(expr);
 
             ScopeVar *var = scope_get_var(ident->scope, ident->str);
-            assert(var);
+            if (var)
+            {
+                // Allocate a temporary if the variable doesn't already have one.
+                if (var->ir_tmp_index == -1)
+                    var->ir_tmp_index = alloc_tmp(ir, expr);
 
-            // Allocate a temporary if the variable doesn't already have one.
-            if (var->ir_tmp_index == -1)
-                var->ir_tmp_index = alloc_tmp(ir, expr);
+                IrExprVar *ir_var = new IrExprVar();
+                ir_var->tmp = var->ir_tmp_index;
+                if (ident->type.ptr_depth > 0)
+                    ir_var->is_ptr = true;
 
-            IrExprVar *ir_var = new IrExprVar();
-            ir_var->tmp = var->ir_tmp_index;
-            if (ident->type.ptr_depth > 0)
-                ir_var->is_ptr = true;
+                return ir_var;
+            }
 
-            return ir_var;
+            // No matching variable, so check if it's the name of a function.
+            for (auto &func : ident->scope->module->funcs)
+            {
+                if (strings_match(func->name->str, ident->str))
+                {
+                    IrExprFuncPtr *fp = new IrExprFuncPtr();
+                    fp->name = func->name->str; // TODO: copy?
+                    return fp;
+                }
+            }
+
+            assert(false);
+            return NULL;
         }
         case AST_EXPR_LIT:
         {
@@ -1671,6 +1694,14 @@ static void dump_c_expr(IrExpr *expr)
             printf(")");
             dump_c_expr(cast->expr);
             printf(")");
+
+            break;
+        }
+        case IR_EXPR_FUNC_PTR:
+        {
+            auto func_ptr = static_cast<IrExprFuncPtr *>(expr);
+
+            printf("%s", func_ptr->name);
 
             break;
         }
