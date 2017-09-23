@@ -47,6 +47,15 @@ void string_copy(const char *src, char *dest, int length)
     dest[length] = '\0';
 }
 
+int string_write(char *buf, const char *add)
+{
+    char *base = buf;
+    while (*add)
+        *buf++ = *add++;
+
+    return buf - base;
+}
+
 extern "C" { void *malloc(u64 size); }
 char *string_duplicate(const char *str)
 {

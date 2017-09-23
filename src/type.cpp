@@ -66,17 +66,30 @@ static char *get_type_string(Type type)
     for (i64 i = 0; i < type.ptr_depth; ++i)
         *c++ = '*';
 
-    if (type.defn->name)
+    if (type.defn->flags & TYPE_DEFN_IS_FUNC_PTR)
     {
-        string_copy(type.defn->name, c);
+        c += string_write(c, "fn(");
+
+        for (i64 i = 0; i < type.defn->func_params.count; ++i)
+        {
+            c += string_write(c, get_type_string(type.defn->func_params[i]));
+            if (i < type.defn->func_params.count - 1)
+                c += string_write(c, ", ");
+        }
+        c += string_write(c, ")");
+
+        if (!type_is_void(type.defn->func_ret))
+        {
+            c += string_write(c, " -> ");
+            c += string_write(c, get_type_string(type.defn->func_ret));
+        }
+
+        *c = '\0';
     }
     else
     {
-        // Function pointer.
-        string_copy("fn(FIXME) -> FIXME", c);
+        string_copy(type.defn->name, c);
     }
-
-    // FIXME: null terminate?!
 
     return buf;
 }
