@@ -1210,6 +1210,7 @@ static void gen_func(Ir *ir, Module *module, AstFunc *ast_func, i64 func_index)
         IrDecl decl;
         decl.tmp = 0; // 0 is always reserved for the return value.
         decl.type = func->ret;
+        decl.name = string_duplicate("ret");
 
         func->decls.add(decl);
     }
