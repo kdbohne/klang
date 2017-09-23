@@ -301,15 +301,21 @@ static char *mangle_call_name(Module *module, AstExprCall *call)
     return mangle_name(module, func->name->str);
 }
 
+static IrType ir_type_from_type(Type type)
+{
+    IrType t;
+
+    // TODO: smarter allocation?
+    t.name = mangle_type_defn(type.defn);
+    t.ptr_depth = type.ptr_depth;
+
+    return t;
+}
+
 static void gen_struct(Ir *ir, Module *module, AstStruct *ast_struct)
 {
     IrStruct *struct_ = ir->structs.next();
     struct_->name = mangle_name(module, ast_struct->name->str);
-
-    // Bleh.
-    struct_->fields.data = NULL;
-    struct_->fields.count = 0;
-    struct_->fields.capacity = 0;
 
     // TODO: is there a better way of doing this?
     TypeDefn *defn = ast_struct->type.defn;
@@ -332,27 +338,6 @@ static void gen_struct(Ir *ir, Module *module, AstStruct *ast_struct)
 static i64 create_func(Ir *ir)
 {
     IrFunc *func = ir->funcs.next();
-
-    // Bleh.
-    func->flags = 0;
-
-    func->bbs.data = NULL;
-    func->bbs.count = 0;
-    func->bbs.capacity = 0;
-    func->current_bb = -1;
-
-    func->name = NULL;
-
-    func->params.data = NULL;
-    func->params.count = 0;
-    func->params.capacity = 0;
-
-    func->ret = NULL;
-
-    func->decls.data = NULL;
-    func->decls.count = 0;
-    func->decls.capacity = 0;
-
     return ir->funcs.count - 1;
 }
 
@@ -376,11 +361,6 @@ static i64 create_bb(Ir *ir)
 {
     IrFunc *func = get_current_func(ir);
     IrBb *bb = func->bbs.next();
-
-    // Bleh.
-    bb->instrs.data = NULL;
-    bb->instrs.count = 0;
-    bb->instrs.capacity = 0;
 
     return func->bbs.count - 1;
 }

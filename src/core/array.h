@@ -26,7 +26,10 @@ struct Array
     ~Array()
     {
         if (data)
-            free(data);
+        {
+//            free(data);
+            delete[] data;
+        }
     }
 
     void grow_if_needed()
@@ -38,16 +41,19 @@ struct Array
         {
             capacity = ARRAY_INITIAL_CAPACITY;
 
-            data = (T *)malloc(sizeof(T) * capacity);
+//            data = (T *)malloc(sizeof(T) * capacity);
+            data = new T[capacity];
         }
         else
         {
             capacity *= ARRAY_GROWTH_RATE;
 
-            T *new_data = (T *)malloc(sizeof(T) * capacity);
+//            T *new_data = (T *)malloc(sizeof(T) * capacity);
+            T *new_data = new T[capacity];
             memcpy(new_data, data, sizeof(T) * count);
 
-            free(data);
+//            free(data);
+            delete[] data;
 
             data = new_data;
         }
