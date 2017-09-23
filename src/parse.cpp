@@ -303,6 +303,8 @@ static AstExpr *parse_expr(Parser *parser, bool is_unary)
 
             lhs = if_expr;
 
+            copy_loc(if_expr, tok);
+
             break;
         }
         case TOK_KEY_LOOP:
