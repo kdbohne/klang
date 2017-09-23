@@ -619,10 +619,10 @@ static void assign_scopes(AstNode *node, Scope *enclosing, Module *module)
                 mod->scope = make_scope(root->scope);
                 mod->scope->module = mod;
 
-                for (auto &var : mod->vars)
-                    assign_scopes(var, mod->scope, mod);
                 for (auto &func : mod->funcs)
                     assign_scopes(func, mod->scope, mod);
+                for (auto &var : mod->vars)
+                    assign_scopes(var, mod->scope, mod);
             }
 
             break;
@@ -1057,10 +1057,10 @@ static Type infer_types(AstNode *node)
 
             for (auto &mod : root->modules)
             {
-                for (auto &var : mod->vars)
-                    infer_types(var);
                 for (auto &func : mod->funcs)
                     infer_types(func);
+                for (auto &var : mod->vars)
+                    infer_types(var);
             }
 
             root->type = type_error;
@@ -1072,7 +1072,14 @@ static Type infer_types(AstNode *node)
             auto ident = static_cast<AstExprIdent *>(node);
 
             ScopeVar *var = scope_get_var(ident->scope, ident->str);
-            assert(var);
+            if (!var)
+            {
+                report_error("Internal error: scope_get_var() failed for \"%s\" in module \"%s\".\n",
+                             ident,
+                             ident->str,
+                             ident->scope->module->name);
+                return type_error;
+            }
 
             // TODO: should this be done here?
             if (types_match(ident->type, type_error))
@@ -1508,13 +1515,13 @@ static Type infer_types(AstNode *node)
         {
             auto func = static_cast<AstFunc *>(node);
 
-            func->type.defn = register_func(func->scope->module, func);
-            func->type.ptr_depth = 0;
-
             func->name->type = func->type;
 
             // TODO: rename to scope_add_symbol()?
-            if (!scope_add_var(func->scope, func->name))
+            // Use func->scope->module to get the module the function
+            // belongs to, then use that to get the module's global scope.
+            Scope *mod_scope = func->scope->module->scope;
+            if (!scope_add_var(mod_scope, func->name))
             {
                 report_error("Redeclaring existing function \"%s\".\n",
                              func->name,
@@ -1597,7 +1604,30 @@ bool type_is_ptr(Type type)
 
 bool types_match(Type a, Type b)
 {
-    return (a.defn == b.defn) && (a.ptr_depth == b.ptr_depth);
+    if ((a.defn == b.defn) && (a.ptr_depth == b.ptr_depth))
+        return true;
+
+    // Function pointers.
+    if (!a.defn->name || !b.defn->name)
+    {
+        TypeDefn *da = a.defn;
+        TypeDefn *db = b.defn;
+
+        if (da->func_params.count != db->func_params.count)
+            return false;
+        if (!types_match(da->func_ret, db->func_ret))
+            return false;
+
+        for (i64 i = 0; i < da->func_params.count; ++i)
+        {
+            if (!types_match(da->func_params[i], db->func_params[i]))
+                return false;
+        }
+
+        return true;
+    }
+
+    return false;
 }
 
 bool type_check(AstRoot *ast)
@@ -1637,6 +1667,12 @@ bool type_check(AstRoot *ast)
         {
             struct_->type.defn = register_struct(mod, struct_);
             struct_->type.ptr_depth = 0;
+        }
+
+        for (auto &func : mod->funcs)
+        {
+            func->type.defn = register_func(mod, func);
+            func->type.ptr_depth = 0;
         }
     }
 

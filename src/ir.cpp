@@ -165,7 +165,7 @@ struct IrExprCast : IrExpr
 {
     IrExprCast() : IrExpr(IR_EXPR_CAST) {}
 
-    IrType *type = NULL;
+    IrType type;
     IrExpr *expr = NULL;
 };
 
@@ -195,13 +195,13 @@ struct IrBb
 
 struct IrParam
 {
-    IrType *type = NULL;
+    IrType type;
     i64 tmp = -1;
 };
 
 struct IrDecl
 {
-    IrType *type = NULL;
+    IrType type;
     i64 tmp = -1;
 
     char *name = NULL;
@@ -221,7 +221,7 @@ struct IrFunc
 
     char *name = NULL;
     Array<IrParam> params;
-    IrType *ret = NULL;
+    IrType ret;
 
     Array<IrDecl> decls;
 };
@@ -229,7 +229,7 @@ struct IrFunc
 struct IrStruct
 {
     char *name = NULL;
-    Array<IrType *> fields;
+    Array<IrType> fields;
 };
 
 struct Ir
@@ -244,6 +244,16 @@ struct Ir
     Array<IrExpr *> lhs_block_assignment_stack;
     Array<i64> break_stack;
 };
+
+struct FuncPtr
+{
+    char *name = NULL;
+    TypeDefn *defn = NULL;
+};
+
+// TODO: size?
+static FuncPtr func_ptrs[256];
+static i64 func_ptrs_count;
 
 static char *mangle_name(Module *module, char *name)
 {
@@ -284,6 +294,30 @@ static char *mangle_name(Module *module, char *name)
 char *mangle_type_defn(TypeDefn *defn)
 {
     assert(defn);
+
+    // TODO: mangle function pointer anyway?
+    if (!defn->name)
+    {
+        for (i64 i = 0; i < func_ptrs_count; ++i)
+        {
+            FuncPtr *fp = &func_ptrs[i];
+            if (defn == fp->defn)
+                return fp->name;
+        }
+
+        // TODO: smarter allocation
+        i64 buf_size = 64;
+        char *buf = (char *)malloc(buf_size);
+        snprintf(buf, buf_size, "__func_ptr_%ld", func_ptrs_count);
+
+        assert(func_ptrs_count < sizeof(func_ptrs) / sizeof(func_ptrs[0]));
+        FuncPtr *fp = &func_ptrs[func_ptrs_count++];
+        fp->name = buf;
+        fp->defn = defn;
+
+        return fp->name;
+    }
+
     return mangle_name(defn->module, defn->name);
 }
 
@@ -327,10 +361,7 @@ static void gen_struct(Ir *ir, Module *module, AstStruct *ast_struct)
         Type type = defn->struct_field_types[i];
         assert(type.defn);
 
-        IrType *t = new IrType(); // TODO: reduce allocations
-        t->name = mangle_type_defn(type.defn);
-        t->ptr_depth = type.ptr_depth;
-
+        IrType t = ir_type_from_type(type);
         struct_->fields.add(t);
     }
 }
@@ -391,7 +422,7 @@ static void add_instr(Ir *ir, IrInstr instr)
     bb->instrs.add(instr);
 }
 
-static i64 alloc_tmp(Ir *ir, AstExpr *expr, IrType *type)
+static i64 alloc_tmp(Ir *ir, AstExpr *expr, IrType type)
 {
     Scope *top_level = get_top_level_scope(expr->scope);
     i64 tmp = top_level->ir_tmp_counter++;
@@ -414,10 +445,7 @@ static i64 alloc_tmp(Ir *ir, AstExpr *expr, IrType *type)
 
 static i64 alloc_tmp(Ir *ir, AstExpr *expr)
 {
-    IrType *type = new IrType(); // TODO: reduce allocations
-    type->name = mangle_type_defn(expr->type.defn);
-    type->ptr_depth = expr->type.ptr_depth;
-
+    IrType type = ir_type_from_type(expr->type);
     return alloc_tmp(ir, expr, type);
 }
 
@@ -449,7 +477,7 @@ static IrExpr *flatten_expr(Ir *ir, AstExpr *ast_expr, IrExpr *expr)
     if (expr->type == IR_EXPR_CALL)
     {
         auto call = static_cast<IrExprCall *>(expr);
-        if (!call->func->ret)
+        if (!call->func->ret.name)
         {
             IrInstr instr;
             instr.type = IR_INSTR_SEMI;
@@ -468,9 +496,9 @@ static IrExpr *flatten_expr(Ir *ir, AstExpr *ast_expr, IrExpr *expr)
     if (is_comparison(expr))
     {
         // TODO: don't allocate this every time!
-        IrType *bool_type = new IrType();
-        bool_type->name = string_duplicate("bool");
-        bool_type->ptr_depth = 0;
+        IrType bool_type;
+        bool_type.name = string_duplicate("bool");
+        bool_type.ptr_depth = 0;
 
         var->tmp = alloc_tmp(ir, ast_expr, bool_type);
     }
@@ -680,12 +708,9 @@ static IrExpr *gen_expr(Ir *ir, Module *module, AstExpr *expr)
         case AST_EXPR_CAST:
         {
             auto ast_cast = static_cast<AstExprCast *>(expr);
-
-            // TODO: smarter allocation
-            // TODO: TypeDefn -> IrType helper function
-            IrType *type = new IrType();
-            type->name = mangle_type_defn(((AstNode *)ast_cast)->type.defn); // FIXME: dumb hack to work around 'type' field shadowing between AstNode and AstExprCast
-            type->ptr_depth = ((AstNode *)ast_cast)->type.ptr_depth; // FIXME: dumb hack to work around 'type' field shadowing between AstNode and AstExprCast
+            
+            // FIXME: dumb hack to work around 'type' field shadowing between AstNode and AstExprCast
+            IrType type = ir_type_from_type(((AstNode *)ast_cast)->type);
 
             IrExprCast *cast = new IrExprCast();
             cast->type = type;
@@ -1103,9 +1128,7 @@ static void gen_func_prototype(Ir *ir, Module *module, AstFunc *ast_func)
         // NOTE: this uses the Type tag on the AstType node, so the indirection
         // is a bit confusing. The type system and IR generator only work with
         // Type, not the AstType itself, so they use that instead.
-        param->type = new IrType();
-        param->type->name = mangle_type_defn(ast_param->type->type.defn);
-        param->type->ptr_depth = ast_param->type->type.ptr_depth;
+        param->type = ir_type_from_type(ast_param->type->type);
 
         // For an external function, just fill out its parameters and return type.
         // Otherwise, generate temporary bindings as well.
@@ -1130,9 +1153,7 @@ static void gen_func_prototype(Ir *ir, Module *module, AstFunc *ast_func)
         // NOTE: this uses the Type tag on the AstType node, so the indirection
         // is a bit confusing. The type system and IR generator only work with
         // Type, not the AstType itself, so they use that instead.
-        func->ret = new IrType();
-        func->ret->name = mangle_type_defn(ast_func->ret->type.defn);
-        func->ret->ptr_depth = ast_func->ret->type.ptr_depth;
+        func->ret = ir_type_from_type(ast_func->ret->type);
     }
 }
 
@@ -1183,12 +1204,12 @@ static void gen_func(Ir *ir, Module *module, AstFunc *ast_func, i64 func_index)
     debug_validate_func(func);
 }
 
-static void dump_type(IrType *type)
+static void dump_type(IrType type)
 {
-    for (i64 i = 0; i < type->ptr_depth; ++i)
+    for (i64 i = 0; i < type.ptr_depth; ++i)
         fprintf(stderr, "*");
 
-    fprintf(stderr, "%s", type->name);
+    fprintf(stderr, "%s", type.name);
 }
 
 static void dump_expr(IrExpr *expr)
@@ -1351,9 +1372,9 @@ static void dump_ir(Ir *ir)
         {
             auto field_type = struct_.fields[i];
 
-            for (i64 j = 0; j < field_type->ptr_depth; ++j)
+            for (i64 j = 0; j < field_type.ptr_depth; ++j)
                 fprintf(stderr, "*");
-            fprintf(stderr, "%s", field_type->name);
+            fprintf(stderr, "%s", field_type.name);
 
             if (i < struct_.fields.count - 1)
                 fprintf(stderr, ",");
@@ -1380,7 +1401,7 @@ static void dump_ir(Ir *ir)
         }
         fprintf(stderr, ")");
 
-        if (func.ret)
+        if (func.ret.name)
         {
             fprintf(stderr, " -> ");
             dump_type(func.ret);
@@ -1471,13 +1492,13 @@ static void dump_ir(Ir *ir)
     }
 }
 
-static void dump_c_type(IrType *type)
+static void dump_c_type(IrType type)
 {
-    printf("%s", type->name);
-    if (type->ptr_depth > 0)
+    printf("%s", type.name);
+    if (type.ptr_depth > 0)
         printf(" ");
 
-    for (i64 i = 0; i < type->ptr_depth; ++i)
+    for (i64 i = 0; i < type.ptr_depth; ++i)
         printf("*");
 }
 
@@ -1670,10 +1691,10 @@ static void dump_c_func_signature(IrFunc *func)
     else
         printf("static ");
 
-    if (func->ret)
+    if (func->ret.name)
     {
         dump_c_type(func->ret);
-        if (func->ret->ptr_depth == 0)
+        if (func->ret.ptr_depth == 0)
             printf(" ");
     }
     else
@@ -1696,7 +1717,7 @@ static void dump_c_func_signature(IrFunc *func)
         // External functions don't have temporary parameter bindings.
         if (!is_extern)
         {
-            if (param->type->ptr_depth == 0)
+            if (param->type.ptr_depth == 0)
                 printf(" ");
             printf("_%ld", param->tmp);
         }
@@ -1709,6 +1730,7 @@ static void dump_c_func_signature(IrFunc *func)
 
 static void dump_c(Ir *ir)
 {
+    // Basic types.
     printf("#include <stdint.h>\n");
     printf("#include <stdbool.h>\n");
     printf("typedef int8_t    i8;\n");
@@ -1724,11 +1746,38 @@ static void dump_c(Ir *ir)
     printf("#define c_void void\n");
     printf("\n");
 
+    // Struct typedefs.
     for (auto &struct_ : ir->structs)
         printf("typedef struct %s %s;\n", struct_.name, struct_.name);
     if (ir->structs.count > 0)
         printf("\n");
 
+    // Function pointer typedefs.
+    for (i64 i = 0; i < func_ptrs_count; ++i)
+    {
+        FuncPtr *fp = &func_ptrs[i];
+        TypeDefn *defn = fp->defn;
+
+        printf("typedef ");
+
+        IrType ret_type = ir_type_from_type(defn->func_ret);
+        dump_c_type(ret_type);
+
+        printf(" (*%s)(", fp->name);
+        for (i64 j = 0; j < defn->func_params.count; ++j)
+        {
+            IrType type = ir_type_from_type(defn->func_params[j]);
+            dump_c_type(type);
+
+            if (j < defn->func_params.count - 1)
+                printf(", ");
+        }
+        printf(");\n");
+    }
+    if (func_ptrs_count > 0)
+        printf("\n");
+
+    // Struct definitions.
     for (auto &struct_ : ir->structs)
     {
         printf("struct %s {\n", struct_.name);
@@ -1739,7 +1788,7 @@ static void dump_c(Ir *ir)
             printf("    ");
 
             dump_c_type(field);
-            if (field->ptr_depth == 0)
+            if (field.ptr_depth == 0)
                 printf(" ");
 
             printf("_%ld;\n", i);
@@ -1747,6 +1796,7 @@ static void dump_c(Ir *ir)
         printf("};\n\n");
     }
 
+    // Function declarations.
     for (auto &func : ir->funcs)
     {
         dump_c_func_signature(&func);
@@ -1755,12 +1805,13 @@ static void dump_c(Ir *ir)
     if (ir->funcs.count > 0)
         printf("\n");
 
+    // Global variable declarations.
     for (auto &var : ir->vars)
     {
         printf("    ");
 
         dump_c_type(var.type);
-        if (var.type->ptr_depth == 0)
+        if (var.type.ptr_depth == 0)
             printf(" ");
 
         printf("_%ld;", var.tmp);
@@ -1770,6 +1821,7 @@ static void dump_c(Ir *ir)
         printf("\n");
     }
 
+    // Function definitions.
     for (auto &func : ir->funcs)
     {
         if (func.flags & IR_FUNC_IS_EXTERN)
@@ -1783,7 +1835,7 @@ static void dump_c(Ir *ir)
             printf("    ");
 
             dump_c_type(decl.type);
-            if (decl.type->ptr_depth == 0)
+            if (decl.type.ptr_depth == 0)
                 printf(" ");
 
             printf("_%ld;", decl.tmp);
@@ -1828,7 +1880,7 @@ static void dump_c(Ir *ir)
                     {
                         // FIXME: void
                         printf("return");
-                        if (func.ret)
+                        if (func.ret.name)
                             printf(" _0");
                         break;
                     }
@@ -1870,6 +1922,7 @@ static void dump_c(Ir *ir)
         printf("}\n\n");
     }
 
+    // Entry point.
     printf("int main(int argc, char *argv[]) {\n");
     printf("    __main();\n");
     printf("    return 0;\n");
@@ -1889,9 +1942,8 @@ void gen_ir(AstRoot *ast)
         // Declare global variables.
         for (auto &var : mod->vars)
         {
-            IrType *type = new IrType(); // TODO: reduce allocations
-            type->name = mangle_type_defn(((AstNode *)var)->type.defn); // FIXME: dumb hack to work around 'type' field shadowing between AstNode and AstStmtDecl
-            type->ptr_depth = ((AstNode *)var)->type.ptr_depth; // FIXME: dumb hack to work around 'type' field shadowing between AstNode and AstStmtDecl
+            // FIXME: dumb hack to work around 'type' field shadowing between AstNode and AstStmtDecl
+            IrType type = ir_type_from_type(((AstNode *)var)->type);
 
             i64 tmp = mod->scope->ir_tmp_counter++;
 

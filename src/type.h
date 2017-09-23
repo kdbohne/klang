@@ -26,7 +26,6 @@ struct TypeDefn
     Array<char *> struct_field_names;
     Array<Type> struct_field_types;
 
-    // Function pointer.
     Array<Type> func_params;
     Type func_ret;
 };
