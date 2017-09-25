@@ -4,6 +4,10 @@
 FILENAME=$(echo $1 | cut -f 1 -d '.' | rev | cut -f 1 -d '/' | rev)
 
 IR="$(./bin/klang $1)"
+if [[ "$?" -ne 0 ]]; then
+    exit
+fi
+
 printf "%s" "$IR" | clang -x c - -m64 -c -o $FILENAME.o
 
 # TODO: detect libs in frontend
