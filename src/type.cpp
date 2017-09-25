@@ -226,7 +226,7 @@ static Type type_from_ast_type(Module *module, AstType *ast_type)
             AstExprIdent *name = path->segments[path->segments.count - 1];
 
             Type type;
-            type.defn = find_type_defn(module, name->str);
+            type.defn = find_type_defn(mod, name->str);
             type.ptr_depth = ast_type->ptr_depth;
             return type;
         }
