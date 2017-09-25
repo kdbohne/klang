@@ -147,11 +147,7 @@ static Type type_from_ast_type(Module *module, AstType *ast_type)
         {
             TypeDefn *cand = &global_module->type_defns[i];
             
-            // TODO: more thorough check here? This is just assuming that any
-            // type definition without a name is a function pointer. We can't
-            // just check if there are args or a return type set in the type
-            // definition, because fn(void) -> void is a valid function pointer.
-            if (cand->name)
+            if (!(cand->flags & TYPE_DEFN_IS_FUNC_PTR))
                 continue;
 
             if (cand->func_params.count != ast_type->params.count)
@@ -184,13 +180,18 @@ static Type type_from_ast_type(Module *module, AstType *ast_type)
             assert(global_module->type_defns_count < (sizeof(global_module->type_defns) / sizeof(global_module->type_defns[0])));
             defn = &global_module->type_defns[global_module->type_defns_count++];
 
+            defn->flags |= TYPE_DEFN_IS_FUNC_PTR;
+
             for (i64 i = 0; i < ast_type->params.count; ++i)
             {
                 Type t = type_from_ast_type(module, ast_type->params[i]);
                 defn->func_params.add(t);
             }
 
-            defn->func_ret = type_from_ast_type(module, ast_type->ret);
+            if (ast_type->ret)
+                defn->func_ret = type_from_ast_type(module, ast_type->ret);
+            else
+                defn->func_ret = type_void;
         }
 
         Type type;
@@ -309,6 +310,7 @@ static TypeDefn *register_func(Module *module, AstFunc *func)
     TypeDefn *defn = &module->type_defns[module->type_defns_count++];
     defn->name = func->name->str; // TODO: duplicate?
     defn->module = module;
+    defn->flags |= TYPE_DEFN_IS_FUNC_PTR;
 
     for (auto &param : func->params)
     {
@@ -613,7 +615,12 @@ static void resolve_calls(Array<AstNode *> &ast)
         assert(call->scope);
 
         call->func = module_get_func(call->scope->module, call->name);
-        assert(call->func);
+        if (!call->func)
+        {
+            // Function pointer.
+            // TODO: verify that this is a function pointer!
+        }
+//        assert(call->func);
     }
 }
 
@@ -1252,11 +1259,26 @@ static Type infer_types(AstNode *node)
             for (auto &arg : call->args)
                 infer_types(arg);
 
-            assert(call->func);
-            if (call->func->ret)
-                call->type = type_from_ast_type(call->func->scope->module, call->func->ret);
+            if (call->func)
+            {
+                if (call->func->ret)
+                    call->type = type_from_ast_type(call->func->scope->module, call->func->ret);
+                else
+                    call->type = type_void;
+            }
             else
-                call->type = type_void;
+            {
+                // TODO: paths
+                // Function pointers don't have a direct AstFunc reference,
+                // so look up the type of function pointer itself.
+                assert(call->name->ast_type == AST_EXPR_IDENT);
+                auto name = static_cast<AstExprIdent *>(call->name);
+
+                ScopeVar *var = scope_get_var(call->scope, name->str);
+                assert(var);
+
+                call->type = var->type;
+            }
 
             break;
         }
@@ -1627,8 +1649,15 @@ bool types_match(Type a, Type b)
     if ((a.defn == b.defn) && (a.ptr_depth == b.ptr_depth))
         return true;
 
+    // TODO: is this right?
+    if (!a.defn || !b.defn)
+        return false;
+
+    if ((a.defn->flags & TYPE_DEFN_IS_FUNC_PTR) != (b.defn->flags & TYPE_DEFN_IS_FUNC_PTR))
+        return false;
+
     // Function pointers.
-    if (!a.defn->name || !b.defn->name)
+    if ((a.defn->flags & TYPE_DEFN_IS_FUNC_PTR) && (b.defn->flags & TYPE_DEFN_IS_FUNC_PTR))
     {
         TypeDefn *da = a.defn;
         TypeDefn *db = b.defn;

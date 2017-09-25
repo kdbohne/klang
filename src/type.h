@@ -13,10 +13,17 @@ struct Type
     i64 ptr_depth = -1;
 };
 
+enum TypeDefnFlags
+{
+    TYPE_DEFN_IS_FUNC_PTR = 0x1,
+};
+
 struct TypeDefn
 {
     char *name = NULL;
     Module *module = NULL;
+
+    u32 flags = 0;
 
     i64 size = -1;
     i64 alignment = -1;
