@@ -1271,16 +1271,7 @@ static Type infer_types(AstNode *node)
             }
             else
             {
-                // TODO: paths
-                // Function pointers don't have a direct AstFunc reference,
-                // so look up the type of function pointer itself.
-                assert(call->name->ast_type == AST_EXPR_IDENT);
-                auto name = static_cast<AstExprIdent *>(call->name);
-
-                ScopeVar *var = scope_get_var(call->scope, name->str);
-                assert(var);
-
-                call->type = var->type;
+                call->type = infer_types(call->name);
             }
 
             break;

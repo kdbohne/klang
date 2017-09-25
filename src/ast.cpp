@@ -102,6 +102,15 @@ AstFunc *module_get_func(Module *module, AstExpr *name)
             auto mod = resolve_path_into_module(module, path);
             return module_get_func(mod, path->segments[path->segments.count - 1]);
         }
+        case AST_EXPR_FIELD:
+        {
+#if 0
+            auto field = static_cast<AstExprField *>(name);
+            return module_get_func(module, field->name);
+#endif
+            // Do nothing, since this is just a function pointer field.
+            return NULL;
+        }
         default:
         {
             assert(false);

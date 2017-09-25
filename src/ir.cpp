@@ -47,7 +47,7 @@ enum IrExprType : u32
     IR_EXPR_FIELD,
     IR_EXPR_PAREN,
     IR_EXPR_CAST,
-    IR_EXPR_FUNC_PTR,
+    IR_EXPR_FUNC_NAME,
 };
 
 struct IrExpr
@@ -78,13 +78,19 @@ struct IrExprLit : IrExpr
 };
 
 struct IrFunc;
-struct IrExprFuncPtr;
+struct IrFuncPtr;
 struct IrExprCall : IrExpr
 {
     IrExprCall() : IrExpr(IR_EXPR_CALL) {}
 
+    // If a plain function call.
     IrFunc *func = NULL;
-    IrExprFuncPtr *func_ptr = NULL;
+
+    // If a function pointer.
+    // The "call" can be an arbitrary expression, e.g. foo.bar() or
+    // mod::test(), so the expression is stored here.
+    IrFuncPtr *func_ptr = NULL;
+    IrExpr *func_ptr_expr = NULL;
 
     Array<IrExpr *> args; // TODO: static array?
 };
@@ -158,20 +164,11 @@ struct IrExprCast : IrExpr
     IrExpr *expr = NULL;
 };
 
-struct IrFuncPtr
+struct IrExprFuncName : IrExpr
 {
+    IrExprFuncName() : IrExpr(IR_EXPR_FUNC_NAME) {}
+
     char *name = NULL;
-    TypeDefn *defn = NULL;
-};
-
-struct IrExprFuncPtr : IrExpr
-{
-    IrExprFuncPtr() : IrExpr(IR_EXPR_FUNC_PTR) {}
-
-    // TODO: this is kinda wonky, just handle as a normal var and give it
-    // some kind of flag denoting it's a function pointer?
-    i64 tmp = -1;
-    IrFuncPtr *func_ptr = NULL;
 };
 
 enum IrInstrType : u32
@@ -253,6 +250,12 @@ struct Ir
     Array<i64> break_stack;
 };
 
+struct IrFuncPtr
+{
+    char *name = NULL;
+    TypeDefn *defn = NULL;
+};
+
 // TODO: size?
 static IrFuncPtr func_ptrs[256];
 static i64 func_ptrs_count;
@@ -332,7 +335,13 @@ static char *mangle_call_name(Module *module, AstExprCall *call)
 {
     // TODO: leak
     AstFunc *func = module_get_func(module, call->name);
-    assert(func);
+    if (!func)
+    {
+        // TODO: verify that this is actually a function pointer instead
+        // of just assuming that's what null means.
+        // Function pointer.
+        return NULL;
+    }
 
     if (call->name->ast_type == AST_EXPR_PATH)
     {
@@ -490,7 +499,7 @@ static IrExpr *flatten_expr(Ir *ir, AstExpr *ast_expr, IrExpr *expr)
         // If there is not a return value, just make an instruction out of
         // the plain call and don't bother assigning the result to a temporary.
         if ((call->func && !call->func->ret.name) ||
-            (call->func_ptr && type_is_void(call->func_ptr->func_ptr->defn->func_ret)))
+            (call->func_ptr && type_is_void(call->func_ptr->defn->func_ret)))
         {
             IrInstr instr;
             instr.type = IR_INSTR_SEMI;
@@ -560,6 +569,35 @@ static void debug_validate_func(IrFunc *func)
         debug_validate_bb(&bb);
 }
 
+static IrFunc *get_func_from_call(Ir *ir, Module *module, AstExprCall *call)
+{
+    Module *mod = module;
+
+    while (mod)
+    {
+        char *mangled = mangle_call_name(mod, call);
+
+        // TODO: check?
+        // Function pointer.
+        if (!mangled)
+            break;
+
+        for (auto &func : ir->funcs)
+        {
+            if (strings_match(func.name, mangled))
+            {
+                free(mangled);
+                return &func;
+            }
+        }
+        free(mangled);
+
+        mod = mod->parent;
+    }
+
+    return NULL;
+}
+
 static IrExpr *gen_expr(Ir *ir, Module *module, AstExpr *expr)
 {
     switch (expr->ast_type)
@@ -588,18 +626,10 @@ static IrExpr *gen_expr(Ir *ir, Module *module, AstExpr *expr)
             {
                 if (strings_match(func->name->str, ident->str))
                 {
-                    IrExprFuncPtr *fp = new IrExprFuncPtr();
+                    IrExprFuncName *f = new IrExprFuncName();
+                    f->name = ident->str; // TODO: copy?
 
-                    // HACK: just setting this to an arbitrary value so that
-                    // the C dumper can know whether this is actually a
-                    // function pointer variable or just the name of a
-                    // function. TODO: separate IrExprIdent type or something
-                    fp->tmp = -2;
-
-                    fp->func_ptr = get_func_ptr(ident->type.defn);
-                    assert(fp->func_ptr);
-
-                    return fp;
+                    return f;
                 }
             }
 
@@ -700,54 +730,11 @@ static IrExpr *gen_expr(Ir *ir, Module *module, AstExpr *expr)
             auto ast_call = static_cast<AstExprCall *>(expr);
 
             IrExprCall *call = new IrExprCall();
-
-            // TODO: paths
-            auto ident = static_cast<AstExprIdent *>(ast_call->name);
-            ScopeVar *var = scope_get_var(ident->scope, ident->str);
-            if (var)
+            call->func = get_func_from_call(ir, module, ast_call);
+            if (!call->func)
             {
-                IrExprFuncPtr *fp = new IrExprFuncPtr();
-
-                assert(var);
-                fp->tmp = var->ir_tmp_index;
-
-                fp->func_ptr = get_func_ptr(ast_call->type.defn);
-                assert(fp->func_ptr);
-
-                call->func_ptr = fp;
-            }
-            else
-            {
-                // TODO: refactor this mess
-
-                // TODO: leak
-                // TODO: handle overloads if they are added as a feature
-                // HACK: using mangle_call_name() with the global module to build
-                // a string for the call's path expr.
-                // Find the matching function and cache it for later use.
-                Module *global_module = module;
-                while (global_module->parent)
-                    global_module = global_module->parent;
-                char *name = mangle_call_name(global_module, ast_call);
-                for (auto &func : ir->funcs)
-                {
-                    if (strings_match(func.name, name))
-                        call->func = &func;
-                }
-                free(name);
-
-                // If no match was found, mangle the name and try again.
-                if (!call->func)
-                {
-                    char *mangled = mangle_call_name(module, ast_call);
-                    for (auto &func : ir->funcs)
-                    {
-                        if (strings_match(func.name, mangled))
-                            call->func = &func;
-                    }
-                    free(mangled);
-                }
-                assert(call->func);
+                call->func_ptr = get_func_ptr(ast_call->type.defn);
+                call->func_ptr_expr = gen_expr(ir, module, ast_call->name);
             }
 
             for (auto &ast_arg : ast_call->args)
@@ -1630,14 +1617,15 @@ static void dump_c_expr(IrExpr *expr)
 
             if (call->func)
             {
-                printf("%s(", call->func->name);
+                printf("%s", call->func->name);
             }
             else
             {
                 assert(call->func_ptr);
-                printf("_%ld(", call->func_ptr->tmp);
+                dump_c_expr(call->func_ptr_expr);
             }
 
+            printf("(");
             for (i64 i = 0; i < call->args.count; ++i)
             {
                 dump_c_expr(call->args[i]);
@@ -1733,18 +1721,6 @@ static void dump_c_expr(IrExpr *expr)
             printf(")");
             dump_c_expr(cast->expr);
             printf(")");
-
-            break;
-        }
-        case IR_EXPR_FUNC_PTR:
-        {
-            auto func_ptr = static_cast<IrExprFuncPtr *>(expr);
-
-            // HACK TODO: separate type for function name expressions?
-            if (func_ptr->tmp == -2)
-                printf("%s", func_ptr->func_ptr->defn->name);
-            else
-                printf("_%ld", func_ptr->tmp);
 
             break;
         }
