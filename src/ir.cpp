@@ -317,7 +317,6 @@ static IrFuncPtr *get_func_ptr(TypeDefn *defn)
 char *mangle_type_defn(TypeDefn *defn)
 {
     assert(defn);
-    assert(defn->name);
 
     if (defn->flags & TYPE_DEFN_IS_FUNC_PTR)
     {
