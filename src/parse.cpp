@@ -222,19 +222,14 @@ static AstExpr *parse_expr(Parser *parser, bool is_unary)
                 call->name = static_cast<AstExprIdent *>(lhs);
                 assert(call->name);
 
-                if (peek(parser).type != TOK_CLOSE_PAREN)
+                while (peek(parser).type != TOK_CLOSE_PAREN)
                 {
-                    while (true)
-                    {
-                        if (peek(parser).type == TOK_CLOSE_PAREN)
-                            break;
+                    AstExpr *arg = parse_expr(parser);
+//                    assert(arg->file.src);
+                    call->args.add(arg);
 
-                        eat_optional(parser, TOK_COMMA);
-
-                        AstExpr *arg = parse_expr(parser);
-//                        assert(arg->file.src);
-                        call->args.add(arg);
-                    }
+                    if (peek(parser).type != TOK_CLOSE_PAREN)
+                        expect(parser, TOK_COMMA);
                 }
                 expect(parser, TOK_CLOSE_PAREN);
 
@@ -609,15 +604,13 @@ static AstFunc *parse_func(Parser *parser)
 
     // Parse parameter list.
     expect(parser, TOK_OPEN_PAREN);
-    while (true)
+    while (peek(parser).type != TOK_CLOSE_PAREN)
     {
-        if (peek(parser).type == TOK_CLOSE_PAREN)
-            break;
-
         AstParam *param = parse_param(parser);
         func->params.add(param);
 
-        eat_optional(parser, TOK_COMMA);
+        if (peek(parser).type != TOK_CLOSE_PAREN)
+            expect(parser, TOK_COMMA);
     }
     expect(parser, TOK_CLOSE_PAREN);
 
