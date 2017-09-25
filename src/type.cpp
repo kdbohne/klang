@@ -1080,10 +1080,10 @@ static Type infer_types(AstNode *node)
 
             for (auto &mod : root->modules)
             {
-                for (auto &func : mod->funcs)
-                    infer_types(func);
                 for (auto &var : mod->vars)
                     infer_types(var);
+                for (auto &func : mod->funcs)
+                    infer_types(func);
             }
 
             root->type = type_null;
@@ -1461,9 +1461,26 @@ static Type infer_types(AstNode *node)
         {
             auto path = static_cast<AstExprPath *>(node);
 
-            // FIXME
-            assert(false);
-            path->type = type_null;
+            // TODO: is there a better way of doing this?
+            Module *mod = resolve_path_into_module(global_module, path);
+            assert(mod);
+
+            AstExprIdent *name = path->segments[path->segments.count - 1];
+
+            ScopeVar *var = scope_get_var(mod->scope, name->str);
+            if (var)
+            {
+                path->type = var->type;
+            }
+            else
+            {
+                report_error("Undeclared identifier \"%s\" in module \"%s\".\n",
+                             path,
+                             name->str,
+                             mod->name);
+
+                path->type = type_null;
+            }
 
             break;
         }
@@ -1529,6 +1546,14 @@ static Type infer_types(AstNode *node)
                 // Infer the type from the rhs of the assignment expression.
                 assert(decl->desugared_rhs);
                 node->type = infer_types(decl->desugared_rhs); // FIXME
+            }
+
+            if (!node->type.defn)
+            {
+                report_error("Unknown type \"%s\".\n",
+                             decl->bind,
+                             get_type_string(node->type));
+                break;
             }
 
             // TODO: multiple decls, patterns, etc.
@@ -1703,6 +1728,15 @@ bool type_check(AstRoot *ast)
     type_void = make_type(type_defn_void, 0);
     type_c_void = make_type(type_defn_c_void, 0);
     type_null = make_type(NULL, -1);
+
+    // HACK: Move the global module to the end of the list to avoid dependency issues.
+    if (ast->modules.count > 1)
+    {
+        Module *global = ast->modules[0];
+        for (i64 i = 1; i < ast->modules.count; ++i)
+            ast->modules[i - 1] = ast->modules[i];
+        ast->modules[ast->modules.count - 1] = global;
+    }
 
     for (auto &mod : ast->modules)
     {

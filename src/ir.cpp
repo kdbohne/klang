@@ -62,6 +62,9 @@ struct IrExprVar : IrExpr
 
     i64 tmp = -1;
     bool is_ptr = false; // TODO: flags
+
+    // If a module global.
+    char *prefix = NULL;
 };
 
 struct IrExprLit : IrExpr
@@ -203,9 +206,11 @@ struct IrParam
 
 struct IrDecl
 {
-    // TODO: some way of handling module globals
     IrType type;
     i64 tmp = -1;
+
+    // Used to distinguish between globals of different modules.
+    char *prefix = NULL;
 
     char *name = NULL;
 };
@@ -606,7 +611,23 @@ static IrExpr *gen_expr(Ir *ir, Module *module, AstExpr *expr)
         {
             auto ident = static_cast<AstExprIdent *>(expr);
 
-            ScopeVar *var = scope_get_var(ident->scope, ident->str);
+            // Module global.
+            ScopeVar *var = scope_get_var(module->scope, ident->str);
+            if (var)
+            {
+                assert(var->ir_tmp_index != -1);
+
+                IrExprVar *ir_var = new IrExprVar();
+                ir_var->tmp = var->ir_tmp_index;
+                if (ident->type.ptr_depth > 0)
+                    ir_var->is_ptr = true;
+
+                ir_var->prefix = module->name; // TODO: copy?
+                return ir_var;
+            }
+
+            // Local variable or parameter.
+            var = scope_get_var(ident->scope, ident->str);
             if (var)
             {
                 // Allocate a temporary if the variable doesn't already have one.
@@ -1110,6 +1131,15 @@ static IrExpr *gen_expr(Ir *ir, Module *module, AstExpr *expr)
             auto paren = static_cast<AstExprParen *>(expr);
             return gen_expr(ir, module, paren->expr);
         }
+        case AST_EXPR_PATH:
+        {
+            auto path = static_cast<AstExprPath *>(expr);
+
+            Module *mod = resolve_path_into_module(module, path);
+            assert(mod);
+
+            return gen_expr(ir, mod, path->segments[path->segments.count - 1]);
+        }
         case AST_EXPR_RETURN:
         {
             auto ret = static_cast<AstExprReturn *>(expr);
@@ -1549,6 +1579,9 @@ static void dump_c_expr(IrExpr *expr)
         case IR_EXPR_VAR:
         {
             auto var = static_cast<IrExprVar *>(expr);
+
+            if (var->prefix)
+                printf("__%s", var->prefix);
             printf("_%ld", var->tmp);
 
             break;
@@ -1862,7 +1895,8 @@ static void dump_c(Ir *ir)
         if (var.type.ptr_depth == 0)
             printf(" ");
 
-        printf("_%ld;", var.tmp);
+        assert(var.prefix);
+        printf("__%s_%ld;", var.prefix, var.tmp);
 
         if (var.name)
             printf(" // %s", var.name);
@@ -2000,6 +2034,7 @@ void gen_ir(AstRoot *ast)
             IrDecl *decl = ir.vars.next();
             decl->type = type;
             decl->tmp = tmp;
+            decl->prefix = mod->name; // TODO: copy?
 
             if (var->bind->ast_type == AST_EXPR_IDENT)
             {
