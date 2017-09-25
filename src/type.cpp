@@ -1720,7 +1720,10 @@ bool type_check(AstRoot *ast)
             struct_->type.defn = register_struct(mod, struct_);
             struct_->type.ptr_depth = 0;
         }
+    }
 
+    for (auto &mod : ast->modules)
+    {
         for (auto &func : mod->funcs)
         {
             func->type.defn = register_func(mod, func);
