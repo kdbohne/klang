@@ -216,29 +216,6 @@ static AstExpr *parse_expr(Parser *parser, bool is_unary)
             parser->index -= 1;
             lhs = parse_ident_or_path(parser);
 
-            // Function call.
-            if (peek(parser).type == TOK_OPEN_PAREN)
-            {
-                eat(parser);
-
-                AstExprCall *call = ast_alloc(AstExprCall);
-                call->name = static_cast<AstExprIdent *>(lhs);
-                assert(call->name);
-
-                while (peek(parser).type != TOK_CLOSE_PAREN)
-                {
-                    AstExpr *arg = parse_expr(parser);
-//                    assert(arg->file.src);
-                    call->args.add(arg);
-
-                    if (peek(parser).type != TOK_CLOSE_PAREN)
-                        expect(parser, TOK_COMMA);
-                }
-                expect(parser, TOK_CLOSE_PAREN);
-
-                lhs = call;
-            }
-
             break;
         }
         case TOK_NUM:
@@ -414,6 +391,32 @@ static AstExpr *parse_expr(Parser *parser, bool is_unary)
         field->name = make_ident(ident);
 
         lhs = field;
+    }
+
+    // Function call.
+    if (peek(parser).type == TOK_OPEN_PAREN)
+    {
+        assert((lhs->ast_type == AST_EXPR_IDENT) || (lhs->ast_type == AST_EXPR_PATH) || (lhs->ast_type == AST_EXPR_FIELD));
+
+        eat(parser);
+
+        // TODO: clean this up?
+        AstExprCall *call = ast_alloc(AstExprCall);
+        call->name = static_cast<AstExprIdent *>(lhs);
+        assert(call->name);
+
+        while (peek(parser).type != TOK_CLOSE_PAREN)
+        {
+            AstExpr *arg = parse_expr(parser);
+//            assert(arg->file.src);
+            call->args.add(arg);
+
+            if (peek(parser).type != TOK_CLOSE_PAREN)
+                expect(parser, TOK_COMMA);
+        }
+        expect(parser, TOK_CLOSE_PAREN);
+
+        lhs = call;
     }
 
     if (is_unary)
