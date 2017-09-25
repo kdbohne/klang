@@ -182,6 +182,9 @@ static Type type_from_ast_type(Module *module, AstType *ast_type)
 
             defn->flags |= TYPE_DEFN_IS_FUNC_PTR;
 
+            defn->size = 8; // 64-bit pointer.
+            defn->alignment = defn->size;
+
             for (i64 i = 0; i < ast_type->params.count; ++i)
             {
                 Type t = type_from_ast_type(module, ast_type->params[i]);
