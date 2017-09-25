@@ -206,6 +206,7 @@ struct IrParam
 
 struct IrDecl
 {
+    // TODO: some way of handling module globals
     IrType type;
     i64 tmp = -1;
 
@@ -1881,8 +1882,6 @@ static void dump_c(Ir *ir)
     // Global variable declarations.
     for (auto &var : ir->vars)
     {
-        printf("    ");
-
         dump_c_type(var.type);
         if (var.type.ptr_depth == 0)
             printf(" ");
@@ -1893,6 +1892,8 @@ static void dump_c(Ir *ir)
             printf(" // %s", var.name);
         printf("\n");
     }
+    if (ir->vars.count > 0)
+        printf("\n");
 
     // Function definitions.
     for (auto &func : ir->funcs)
