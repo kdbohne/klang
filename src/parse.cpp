@@ -147,6 +147,9 @@ static AstType *parse_type(Parser *parser)
         {
             AstType *param = parse_type(parser);
             type->params.add(param);
+
+            if (peek(parser).type != TOK_CLOSE_PAREN)
+                expect(parser, TOK_COMMA);
         }
         expect(parser, TOK_CLOSE_PAREN);
 
