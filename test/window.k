@@ -4,7 +4,8 @@ import "gl.k";
 
 fn main() {
     let win = gl::create_window("floating", 1280, 720);
-    gl::load_funcs();
+    let funcs gl::Funcs;
+    gl::load_funcs(&funcs);
 
     print_string_literal("Created window of size ");
     print_i64(win.width);
@@ -12,7 +13,11 @@ fn main() {
     print_i64(win.height);
     print_string_literal("\n");
 
+    funcs.ClearColor(1.0, 0.0, 1.0, 1.0);
+    funcs.Clear(0x00004000); // GL_COLOR_BUFFER_BIT
+
     loop {
+        funcs.Clear(0x00004000); // GL_COLOR_BUFFER_BIT
         gl::swap_buffers(win);
     };
 

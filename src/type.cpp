@@ -620,8 +620,8 @@ static void resolve_calls(Array<AstNode *> &ast)
         call->func = module_get_func(call->scope->module, call->name);
         if (!call->func)
         {
-            // Function pointer.
             // TODO: verify that this is a function pointer!
+            // Function pointer.
         }
 //        assert(call->func);
     }
