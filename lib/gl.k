@@ -8,6 +8,8 @@ module gl {
         height i64;
     };
 
+    let COLOR_BUFFER_BIT u32 = 0x00004000;
+
     let Clear fn(u32);
     let ClearColor fn(f32, f32, f32, f32);
 

@@ -713,11 +713,15 @@ void parse_file(AstRoot *root, Array<Token> *tokens)
 
             AstType *type = parse_type(&parser);
 
-            // TODO: static assignment?
-
             AstStmtDecl *decl = ast_alloc(AstStmtDecl);
             decl->bind = bind;
             decl->type = type;
+
+            if (eat_optional(&parser, TOK_EQ))
+            {
+                AstExpr *rhs = parse_expr(&parser);
+                decl->desugared_rhs = rhs;
+            }
 
             mod->vars.add(decl);
 

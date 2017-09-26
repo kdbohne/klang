@@ -13,10 +13,10 @@ fn main() {
     print_string_literal("\n");
 
     gl::ClearColor(1.0, 0.0, 1.0, 1.0);
-    gl::Clear(0x00004000); // GL_COLOR_BUFFER_BIT
+    gl::Clear(gl::COLOR_BUFFER_BIT);
 
     loop {
-        gl::Clear(0x00004000); // GL_COLOR_BUFFER_BIT
+        gl::Clear(gl::COLOR_BUFFER_BIT);
         gl::swap_buffers(win);
     };
 

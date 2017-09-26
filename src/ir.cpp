@@ -209,9 +209,11 @@ struct IrDecl
     IrType type;
     i64 tmp = -1;
 
+    // Initial value for globals, since their assignment can't be desugared.
+    IrExpr *init = NULL;
+
     // Used to distinguish between globals of different modules.
     char *prefix = NULL;
-
     char *name = NULL;
 };
 
@@ -1896,7 +1898,13 @@ static void dump_c(Ir *ir)
             printf(" ");
 
         assert(var.prefix);
-        printf("__%s_%ld;", var.prefix, var.tmp);
+        printf("__%s_%ld", var.prefix, var.tmp);
+        if (var.init)
+        {
+            printf(" = ");
+            dump_c_expr(var.init);
+        }
+        printf(";");
 
         if (var.name)
             printf(" // %s", var.name);
@@ -2035,6 +2043,9 @@ void gen_ir(AstRoot *ast)
             decl->type = type;
             decl->tmp = tmp;
             decl->prefix = mod->name; // TODO: copy?
+
+            if (var->desugared_rhs)
+                decl->init = gen_expr(&ir, mod, var->desugared_rhs);
 
             if (var->bind->ast_type == AST_EXPR_IDENT)
             {
