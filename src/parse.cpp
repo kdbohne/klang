@@ -69,17 +69,21 @@ static BinOp get_bin_op(TokenType type)
 {
     switch (type)
     {
-        case TOK_PLUS:     return BIN_ADD;
-        case TOK_MINUS:    return BIN_SUB;
-        case TOK_ASTERISK: return BIN_MUL;
-        case TOK_SLASH:    return BIN_DIV;
-        case TOK_PERCENT:  return BIN_MOD;
-        case TOK_LT:       return BIN_LT;
-        case TOK_LE:       return BIN_LE;
-        case TOK_GT:       return BIN_GT;
-        case TOK_GE:       return BIN_GE;
-        case TOK_EQ_EQ:    return BIN_EQ;
-        case TOK_NE:       return BIN_NE;
+        case TOK_PLUS:        return BIN_ADD;
+        case TOK_MINUS:       return BIN_SUB;
+        case TOK_ASTERISK:    return BIN_MUL;
+        case TOK_SLASH:       return BIN_DIV;
+        case TOK_PERCENT:     return BIN_MOD;
+        case TOK_LT:          return BIN_LT;
+        case TOK_LE:          return BIN_LE;
+        case TOK_GT:          return BIN_GT;
+        case TOK_GE:          return BIN_GE;
+        case TOK_EQ_EQ:       return BIN_EQ;
+        case TOK_NE:          return BIN_NE;
+        case TOK_PLUS_EQ:     return BIN_ADD;
+        case TOK_MINUS_EQ:    return BIN_SUB;
+        case TOK_ASTERISK_EQ: return BIN_MUL;
+        case TOK_SLASH_EQ:    return BIN_DIV;
         default:
         {
             assert(false);
@@ -367,16 +371,6 @@ static AstExpr *parse_expr(Parser *parser, bool is_unary)
             break;
         }
 
-        case TOK_PLUS_EQ:
-        case TOK_MINUS_EQ:
-        case TOK_ASTERISK_EQ:
-        case TOK_SLASH_EQ:
-        {
-            // FIXME
-            assert(false);
-            break;
-        }
-
         default:
         {
             report_error("Expected lhs expression, got \"%s\"",
@@ -486,6 +480,34 @@ static AstExpr *parse_expr(Parser *parser, bool is_unary)
 
             return range;
         }
+
+        // Binary assignment operators.
+        case TOK_PLUS_EQ:
+        case TOK_MINUS_EQ:
+        case TOK_ASTERISK_EQ:
+        case TOK_SLASH_EQ:
+        {
+            eat(parser);
+
+            AstExpr *rhs = parse_expr(parser);
+            BinOp op = get_bin_op(next.type);
+
+            auto bin = ast_alloc(AstExprBin);
+            bin->lhs = lhs;
+            bin->rhs = rhs;
+            bin->op = op;
+
+            copy_loc(bin, next);
+
+            auto assign = ast_alloc(AstExprAssign);
+            assign->lhs = lhs;
+            assign->rhs = bin;
+
+            copy_loc(assign, next);
+
+            return assign;
+        }
+
         default:
         {
             break;
