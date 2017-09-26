@@ -4,12 +4,12 @@ fn write(data *u8, len i64) {
     syscall5(cast(*i64) 1, cast(*i64) 1, cast(*i64) data, cast(*i64) len, cast(*i64) 0, cast(*i64) 0);
 }
 
-fn print_string(str String) {
+fn print_string(str string::String) {
     write(str.data, str.len);
 }
 
 fn print_string_literal(str *u8) {
-    let len = string_len(str);
+    let len = string::len(str);
     write(str, len);
 }
 

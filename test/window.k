@@ -1,4 +1,5 @@
 import "core.k";
+import "string.k";
 import "print.k";
 import "gl.k";
 
