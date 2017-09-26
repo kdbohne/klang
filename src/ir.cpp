@@ -773,7 +773,7 @@ static IrExpr *gen_expr(Ir *ir, Module *module, AstExpr *expr)
         case AST_EXPR_CAST:
         {
             auto ast_cast = static_cast<AstExprCast *>(expr);
-            
+
             // FIXME: dumb hack to work around 'type' field shadowing between AstNode and AstExprCast
             IrType type = ir_type_from_type(((AstNode *)ast_cast)->type);
 

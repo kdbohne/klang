@@ -367,6 +367,16 @@ static AstExpr *parse_expr(Parser *parser, bool is_unary)
             break;
         }
 
+        case TOK_PLUS_EQ:
+        case TOK_MINUS_EQ:
+        case TOK_ASTERISK_EQ:
+        case TOK_SLASH_EQ:
+        {
+            // FIXME
+            assert(false);
+            break;
+        }
+
         default:
         {
             report_error("Expected lhs expression, got \"%s\"",

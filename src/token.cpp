@@ -24,6 +24,11 @@ const char *token_type_names[]
     "eq",
     "percent",
 
+    "plus eq",
+    "minus eq",
+    "asterisk eq",
+    "slash eq",
+
     "and",
     "not",
 

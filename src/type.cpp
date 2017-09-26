@@ -134,7 +134,7 @@ static TypeDefn *register_global_type_defn(const char *name, i64 size)
     defn->module = NULL;
     defn->size = size;
     defn->alignment = defn->size;
-    
+
     return defn;
 }
 
@@ -146,7 +146,7 @@ static Type type_from_ast_type(Module *module, AstType *ast_type)
         for (i64 i = 0; i < global_module->type_defns_count; ++i)
         {
             TypeDefn *cand = &global_module->type_defns[i];
-            
+
             if (!(cand->flags & TYPE_DEFN_IS_FUNC_PTR))
                 continue;
 

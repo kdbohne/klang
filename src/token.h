@@ -26,6 +26,11 @@ enum TokenType : u32
     TOK_EQ,
     TOK_PERCENT,
 
+    TOK_PLUS_EQ,
+    TOK_MINUS_EQ,
+    TOK_ASTERISK_EQ,
+    TOK_SLASH_EQ,
+
     TOK_AND,
     TOK_NOT,
 

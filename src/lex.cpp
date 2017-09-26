@@ -152,10 +152,56 @@ static Token get_token(Lexer *lex)
 
         case '&':  { tok.type = TOK_AND;         break; }
 
-        case '+':  { tok.type = TOK_PLUS;        break; }
-        case '*':  { tok.type = TOK_ASTERISK;    break; }
-        case '/':  { tok.type = TOK_SLASH;       break; }
         case '%':  { tok.type = TOK_PERCENT;     break; }
+
+        case '+':
+        {
+            if (*lex->cur == '=')
+            {
+                tok.type = TOK_PLUS_EQ;
+                tok.len = 2;
+
+                advance(lex);
+            }
+            else
+            {
+                tok.type = TOK_PLUS;
+            }
+
+            break;
+        }
+        case '*':
+        {
+            if (*lex->cur == '=')
+            {
+                tok.type = TOK_ASTERISK_EQ;
+                tok.len = 2;
+
+                advance(lex);
+            }
+            else
+            {
+                tok.type = TOK_ASTERISK;
+            }
+
+            break;
+        }
+        case '/':
+        {
+            if (*lex->cur == '=')
+            {
+                tok.type = TOK_SLASH_EQ;
+                tok.len = 2;
+
+                advance(lex);
+            }
+            else
+            {
+                tok.type = TOK_SLASH;
+            }
+
+            break;
+        }
 
         case '.':
         {
@@ -246,6 +292,13 @@ static Token get_token(Lexer *lex)
             if (*lex->cur == '>')
             {
                 tok.type = TOK_R_ARROW;
+                tok.len = 2;
+
+                advance(lex);
+            }
+            else if (*lex->cur == '=')
+            {
+                tok.type = TOK_MINUS_EQ;
                 tok.len = 2;
 
                 advance(lex);
