@@ -293,7 +293,16 @@ static TypeDefn *register_struct(Module *module, AstStruct *struct_)
             defn->alignment = field_alignment;
     }
 
-    defn->size += defn->size % defn->alignment;
+    if (defn->size == 0)
+    {
+        report_error("Empty struct definition for \"%s\".\n",
+                     struct_,
+                     struct_->name->str);
+    }
+    else
+    {
+        defn->size += defn->size % defn->alignment;
+    }
 
     return defn;
 }
