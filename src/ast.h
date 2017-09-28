@@ -413,11 +413,6 @@ struct AstStmtDecl : AstStmt
     AstExpr *desugared_rhs = NULL;
 };
 
-enum AstFuncFlags
-{
-    FUNC_IS_EXTERN = 0x1,
-};
-
 struct AstType : AstNode
 {
     AstType() : AstNode(AST_TYPE) {}
@@ -425,11 +420,20 @@ struct AstType : AstNode
     AstExpr *expr = NULL;
     i64 ptr_depth = 0;
 
+    // If an array.
+    i64 array_dimensions = 0;
+    i64 array_capacity[3] = {0}; // TODO: size?
+
     // Function pointer.
     // TODO: TypeKind or something?
     bool is_func_ptr = false;
     Array<AstType *> params;
     AstType *ret = NULL;
+};
+
+enum AstFuncFlags
+{
+    FUNC_IS_EXTERN = 0x1,
 };
 
 struct AstFunc : AstNode

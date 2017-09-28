@@ -171,6 +171,21 @@ static AstType *parse_type(Parser *parser)
     type->expr = parse_ident_or_path(parser);
     type->ptr_depth = ptr_depth;
 
+    while (eat_optional(parser, TOK_OPEN_BRACKET))
+    {
+        AstExpr *cap = parse_expr(parser);
+        assert(cap->ast_type == AST_EXPR_LIT);
+
+        AstExprLit *lit = static_cast<AstExprLit *>(cap);
+        assert(lit->lit_type == LIT_INT);
+        assert(lit->value_int.flags == 0);
+
+        assert(type->array_dimensions < sizeof(type->array_capacity) / sizeof(type->array_capacity[0]));
+        type->array_capacity[type->array_dimensions++] = (i64)lit->value_int.value;
+
+        expect(parser, TOK_CLOSE_BRACKET);
+    }
+
     return type;
 }
 
