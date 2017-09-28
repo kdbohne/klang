@@ -12,6 +12,8 @@ enum TokenType : u32
     TOK_CLOSE_PAREN,
     TOK_OPEN_BRACE,
     TOK_CLOSE_BRACE,
+    TOK_OPEN_BRACKET,
+    TOK_CLOSE_BRACKET,
 
     TOK_SEMI,
     TOK_COMMA,

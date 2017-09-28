@@ -10,6 +10,8 @@ const char *token_type_names[]
     "close paren",
     "open brace",
     "close brace",
+    "open bracket",
+    "close bracket",
 
     "semi",
     "comma",

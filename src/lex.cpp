@@ -142,17 +142,19 @@ static Token get_token(Lexer *lex)
 
     switch (c)
     {
-        case '\0': { tok.type = TOK_EOF;         break; }
-        case '(':  { tok.type = TOK_OPEN_PAREN;  break; }
-        case ')':  { tok.type = TOK_CLOSE_PAREN; break; }
-        case '{':  { tok.type = TOK_OPEN_BRACE;  break; }
-        case '}':  { tok.type = TOK_CLOSE_BRACE; break; }
-        case ';':  { tok.type = TOK_SEMI;        break; }
-        case ',':  { tok.type = TOK_COMMA;       break; }
+        case '\0': { tok.type = TOK_EOF;           break; }
+        case '(':  { tok.type = TOK_OPEN_PAREN;    break; }
+        case ')':  { tok.type = TOK_CLOSE_PAREN;   break; }
+        case '{':  { tok.type = TOK_OPEN_BRACE;    break; }
+        case '}':  { tok.type = TOK_CLOSE_BRACE;   break; }
+        case '[':  { tok.type = TOK_OPEN_BRACKET;  break; }
+        case ']':  { tok.type = TOK_CLOSE_BRACKET; break; }
+        case ';':  { tok.type = TOK_SEMI;          break; }
+        case ',':  { tok.type = TOK_COMMA;         break; }
 
-        case '&':  { tok.type = TOK_AND;         break; }
+        case '&':  { tok.type = TOK_AND;           break; }
 
-        case '%':  { tok.type = TOK_PERCENT;     break; }
+        case '%':  { tok.type = TOK_PERCENT;       break; }
 
         case '+':
         {
