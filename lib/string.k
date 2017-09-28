@@ -2,7 +2,7 @@ module string {
     struct String {
         data *u8;
         len i64;
-    };
+    }
 
     fn len(str *u8) -> i64 {
         let len = 0;

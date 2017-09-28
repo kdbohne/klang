@@ -6,7 +6,7 @@ module gl {
     struct Window {
         width i64;
         height i64;
-    };
+    }
 
     let COLOR_BUFFER_BIT u32 = 0x00004000;
 

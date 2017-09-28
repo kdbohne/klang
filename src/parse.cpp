@@ -701,7 +701,6 @@ AstStruct *parse_struct(Parser *parser)
         expect(parser, TOK_SEMI);
     }
     expect(parser, TOK_CLOSE_BRACE);
-    expect(parser, TOK_SEMI);
 
     return struct_;
 }
