@@ -34,7 +34,13 @@ static void print_type_defn(TypeDefn *defn)
 struct IrType
 {
     char *name = NULL;
-    i64 ptr_depth = 0;
+
+    // If a pointer.
+    i64 ptr_depth = -1;
+
+    // If an array.
+    i64 array_capacity[3] = {-1}; // TODO: size?
+    i64 array_dimensions = -1;
 };
 
 enum IrExprType : u32
@@ -359,6 +365,17 @@ static char *mangle_call_name(Module *module, AstExprCall *call)
     return mangle_name(module, func->name->str);
 }
 
+// TODO: this is copied from type.cpp
+static void copy_array_type(Type type, IrType *ir_type)
+{
+    assert(sizeof(type.array_capacity) == sizeof(ir_type->array_capacity));
+
+    for (i64 i = 0; i < sizeof(type.array_capacity) / sizeof(type.array_capacity[0]); ++i)
+        ir_type->array_capacity[i] = type.array_capacity[i];
+
+    ir_type->array_dimensions = type.array_dimensions;
+}
+
 static IrType ir_type_from_type(Type type)
 {
     IrType t;
@@ -366,6 +383,7 @@ static IrType ir_type_from_type(Type type)
     // TODO: smarter allocation?
     t.name = mangle_type_defn(type.defn);
     t.ptr_depth = type.ptr_depth;
+    copy_array_type(type, &t);
 
     return t;
 }
@@ -1564,7 +1582,7 @@ static void dump_ir(Ir *ir)
     }
 }
 
-static void dump_c_type(IrType type)
+static void dump_c_type_prefix(IrType type)
 {
     printf("%s", type.name);
     if (type.ptr_depth > 0)
@@ -1572,6 +1590,18 @@ static void dump_c_type(IrType type)
 
     for (i64 i = 0; i < type.ptr_depth; ++i)
         printf("*");
+}
+
+static void dump_c_type_suffix(IrType type)
+{
+    for (i64 i = 0; i < type.array_dimensions; ++i)
+        printf("[%ld]", type.array_capacity[i]);
+}
+
+static void dump_c_type(IrType type)
+{
+    dump_c_type_prefix(type);
+    dump_c_type_suffix(type);
 }
 
 static void dump_c_expr(IrExpr *expr)
@@ -1872,11 +1902,13 @@ static void dump_c(Ir *ir)
 
             printf("    ");
 
-            dump_c_type(field);
+            dump_c_type_prefix(field);
             if (field.ptr_depth == 0)
                 printf(" ");
 
-            printf("_%ld;\n", i);
+            printf("_%ld", i);
+            dump_c_type_suffix(field);
+            printf(";\n");
         }
         printf("};\n\n");
     }
@@ -1893,12 +1925,13 @@ static void dump_c(Ir *ir)
     // Global variable declarations.
     for (auto &var : ir->vars)
     {
-        dump_c_type(var.type);
+        dump_c_type_prefix(var.type);
         if (var.type.ptr_depth == 0)
             printf(" ");
 
         assert(var.prefix);
         printf("__%s_%ld", var.prefix, var.tmp);
+        dump_c_type_suffix(var.type);
         if (var.init)
         {
             printf(" = ");
@@ -1926,11 +1959,13 @@ static void dump_c(Ir *ir)
         {
             printf("    ");
 
-            dump_c_type(decl.type);
+            dump_c_type_prefix(decl.type);
             if (decl.type.ptr_depth == 0)
                 printf(" ");
 
-            printf("_%ld;", decl.tmp);
+            printf("_%ld", decl.tmp);
+            dump_c_type_suffix(decl.type);
+            printf(";");
 
             if (decl.name)
                 printf(" // %s", decl.name);

@@ -83,13 +83,19 @@ static char *get_type_string(Type type)
             c += string_write(c, " -> ");
             c += string_write(c, get_type_string(type.defn->func_ret));
         }
-
-        *c = '\0';
     }
     else
     {
-        string_copy(type.defn->name, c);
+        c += string_write(c, type.defn->name);
     }
+
+    if (type.array_dimensions > 0)
+    {
+        for (i64 i = 0; i < type.array_dimensions; ++i)
+            c += snprintf(c, sizeof(type_string_buffers[0]) - (c - buf), "[%ld]", type.array_capacity[i]);
+    }
+
+    *c = '\0';
 
     return buf;
 }
@@ -136,6 +142,16 @@ static TypeDefn *register_global_type_defn(const char *name, i64 size)
     defn->alignment = defn->size;
 
     return defn;
+}
+
+static void copy_array_type(AstType *ast_type, Type *type)
+{
+    assert(sizeof(ast_type->array_capacity) == sizeof(type->array_capacity));
+
+    for (i64 i = 0; i < sizeof(ast_type->array_capacity) / sizeof(ast_type->array_capacity[0]); ++i)
+        type->array_capacity[i] = ast_type->array_capacity[i];
+
+    type->array_dimensions = ast_type->array_dimensions;
 }
 
 static Type type_from_ast_type(Module *module, AstType *ast_type)
@@ -200,6 +216,7 @@ static Type type_from_ast_type(Module *module, AstType *ast_type)
         Type type;
         type.defn = defn;
         type.ptr_depth = ast_type->ptr_depth;
+        copy_array_type(ast_type, &type);
         return type;
     }
 
@@ -212,6 +229,7 @@ static Type type_from_ast_type(Module *module, AstType *ast_type)
             Type type;
             type.defn = find_type_defn(module, ident->str);
             type.ptr_depth = ast_type->ptr_depth;
+            copy_array_type(ast_type, &type);
 
             // TODO: dependency?
             assert(type.defn);
@@ -228,6 +246,7 @@ static Type type_from_ast_type(Module *module, AstType *ast_type)
             Type type;
             type.defn = find_type_defn(mod, name->str);
             type.ptr_depth = ast_type->ptr_depth;
+            copy_array_type(ast_type, &type);
             return type;
         }
         default:
@@ -1675,7 +1694,18 @@ bool type_is_ptr(Type type)
 bool types_match(Type a, Type b)
 {
     if ((a.defn == b.defn) && (a.ptr_depth == b.ptr_depth))
+    {
+        if (a.array_dimensions != b.array_dimensions)
+            return false;
+
+        for (i64 i = 0; i < a.array_dimensions; ++i)
+        {
+            if (a.array_capacity[i] != b.array_capacity[i])
+                return false;
+        }
+
         return true;
+    }
 
     // TODO: is this right?
     if (!a.defn || !b.defn)

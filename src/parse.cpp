@@ -170,6 +170,7 @@ static AstType *parse_type(Parser *parser)
     AstType *type = ast_alloc(AstType);
     type->expr = parse_ident_or_path(parser);
     type->ptr_depth = ptr_depth;
+    type->array_dimensions = 0;
 
     while (eat_optional(parser, TOK_OPEN_BRACKET))
     {
@@ -180,7 +181,7 @@ static AstType *parse_type(Parser *parser)
         assert(lit->lit_type == LIT_INT);
         assert(lit->value_int.flags == 0);
 
-        assert(type->array_dimensions < sizeof(type->array_capacity) / sizeof(type->array_capacity[0]));
+        assert(type->array_dimensions < (i64)(sizeof(type->array_capacity) / sizeof(type->array_capacity[0])));
         type->array_capacity[type->array_dimensions++] = (i64)lit->value_int.value;
 
         expect(parser, TOK_CLOSE_BRACKET);

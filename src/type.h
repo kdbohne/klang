@@ -10,7 +10,13 @@ struct TypeDefn;
 struct Type
 {
     TypeDefn *defn = NULL;
+
+    // If a pointer.
     i64 ptr_depth = -1;
+
+    // If an array.
+    i64 array_capacity[3] = {-1}; // TODO: size?
+    i64 array_dimensions = -1;
 };
 
 enum TypeDefnFlags
