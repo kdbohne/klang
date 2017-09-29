@@ -1,6 +1,16 @@
-extern fn gl_create_window(title *u8, width i64, height i64) -> *c_void;
-extern fn gl_destroy_window(window *c_void);
-extern fn gl_swap_buffers(window *c_void);
+struct Input {
+    keys u8[256];
+
+    mouse_buttons u8[8];
+    mouse_down_positions i32[8][2];
+
+    mouse_position i32[2];
+}
+
+extern fn platform_create_window(title *u8, width i64, height i64) -> *c_void;
+extern fn platform_destroy_window(window *c_void);
+extern fn platform_swap_buffers(window *c_void);
+extern fn platform_poll_events(window *c_void, input *Input);
 
 module gl {
     struct Window {
@@ -64,16 +74,16 @@ module gl {
     let DepthMask fn(u8);
 
     fn create_window(title *u8, width i64, height i64) -> *Window {
-        let win = cast(*Window) gl_create_window(title, width, height);
+        let win = cast(*Window) platform_create_window(title, width, height);
         win
     }
 
     fn destroy_window(win *Window) {
-        gl_destroy_window(cast(*c_void) win);
+        platform_destroy_window(cast(*c_void) win);
     }
 
     fn swap_buffers(win *Window) {
-        gl_swap_buffers(cast(*c_void) win);
+        platform_swap_buffers(cast(*c_void) win);
     }
 
     fn load_funcs() {
@@ -82,8 +92,6 @@ module gl {
             print_string_literal("Failed to load libGL.\n");
             return;
         };
-
-        print_string_literal("Loading function pointers...\n");
 
         Clear = cast(fn(u32)) dll_get_symbol(dll, "glClear");
         ClearColor = cast(fn(f32, f32, f32, f32)) dll_get_symbol(dll, "glClearColor");
