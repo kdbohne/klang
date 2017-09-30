@@ -1780,8 +1780,8 @@ bool type_check(AstRoot *ast)
     type_defn_u64 = register_global_type_defn("u64", 8);
     type_defn_f32 = register_global_type_defn("f32", 4);
     type_defn_f64 = register_global_type_defn("f64", 8);
-    type_defn_void = register_global_type_defn("void", -1);
-    type_defn_c_void = register_global_type_defn("c_void", -1);
+    type_defn_void = register_global_type_defn("void", 0);
+    type_defn_c_void = register_global_type_defn("c_void", 0);
 
     type_i8  = make_type(type_defn_i8,  0);
     type_i16 = make_type(type_defn_i16, 0);
@@ -1795,7 +1795,7 @@ bool type_check(AstRoot *ast)
     type_f64 = make_type(type_defn_f64, 0);
     type_void = make_type(type_defn_void, 0);
     type_c_void = make_type(type_defn_c_void, 0);
-    type_null = make_type(NULL, -1);
+    type_null = make_type(NULL, 0);
 
     // HACK: Move the global module to the end of the list to avoid dependency issues.
     if (ast->modules.count > 1)
