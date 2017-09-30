@@ -1196,7 +1196,8 @@ static IrExpr *gen_expr(Ir *ir, Module *module, AstExpr *expr)
 
             IrExprIndex *index = new IrExprIndex();
             index->expr = gen_expr(ir, module, ast_index->expr);
-            index->expr = flatten_expr(ir, ast_index, index->expr);
+            // TODO: should these be flattened?
+//            index->expr = flatten_expr(ir, ast_index, index->expr);
             index->index = ast_index->index;
 
             return index;

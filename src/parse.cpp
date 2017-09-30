@@ -439,7 +439,7 @@ static AstExpr *parse_expr(Parser *parser, bool is_unary)
         lhs = call;
     }
 
-    if (peek(parser).type == TOK_OPEN_BRACKET)
+    while (peek(parser).type == TOK_OPEN_BRACKET)
     {
         eat(parser);
 
