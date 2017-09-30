@@ -443,20 +443,9 @@ static AstExpr *parse_expr(Parser *parser, bool is_unary)
     {
         eat(parser);
 
-        tok = expect(parser, TOK_NUM);
-
-        // TODO: make this a helper in string.h or something
-        // TODO: size?
-        static char buf[64];
-        assert(tok.len < (i32)(sizeof(buf) / sizeof(buf[0])));
-        string_copy(tok.str, buf, tok.len);
-        buf[tok.len] = '\0';
-
-        u64 i = strtoull(buf, NULL, 10);
-
         AstExprIndex *index = ast_alloc(AstExprIndex);
         index->expr = lhs;
-        index->index = i;
+        index->index = parse_expr(parser);
 
         expect(parser, TOK_CLOSE_BRACKET);
 

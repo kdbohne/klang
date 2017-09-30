@@ -16,11 +16,16 @@ fn main() {
     gl::ClearColor(1.0, 0.0, 1.0, 1.0);
     gl::Clear(gl::COLOR_BUFFER_BIT);
 
-    let t = 0;
+    let input Input;
+
     loop {
-        t += 1;
-        print_i64(t);
-        print_string_literal("\n");
+        gl::poll_events(win, &input);
+        for i in 0..256 {
+            if input.keys[i] {
+                print_i64(i);
+                print_string_literal("\n");
+            };
+        };
 
         gl::Clear(gl::COLOR_BUFFER_BIT);
         gl::swap_buffers(win);

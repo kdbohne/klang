@@ -389,7 +389,7 @@ struct AstExprIndex : AstExpr
     AstExprIndex() : AstExpr(AST_EXPR_INDEX) {}
 
     AstExpr *expr = NULL;
-    i64 index = -1;
+    AstExpr *index = NULL;
 };
 
 struct AstStmt : AstNode

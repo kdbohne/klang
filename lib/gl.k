@@ -86,6 +86,10 @@ module gl {
         platform_swap_buffers(cast(*c_void) win);
     }
 
+    fn poll_events(win *Window, input *Input) {
+        platform_poll_events(cast(*c_void) win, input);
+    }
+
     fn load_funcs() {
         let dll = dll_load("libGL.so.1");
         if !dll {

@@ -869,6 +869,7 @@ static void assign_scopes(AstNode *node, Scope *enclosing, Module *module)
             index->scope = enclosing;
 
             assign_scopes(index->expr, enclosing, module);
+            assign_scopes(index->index, enclosing, module);
 
             break;
         }
@@ -1543,6 +1544,13 @@ static Type infer_types(AstNode *node)
         case AST_EXPR_INDEX:
         {
             auto index = static_cast<AstExprIndex *>(node);
+
+            infer_types(index->index);
+            if (!type_is_int(index->index->type))
+            {
+                report_error("Indexing an array with a non-integer.%s\n",
+                             index->index, ""); // HACK
+            }
 
             index->type = infer_types(index->expr);
 

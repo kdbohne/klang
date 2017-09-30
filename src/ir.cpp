@@ -179,7 +179,7 @@ struct IrExprIndex : IrExpr
     IrExprIndex() : IrExpr(IR_EXPR_INDEX) {}
 
     IrExpr *expr = NULL;
-    i64 index = -1;
+    IrExpr *index = NULL;
 };
 
 struct IrExprFuncName : IrExpr
@@ -1198,7 +1198,7 @@ static IrExpr *gen_expr(Ir *ir, Module *module, AstExpr *expr)
             index->expr = gen_expr(ir, module, ast_index->expr);
             // TODO: should these be flattened?
 //            index->expr = flatten_expr(ir, ast_index, index->expr);
-            index->index = ast_index->index;
+            index->index = gen_expr(ir, module, ast_index->index);
 
             return index;
         }
@@ -1815,7 +1815,9 @@ static void dump_c_expr(IrExpr *expr)
             auto index = static_cast<IrExprIndex *>(expr);
 
             dump_c_expr(index->expr);
-            printf("[%ld]", index->index);
+            printf("[");
+            dump_c_expr(index->index);
+            printf("]");
 
             break;
         }
