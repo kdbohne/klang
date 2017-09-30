@@ -12,11 +12,11 @@ struct Type
     TypeDefn *defn = NULL;
 
     // If a pointer.
-    i64 ptr_depth = -1;
+    i64 ptr_depth = 0;
 
     // If an array.
-    i64 array_capacity[3] = {-1}; // TODO: size?
-    i64 array_dimensions = -1;
+    i64 array_capacity[3] = {0}; // TODO: size?
+    i64 array_dimensions = 0;
 };
 
 enum TypeDefnFlags

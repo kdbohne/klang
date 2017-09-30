@@ -36,11 +36,11 @@ struct IrType
     char *name = NULL;
 
     // If a pointer.
-    i64 ptr_depth = -1;
+    i64 ptr_depth = 0;
 
     // If an array.
-    i64 array_capacity[3] = {-1}; // TODO: size?
-    i64 array_dimensions = -1;
+    i64 array_capacity[3] = {0}; // TODO: size?
+    i64 array_dimensions = 0;
 };
 
 enum IrExprType : u32
@@ -53,6 +53,7 @@ enum IrExprType : u32
     IR_EXPR_FIELD,
     IR_EXPR_PAREN,
     IR_EXPR_CAST,
+    IR_EXPR_INDEX,
     IR_EXPR_FUNC_NAME,
 };
 
@@ -171,6 +172,14 @@ struct IrExprCast : IrExpr
 
     IrType type;
     IrExpr *expr = NULL;
+};
+
+struct IrExprIndex : IrExpr
+{
+    IrExprIndex() : IrExpr(IR_EXPR_INDEX) {}
+
+    IrExpr *expr = NULL;
+    i64 index = -1;
 };
 
 struct IrExprFuncName : IrExpr
@@ -1181,6 +1190,17 @@ static IrExpr *gen_expr(Ir *ir, Module *module, AstExpr *expr)
 
             return NULL;
         }
+        case AST_EXPR_INDEX:
+        {
+            auto ast_index = static_cast<AstExprIndex *>(expr);
+
+            IrExprIndex *index = new IrExprIndex();
+            index->expr = gen_expr(ir, module, ast_index->expr);
+            index->expr = flatten_expr(ir, ast_index, index->expr);
+            index->index = ast_index->index;
+
+            return index;
+        }
         default:
         {
             assert(false);
@@ -1786,6 +1806,15 @@ static void dump_c_expr(IrExpr *expr)
             printf(")");
             dump_c_expr(cast->expr);
             printf(")");
+
+            break;
+        }
+        case IR_EXPR_INDEX:
+        {
+            auto index = static_cast<IrExprIndex *>(expr);
+
+            dump_c_expr(index->expr);
+            printf("[%ld]", index->index);
 
             break;
         }

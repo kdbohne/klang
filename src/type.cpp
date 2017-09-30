@@ -538,6 +538,14 @@ static void flatten_ast_visit(Array<AstNode *> *ast, AstNode *node)
 
             break;
         }
+        case AST_EXPR_INDEX:
+        {
+            auto index = static_cast<AstExprIndex *>(node);
+
+            flatten_ast_visit(ast, index->expr);
+
+            break;
+        }
         case AST_STMT_EXPR:
         {
             auto expr = static_cast<AstStmtExpr *>(node);
@@ -852,6 +860,15 @@ static void assign_scopes(AstNode *node, Scope *enclosing, Module *module)
 
             if (ret->expr)
                 assign_scopes(ret->expr, enclosing, module);
+
+            break;
+        }
+        case AST_EXPR_INDEX:
+        {
+            auto index = static_cast<AstExprIndex *>(node);
+            index->scope = enclosing;
+
+            assign_scopes(index->expr, enclosing, module);
 
             break;
         }
@@ -1523,6 +1540,18 @@ static Type infer_types(AstNode *node)
 
             break;
         }
+        case AST_EXPR_INDEX:
+        {
+            auto index = static_cast<AstExprIndex *>(node);
+
+            index->type = infer_types(index->expr);
+
+            for (i64 i = 1; i < index->type.array_dimensions; ++i)
+                index->type.array_capacity[i - 1] = index->type.array_capacity[i];
+            --index->type.array_dimensions;
+
+            break;
+        }
         case AST_STMT_EXPR:
         {
             auto expr = static_cast<AstStmtExpr *>(node);
@@ -1666,7 +1695,7 @@ static Type infer_types(AstNode *node)
 
 bool type_is_null(Type type)
 {
-    return !type.defn && (type.ptr_depth == -1);
+    return !type.defn && (type.ptr_depth == 0);
 }
 
 bool type_is_void(Type type)

@@ -68,6 +68,7 @@ enum AstNodeType : u32
     AST_EXPR_PAREN,
     AST_EXPR_PATH, // TODO: move this up below IDENT
     AST_EXPR_RETURN,
+    AST_EXPR_INDEX,
 
     // Stmt
     AST_STMT_EXPR,
@@ -381,6 +382,14 @@ struct AstExprReturn : AstExpr
     AstExprReturn() : AstExpr(AST_EXPR_RETURN) {}
 
     AstExpr *expr = NULL;
+};
+
+struct AstExprIndex : AstExpr
+{
+    AstExprIndex() : AstExpr(AST_EXPR_INDEX) {}
+
+    AstExpr *expr = NULL;
+    i64 index = -1;
 };
 
 struct AstStmt : AstNode
