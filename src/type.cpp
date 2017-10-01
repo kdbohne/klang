@@ -1712,6 +1712,42 @@ static Type infer_types(AstNode *node)
     return node->type;
 }
 
+static void check_array_bounds(Array<AstNode *> ast)
+{
+    for (auto &node : ast)
+    {
+        if (node->ast_type != AST_EXPR_INDEX)
+            continue;
+
+        auto index = static_cast<AstExprIndex *>(node);
+        // TODO: check for constant instead of literal
+        if (index->index->ast_type != AST_EXPR_LIT)
+            continue;
+
+        auto lit = static_cast<AstExprLit *>(index->index);
+        assert(lit->lit_type == LIT_INT);
+
+        Type t = index->expr->type;
+        assert(type_is_array(t));
+
+        // TODO: slicing?
+        if (lit->value_int.flags & INT_IS_NEGATIVE)
+        {
+            report_error("Array index is negative.%s\n",
+                         index->index, ""); // HACK
+        }
+
+        // TODO: is this always the correct dimension to check?
+        if (lit->value_int.value >= t.array_capacity[0])
+        {
+            report_error("Array index is out of bounds (index=%lu, capacity=%ld).\n",
+                         index->index,
+                         lit->value_int.value,
+                         t.array_capacity[0]);
+        }
+    }
+}
+
 bool type_is_null(Type type)
 {
     return !type.defn && (type.ptr_depth == 0);
@@ -1859,6 +1895,8 @@ bool type_check(AstRoot *ast)
 
     infer_types(ast);
 //    declare_vars(ast);
+
+    check_array_bounds(flat);
 
 #if 0
     for (auto &mod : ast->modules)
