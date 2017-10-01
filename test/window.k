@@ -17,6 +17,9 @@ fn main() {
     gl::Clear(gl::COLOR_BUFFER_BIT);
 
     let input Input;
+    for i in 0..256 {
+        input.keys[i] = 0;
+    };
 
     loop {
         gl::poll_events(win, &input);

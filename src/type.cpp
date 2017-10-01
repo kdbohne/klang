@@ -754,6 +754,7 @@ static void assign_scopes(AstNode *node, Scope *enclosing, Module *module)
         case AST_EXPR_IF:
         {
             auto if_ = static_cast<AstExprIf *>(node);
+            // TODO: make new scope? (see for loop case for reference)
             if_->scope = enclosing;
 
             assign_scopes(if_->cond, enclosing, module);
@@ -790,6 +791,7 @@ static void assign_scopes(AstNode *node, Scope *enclosing, Module *module)
         case AST_EXPR_LOOP:
         {
             auto loop = static_cast<AstExprLoop *>(node);
+            // TODO: make new scope? (see for loop case for reference)
             loop->scope = enclosing;
 
             assign_scopes(loop->block, enclosing, module);
@@ -806,11 +808,11 @@ static void assign_scopes(AstNode *node, Scope *enclosing, Module *module)
         case AST_EXPR_FOR:
         {
             auto for_ = static_cast<AstExprFor *>(node);
-            for_->scope = enclosing;
+            for_->scope = make_scope(enclosing);
 
-            assign_scopes(for_->it, enclosing, module);
-            assign_scopes(for_->range, enclosing, module);
-            assign_scopes(for_->block, enclosing, module);
+            assign_scopes(for_->it, for_->scope, module);
+            assign_scopes(for_->range, for_->scope, module);
+            assign_scopes(for_->block, for_->scope, module);
 
             break;
         }
@@ -827,6 +829,7 @@ static void assign_scopes(AstNode *node, Scope *enclosing, Module *module)
         case AST_EXPR_WHILE:
         {
             auto while_ = static_cast<AstExprWhile *>(node);
+            // TODO: make new scope? (see for loop case for reference)
             while_->scope = enclosing;
 
             assign_scopes(while_->cond, enclosing, module);
