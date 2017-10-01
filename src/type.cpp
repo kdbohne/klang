@@ -1348,10 +1348,18 @@ static Type infer_types(AstNode *node)
             Type rhs = infer_types(assign->rhs);
             if (!types_match(lhs, rhs))
             {
-                report_error("Type mismatch in assignment. Assigning rvalue \"%s\" to lvalue \"%s\".\n",
-                             assign,
-                             get_type_string(rhs),
-                             get_type_string(lhs));
+                // TODO: smarter way of doing this; actually check if/which ones
+                // are literals and only try to narrow those
+                lhs = narrow_type(lhs, assign->rhs);
+                rhs = narrow_type(rhs, assign->lhs);
+
+                if (!types_match(lhs, rhs))
+                {
+                    report_error("Type mismatch in assignment. Assigning rvalue \"%s\" to lvalue \"%s\".\n",
+                                 assign,
+                                 get_type_string(rhs),
+                                 get_type_string(lhs));
+                }
             }
 
             assign->type = lhs;
