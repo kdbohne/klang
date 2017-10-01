@@ -11,7 +11,7 @@ fi
 printf "%s" "$IR" | clang -x c - -m64 -c -o $FILENAME.o
 
 # TODO: detect libs in frontend
-OBJS="lib/build/start.o lib/build/syscall.o lib/build/bit.o lib/build/dll.o lib/build/gl.o"
+OBJS="lib/build/start.o lib/build/syscall.o lib/build/bit.o lib/build/dll.o lib/build/platform.o"
 LIBS="-ldl -lX11 -lGL"
 
 # TODO: -nostdlib?
