@@ -1739,6 +1739,11 @@ bool type_is_ptr(Type type)
     return (type.ptr_depth > 0);
 }
 
+bool type_is_array(Type type)
+{
+    return (type.array_dimensions > 0);
+}
+
 bool types_match(Type a, Type b)
 {
     if ((a.defn == b.defn) && (a.ptr_depth == b.ptr_depth))

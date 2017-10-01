@@ -61,6 +61,7 @@ bool type_is_null(Type type);
 bool type_is_void(Type type);
 bool type_is_int(Type type);
 bool type_is_ptr(Type type);
+bool type_is_array(Type type);
 
 bool types_match(Type a, Type b);
 
