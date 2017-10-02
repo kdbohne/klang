@@ -1,3 +1,12 @@
+fn sum(x i64[]) -> i64 {
+    let sum = 0;
+    for i in 0..x.count {
+        sum += x[i];
+    };
+
+    sum
+}
+
 fn main() {
     let x i64[4];
     x[0] = 0;
