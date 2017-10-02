@@ -1412,23 +1412,42 @@ static Type infer_types(AstNode *node)
             auto field = static_cast<AstExprField *>(node);
 
             Type struct_type = infer_types(field->expr);
-
-            TypeDefn *defn = struct_type.defn;
-            assert(defn);
-            assert(defn->struct_field_names.count == defn->struct_field_types.count);
-            assert(defn->struct_field_names.count > 0);
-
-            Type type = type_null;
-            for (i64 i = 0; i < defn->struct_field_names.count; ++i)
+            if (struct_type.is_array_slice)
             {
-                char *name = defn->struct_field_names[i];
-                if (strings_match(name, field->name->str))
+                // Handle array slice "fat pointers".
+                // i.e. struct { count i64, data *T }
+
+                if (strings_match(field->name->str, "count"))
                 {
-                    field->type = defn->struct_field_types[i];
-                    break;
+                    // TODO: allow specifying type of count
+                    field->type = type_i64;
+                }
+                else
+                {
+                    report_error("Unknown array slice field \"%s\".\n",
+                                 field->name,
+                                 field->name->str);
                 }
             }
-            assert(!type_is_null(field->type));
+            else
+            {
+                TypeDefn *defn = struct_type.defn;
+                assert(defn);
+                assert(defn->struct_field_names.count == defn->struct_field_types.count);
+                assert(defn->struct_field_names.count > 0);
+
+                Type type = type_null;
+                for (i64 i = 0; i < defn->struct_field_names.count; ++i)
+                {
+                    char *name = defn->struct_field_names[i];
+                    if (strings_match(name, field->name->str))
+                    {
+                        field->type = defn->struct_field_types[i];
+                        break;
+                    }
+                }
+                assert(!type_is_null(field->type));
+            }
 
             break;
         }

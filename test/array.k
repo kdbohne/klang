@@ -8,6 +8,14 @@ fn sum(x i64[]) -> i64 {
 }
 
 fn main() {
+    let x i64[5];
+    x[0] = 1;
+    x[1] = 3;
+    x[2] = 5;
+    x[3] = 7;
+    x[4] = 9;
+
+    /*
     let x i64[4];
     x[0] = 0;
     x[1] = 1;
@@ -31,20 +39,5 @@ fn main() {
     y[2][2] = 8;
     y[3][-1] = 8;
     y[2][4] = 8;
-
-    /*
-    let xs i64[3];
-    let ys i64[3];
-    let zs i64[5];
-    let ws i64[3][4];
-
-    xs = ys;
-
-    let x i64;
-    x = xs;
-
-    ys = xs;
-    zs = xs;
-    ws = xs;
     */
 }
