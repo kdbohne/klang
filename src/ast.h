@@ -432,6 +432,7 @@ struct AstType : AstNode
     // If an array.
     i64 array_capacity[3] = {0}; // TODO: size?
     i64 array_dimensions = 0;
+    bool is_array_slice = false; // TODO: flags?
 
     // Function pointer.
     // TODO: TypeKind or something?

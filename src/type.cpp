@@ -152,6 +152,7 @@ static void copy_array_type(AstType *ast_type, Type *type)
         type->array_capacity[i] = ast_type->array_capacity[i];
 
     type->array_dimensions = ast_type->array_dimensions;
+    type->is_array_slice = ast_type->is_array_slice;
 }
 
 static Type type_from_ast_type(Module *module, AstType *ast_type)
@@ -1777,7 +1778,7 @@ bool type_is_ptr(Type type)
 
 bool type_is_array(Type type)
 {
-    return (type.array_dimensions > 0);
+    return (type.array_dimensions > 0) || (type.is_array_slice);
 }
 
 bool types_match(Type a, Type b)

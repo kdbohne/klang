@@ -186,6 +186,10 @@ static AstType *parse_type(Parser *parser)
             assert(type->array_dimensions < (i64)(sizeof(type->array_capacity) / sizeof(type->array_capacity[0])));
             type->array_capacity[type->array_dimensions++] = (i64)lit->value_int.value;
         }
+        else
+        {
+            type->is_array_slice = true;
+        }
 
         expect(parser, TOK_CLOSE_BRACKET);
     }
