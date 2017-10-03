@@ -41,6 +41,7 @@ struct IrType
     // If an array.
     i64 array_capacity[3] = {0}; // TODO: size?
     i64 array_dimensions = 0;
+    bool is_array_slice = false; // TODO: flags?
 };
 
 enum IrExprType : u32
@@ -180,6 +181,10 @@ struct IrExprIndex : IrExpr
 
     IrExpr *expr = NULL;
     IrExpr *index = NULL;
+
+    // TODO: should this go somewhere else?
+    bool is_array_slice = false;
+    IrType slice_type;
 };
 
 struct IrExprFuncName : IrExpr
@@ -383,6 +388,7 @@ static void copy_array_type(Type type, IrType *ir_type)
         ir_type->array_capacity[i] = type.array_capacity[i];
 
     ir_type->array_dimensions = type.array_dimensions;
+    ir_type->is_array_slice = type.is_array_slice;
 }
 
 static IrType ir_type_from_type(Type type)
@@ -954,22 +960,36 @@ static IrExpr *gen_expr(Ir *ir, Module *module, AstExpr *expr)
         {
             auto ast_field = static_cast<AstExprField *>(expr);
 
-            Type struct_type = ast_field->expr->type;
-
-            auto defn = struct_type.defn;
-            assert(defn);
-            assert(defn->struct_field_names.count == defn->struct_field_types.count);
-            assert(defn->struct_field_names.count > 0);
-
             // TODO: optimize, store index in field?
             i64 index = -1;
-            for (i64 i = 0; i < defn->struct_field_names.count; ++i)
+            Type struct_type = ast_field->expr->type;
+            if (struct_type.is_array_slice)
             {
-                char *name = defn->struct_field_names[i];
-                if (strings_match(name, ast_field->name->str))
+                // Handle array slice "fat pointers".
+                // i.e. struct { count i64, data *T }
+
+                if (strings_match(ast_field->name->str, "count"))
+                    index = 0;
+                else
+                    assert(false);
+
+                // FIXME: data
+            }
+            else
+            {
+                auto defn = struct_type.defn;
+                assert(defn);
+                assert(defn->struct_field_names.count == defn->struct_field_types.count);
+                assert(defn->struct_field_names.count > 0);
+
+                for (i64 i = 0; i < defn->struct_field_names.count; ++i)
                 {
-                    index = i;
-                    break;
+                    char *name = defn->struct_field_names[i];
+                    if (strings_match(name, ast_field->name->str))
+                    {
+                        index = i;
+                        break;
+                    }
                 }
             }
             assert(index != -1);
@@ -1199,6 +1219,14 @@ static IrExpr *gen_expr(Ir *ir, Module *module, AstExpr *expr)
             // TODO: should these be flattened?
 //            index->expr = flatten_expr(ir, ast_index, index->expr);
             index->index = gen_expr(ir, module, ast_index->index);
+
+            if (ast_index->expr->type.is_array_slice)
+            {
+                index->is_array_slice = true;
+
+                index->slice_type = ir_type_from_type(ast_index->expr->type);
+                index->slice_type.is_array_slice = false;
+            }
 
             return index;
         }
@@ -1605,6 +1633,12 @@ static void dump_ir(Ir *ir)
 
 static void dump_c_type_prefix(IrType type)
 {
+    if (type.is_array_slice)
+    {
+        printf("__ArraySlice");
+        return;
+    }
+
     printf("%s", type.name);
     if (type.ptr_depth > 0)
         printf(" ");
@@ -1714,7 +1748,27 @@ static void dump_c_expr(IrExpr *expr)
             printf("(");
             for (i64 i = 0; i < call->args.count; ++i)
             {
-                dump_c_expr(call->args[i]);
+                IrExpr *arg = call->args[i];
+
+                if (call->func)
+                {
+                    IrParam *param = &call->func->params[i];
+                    if (param->type.is_array_slice)
+                    {
+                        // FIXME: multidimensional arrays
+                        printf("(__ArraySlice){._0 = %ld, ._1 = ", param->type.array_capacity[0]);
+                        dump_c_expr(arg);
+                        printf("}");
+                    }
+                    else
+                    {
+                        dump_c_expr(arg);
+                    }
+                }
+                else
+                {
+                    // FIXME: function pointer
+                }
 
                 if (i < call->args.count - 1)
                     printf(", ");
@@ -1814,7 +1868,17 @@ static void dump_c_expr(IrExpr *expr)
         {
             auto index = static_cast<IrExprIndex *>(expr);
 
+            if (index->is_array_slice)
+            {
+                printf("((");
+                dump_c_type(index->slice_type);
+                printf(" *)(");
+            }
+
             dump_c_expr(index->expr);
+            if (index->is_array_slice)
+                printf("._1))");
+
             printf("[");
             dump_c_expr(index->index);
             printf("]");
@@ -1891,6 +1955,10 @@ static void dump_c(Ir *ir)
     printf("typedef float    f32;\n");
     printf("typedef double   f64;\n");
     printf("#define c_void void\n");
+    printf("\n");
+
+    printf("typedef struct __ArraySlice __ArraySlice;\n");
+    printf("struct __ArraySlice { i64 _0; void *_1; };\n");
     printf("\n");
 
     // Struct typedefs.

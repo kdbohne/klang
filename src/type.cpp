@@ -1584,10 +1584,15 @@ static Type infer_types(AstNode *node)
             }
 
             index->type = infer_types(index->expr);
+            index->type.is_array_slice = false;
 
-            for (i64 i = 1; i < index->type.array_dimensions; ++i)
-                index->type.array_capacity[i - 1] = index->type.array_capacity[i];
-            --index->type.array_dimensions;
+            if (!index->expr->type.is_array_slice)
+            {
+                for (i64 i = 1; i < index->type.array_dimensions; ++i)
+                    index->type.array_capacity[i - 1] = index->type.array_capacity[i];
+
+                --index->type.array_dimensions;
+            }
 
             break;
         }
@@ -1916,7 +1921,7 @@ bool type_check(AstRoot *ast)
     infer_types(ast);
 //    declare_vars(ast);
 
-    check_array_bounds(flat);
+//    check_array_bounds(flat);
 
 #if 0
     for (auto &mod : ast->modules)

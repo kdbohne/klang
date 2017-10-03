@@ -1,4 +1,9 @@
+import "core.k";
+import "string.k";
+import "print.k";
+
 fn sum(x i64[]) -> i64 {
+    let y = x[0];
     let sum = 0;
     for i in 0..x.count {
         sum += x[i];
@@ -14,6 +19,10 @@ fn main() {
     x[2] = 5;
     x[3] = 7;
     x[4] = 9;
+
+    let s = sum(x);
+    print_i64(s);
+    print_string_literal("\n");
 
     /*
     let x i64[4];
