@@ -44,6 +44,7 @@ struct TypeDefn
     Type func_ret;
 };
 
+// TODO: do these really need to be exposed?
 extern Type type_i8;
 extern Type type_i16;
 extern Type type_i32;
@@ -57,6 +58,7 @@ extern Type type_f64;
 extern Type type_void;
 extern Type type_c_void;
 extern Type type_null;
+extern Type type_array_slice;
 
 bool type_is_null(Type type);
 bool type_is_void(Type type);

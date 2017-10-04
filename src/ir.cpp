@@ -3,33 +3,6 @@
 
 #include <stdio.h>
 
-// Expr
-//     Lit
-//     Ident
-//     Call
-//     Expr <binop> Expr
-//     <unop> Expr
-//     Expr.Field
-//     (Expr)
-//
-// Stmt
-//     Expr;           <- call
-//     Expr = Expr;
-//     return;
-//     goto bbX;
-//     gotoif Expr bbX bbY;
-
-#if 0
-static void print_type_defn(TypeDefn *defn)
-{
-    int depth = get_ptr_depth(defn);
-    for (i64 i = 0; i < depth; ++i)
-        fprintf(stderr, "*");
-
-    fprintf(stderr, "%s", defn->name);
-}
-#endif
-
 // TODO: could this be merged with Type in type.h?
 struct IrType
 {
@@ -56,6 +29,7 @@ enum IrExprType : u32
     IR_EXPR_CAST,
     IR_EXPR_INDEX,
     IR_EXPR_FUNC_NAME,
+    IR_EXPR_ARRAY_PARAM_CAST,
 };
 
 struct IrExpr
@@ -192,6 +166,14 @@ struct IrExprFuncName : IrExpr
     IrExprFuncName() : IrExpr(IR_EXPR_FUNC_NAME) {}
 
     char *name = NULL;
+};
+
+struct IrExprArrayParamCast : IrExpr
+{
+    IrExprArrayParamCast() : IrExpr(IR_EXPR_ARRAY_PARAM_CAST) {}
+
+    IrExpr *expr = NULL;
+    i64 count = -1;
 };
 
 enum IrInstrType : u32
@@ -1230,6 +1212,16 @@ static IrExpr *gen_expr(Ir *ir, Module *module, AstExpr *expr)
 
             return index;
         }
+        case AST_EXPR_ARRAY_PARAM_CAST:
+        {
+            auto ast_cast = static_cast<AstExprArrayParamCast *>(expr);
+
+            IrExprArrayParamCast *cast = new IrExprArrayParamCast();
+            cast->expr = gen_expr(ir, module, ast_cast->expr);
+            cast->count = ast_cast->count;
+
+            return cast;
+        }
         default:
         {
             assert(false);
@@ -1750,25 +1742,7 @@ static void dump_c_expr(IrExpr *expr)
             {
                 IrExpr *arg = call->args[i];
 
-                if (call->func)
-                {
-                    IrParam *param = &call->func->params[i];
-                    if (param->type.is_array_slice)
-                    {
-                        // FIXME: multidimensional arrays
-                        printf("(__ArraySlice){._0 = %ld, ._1 = ", param->type.array_capacity[0]);
-                        dump_c_expr(arg);
-                        printf("}");
-                    }
-                    else
-                    {
-                        dump_c_expr(arg);
-                    }
-                }
-                else
-                {
-                    // FIXME: function pointer
-                }
+                dump_c_expr(arg);
 
                 if (i < call->args.count - 1)
                     printf(", ");
@@ -1882,6 +1856,16 @@ static void dump_c_expr(IrExpr *expr)
             printf("[");
             dump_c_expr(index->index);
             printf("]");
+
+            break;
+        }
+        case IR_EXPR_ARRAY_PARAM_CAST:
+        {
+            auto cast = static_cast<IrExprArrayParamCast *>(expr);
+
+            printf("(__ArraySlice){._0 = %ld, ._1 = ", cast->count);
+            dump_c_expr(cast->expr);
+            printf("}");
 
             break;
         }
