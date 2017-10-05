@@ -1764,6 +1764,14 @@ static void check_array_bounds(Array<AstNode *> &ast)
                          index->index, ""); // HACK
         }
 
+        // TODO: multidimensional?
+
+        // This is an array slice parameter, so its size is not known
+        // at compile time. NOTE: this assumes a 0-capacity array is
+        // always a parameter.
+        if (t.array_capacity[0] == 0)
+            continue;
+
         // TODO: is this always the correct dimension to check?
         if (lit->value_int.value >= t.array_capacity[0])
         {
@@ -2005,8 +2013,7 @@ bool type_check(AstRoot *ast)
 //    declare_vars(ast);
 
     make_array_fat_pointers(flat);
-
-//    check_array_bounds(flat);
+    check_array_bounds(flat);
 
 #if 0
     for (auto &mod : ast->modules)
