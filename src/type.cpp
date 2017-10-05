@@ -1741,6 +1741,34 @@ static Type infer_types(AstNode *node)
 
 static void check_array_bounds(Array<AstNode *> &ast)
 {
+    // Check for negative or zero-capacity array declarations.
+    for (auto &node : ast)
+    {
+        if (node->ast_type != AST_STMT_DECL)
+            continue;
+
+        auto decl = static_cast<AstStmtDecl *>(node);
+
+        Type t = decl->bind->type;
+        if (type_is_array(t))
+        {
+            for (i64 i = 0; i < t.array_dimensions; ++i)
+            {
+                if (t.array_capacity[i] < 0)
+                {
+                    report_error("Negative-capacity array declaration.%s\n",
+                                 decl->bind, ""); // HACK
+                }
+                else if (t.array_capacity[i] == 0)
+                {
+                    report_error("Zero-capacity array declaration.%s\n",
+                                 decl->bind, ""); // HACK
+                }
+            }
+        }
+    }
+
+    // Check array indexing bounds.
     for (auto &node : ast)
     {
         if (node->ast_type != AST_EXPR_INDEX)
@@ -1767,9 +1795,8 @@ static void check_array_bounds(Array<AstNode *> &ast)
         // TODO: multidimensional?
 
         // This is an array slice parameter, so its size is not known
-        // at compile time. NOTE: this assumes a 0-capacity array is
-        // always a parameter.
-        if (t.array_capacity[0] == 0)
+        // at compile time and cannot be bounds-checked.
+        if (t.is_array_slice)
             continue;
 
         // TODO: is this always the correct dimension to check?

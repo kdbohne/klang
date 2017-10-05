@@ -181,10 +181,14 @@ static AstType *parse_type(Parser *parser)
 
             AstExprLit *lit = static_cast<AstExprLit *>(cap);
             assert(lit->lit_type == LIT_INT);
-            assert(lit->value_int.flags == 0);
+//            assert(lit->value_int.flags == 0); // This check is done by type:check_array_bounds()
+
+            i64 capacity = (i64)lit->value_int.value;
+            if (lit->value_int.flags & INT_IS_NEGATIVE)
+                capacity *= -1;
 
             assert(type->array_dimensions < (i64)(sizeof(type->array_capacity) / sizeof(type->array_capacity[0])));
-            type->array_capacity[type->array_dimensions++] = (i64)lit->value_int.value;
+            type->array_capacity[type->array_dimensions++] = capacity;
         }
         else
         {
