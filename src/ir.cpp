@@ -945,7 +945,7 @@ static IrExpr *gen_expr(Ir *ir, Module *module, AstExpr *expr)
             // TODO: optimize, store index in field?
             i64 index = -1;
             Type struct_type = ast_field->expr->type;
-            if (struct_type.is_array_slice)
+            if (type_is_array(struct_type))
             {
                 // Handle array slice "fat pointers".
                 // i.e. struct { count i64, data *T }

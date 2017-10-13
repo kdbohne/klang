@@ -1414,7 +1414,7 @@ static Type infer_types(AstNode *node)
             auto field = static_cast<AstExprField *>(node);
 
             Type struct_type = infer_types(field->expr);
-            if (struct_type.is_array_slice)
+            if (type_is_array(struct_type))
             {
                 // Handle array slice "fat pointers".
                 // i.e. struct { count i64, data *T }
