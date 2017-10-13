@@ -40,8 +40,10 @@ const char *token_type_names[]
     "ge",
     "eq eq",
     "ne",
-//    "colon eq",
+
     "r arrow",
+
+    "dollar",
 
     "key fn",
     "key extern",

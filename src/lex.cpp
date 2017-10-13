@@ -156,6 +156,8 @@ static Token get_token(Lexer *lex)
 
         case '%':  { tok.type = TOK_PERCENT;       break; }
 
+        case '$':  { tok.type = TOK_DOLLAR;        break; }
+
         case '+':
         {
             if (*lex->cur == '=')
