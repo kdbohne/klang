@@ -168,6 +168,8 @@ static AstType *parse_type(Parser *parser)
         ++ptr_depth;
 
     AstType *type = ast_alloc(AstType);
+    if (eat_optional(parser, TOK_DOLLAR))
+        type->is_polymorphic = true;
     type->expr = parse_ident_or_path(parser);
     type->ptr_depth = ptr_depth;
     type->array_dimensions = 0;
@@ -687,13 +689,20 @@ static AstFunc *parse_func(Parser *parser)
         AstParam *param = parse_param(parser);
         func->params.add(param);
 
+        if (param->type->is_polymorphic)
+            func->flags |= FUNC_IS_POLYMORPHIC;
+
         if (peek(parser).type != TOK_CLOSE_PAREN)
             expect(parser, TOK_COMMA);
     }
     expect(parser, TOK_CLOSE_PAREN);
 
     if (eat_optional(parser, TOK_R_ARROW))
+    {
         func->ret = parse_type(parser);
+        if (func->ret->is_polymorphic)
+            func->flags |= FUNC_IS_POLYMORPHIC;
+    }
 
     // Extern functions are just a declaration; there is no body.
     if (func->flags & FUNC_IS_EXTERN)

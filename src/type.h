@@ -18,6 +18,9 @@ struct Type
     i64 array_capacity[3] = {0}; // TODO: size?
     i64 array_dimensions = 0;
     bool is_array_slice = false; // TODO: flags?
+
+    // TODO: flags
+    bool is_polymorphic = false;
 };
 
 enum TypeDefnFlags

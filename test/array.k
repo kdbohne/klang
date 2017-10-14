@@ -13,15 +13,21 @@ fn sum(x i64[]) -> i64 {
 }
 
 fn main() {
-    let e i64[-1];
-    e[0] = 3;
-
     let x i64[5];
     x[0] = 1;
     x[1] = 3;
     x[2] = 5;
     x[3] = 7;
     x[4] = 9;
+
+    let n = 0;
+    for i in 0..x.count {
+        n += 1;
+    };
+
+    print_string_literal("n: ");
+    print_i64(n);
+    print_string_literal("\n");
 
     let s = sum(x);
     print_i64(s);

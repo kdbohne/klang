@@ -49,7 +49,6 @@ enum AstNodeType : u32
 {
     AST_ROOT,
 
-    // Expr
     AST_EXPR_IDENT,
     AST_EXPR_LIT,
     AST_EXPR_BIN,
@@ -71,7 +70,6 @@ enum AstNodeType : u32
     AST_EXPR_INDEX,
     AST_EXPR_ARRAY_PARAM_CAST,
 
-    // Stmt
     AST_STMT_EXPR,
     AST_STMT_SEMI,
     AST_STMT_DECL,
@@ -97,13 +95,15 @@ struct Module
     char *name = NULL;
     Array<AstFunc *> funcs;
     Array<AstStruct *> structs;
+
+    Array<AstFunc *> polymorphic_funcs;
     
     // TODO: using AstStmtDecl because it is convenient at pairing a global
     // variable's name and type... could maybe use ScopeVar instead? Except
     // it uses Type instead of AstType.
     // Global variables.
     Array<AstStmtDecl *> vars;
-    Scope *scope = NULL; // This is sort of a hack to allow vars to be looked up.
+    Scope *scope = NULL; // This is sort of a hack to allow vars to be looked up. TODO: is this still used?
 
     TypeDefn type_defns[512]; // TODO: size?
     i64 type_defns_count;
@@ -438,6 +438,9 @@ struct AstType : AstNode
     AstExpr *expr = NULL;
     i64 ptr_depth = 0;
 
+    // TODO: flags
+    bool is_polymorphic = false;
+
     // If an array.
     i64 array_capacity[3] = {0}; // TODO: size?
     i64 array_dimensions = 0;
@@ -453,6 +456,7 @@ struct AstType : AstNode
 enum AstFuncFlags
 {
     FUNC_IS_EXTERN = 0x1,
+    FUNC_IS_POLYMORPHIC = 0x2,
 };
 
 struct AstFunc : AstNode
@@ -466,6 +470,8 @@ struct AstFunc : AstNode
     AstType *ret = NULL;
 
     AstExprBlock *block = NULL;
+
+    Array<TypeDefn> polymorphic_types;
 };
 
 struct AstParam : AstExpr
