@@ -241,6 +241,7 @@ static Type type_from_ast_type(Module *module, AstType *ast_type)
             auto ident = static_cast<AstExprIdent *>(ast_type->expr);
 
             TypeDefn *defn = find_type_defn(module, ident->str);
+#if 0
             if (!defn)
             {
                 // HACK HACK HACK: assuming a nonexistent type definition
@@ -251,6 +252,7 @@ static Type type_from_ast_type(Module *module, AstType *ast_type)
 
                 return type;
             }
+#endif
 
             Type type;
             type.defn = defn;
@@ -675,10 +677,7 @@ static AstFunc *module_get_polymorphic_func(Module *module, AstExpr *name, Type 
         if (strings_match(func->name->str, ident->str))
         {
             if (types_match(func->type, type))
-            {
-                fprintf(stderr, "Found matching polymorphic function for %s.\n", ident->str);
                 return func;
-            }
         }
     }
 
@@ -732,7 +731,13 @@ static AstFunc *gen_polymorphic_func(AstExprCall *call)
 
     AstFunc *match = module_get_polymorphic_func(module, call->name, type);
     if (match)
+    {
+        fprintf(stderr, "Found matching polymorphic function for %s:\n", func->name->str);
+        fprintf(stderr, "    %s\n", get_type_string(func->type));
         return match;
+    }
+
+    // No match found, so try to generate a new version of the function.
 
     assert(module->type_defns_count < (sizeof(module->type_defns) / sizeof(module->type_defns[0])));
     TypeDefn *new_defn = &module->type_defns[module->type_defns_count++];
@@ -741,34 +746,59 @@ static AstFunc *gen_polymorphic_func(AstExprCall *call)
     func = static_cast<AstFunc *>(duplicate_node(func));
     func->type = type;
     func->flags &= ~FUNC_IS_POLYMORPHIC;
+
     for (i64 i = 0; i < func->params.count; ++i)
     {
         auto param = func->params[i];
         if (param->type->is_polymorphic)
         {
-            // FIXME: set param->type (AstType)
+            // FIXME: set param->type? (AstType)
             ((AstNode *)param)->type = new_defn->func_params[i]; // HACK
+            param->name->type = ((AstNode *)param)->type; // HACK
 
-            // TODO FIXME: propagate type outward to other params/returns that 
-            // use the same type name. polymorphic "instantiator"?
+            // Check the rest of the parameters for other uses of this type.
+            assert(param->type->expr->ast_type == AST_EXPR_IDENT);
+            auto name = static_cast<AstExprIdent *>(param->type->expr);
+
+            for (i64 j = 0; j < func->params.count; ++j)
+            {
+                auto cand = func->params[j];
+                if (i == j)
+                    continue;
+                if (cand->type->is_polymorphic)
+                    continue;
+
+                assert(cand->type->expr->ast_type == AST_EXPR_IDENT);
+                auto cand_name = static_cast<AstExprIdent *>(cand->type->expr);
+                if (strings_match(cand_name->str, name->str))
+                {
+                    ((AstNode *)cand)->type = ((AstNode *)param)->type; // HACK
+                    cand->name->type = ((AstNode *)param)->type; // HACK
+                }
+            }
+
+            if (func->ret)
+            {
+                assert(func->ret->expr->ast_type == AST_EXPR_IDENT);
+                auto ret_name = static_cast<AstExprIdent *>(func->ret->expr);
+                if (strings_match(ret_name->str, name->str))
+                    ((AstNode *)func->ret)->type = ((AstNode *)param)->type; // HACK
+            }
         }
     }
 
-#if 1
-    fprintf(stderr, "Added new polymorphic function instantiation for %s:\n", func->name->str);
-    fprintf(stderr, "    (");
     for (i64 i = 0; i < func->params.count; ++i)
     {
         auto param = func->params[i];
-
-        fprintf(stderr, "%s", get_type_string(((AstNode *)param)->type)); // HACK
-        if (i < func->params.count - 1)
-            fprintf(stderr, ", ");
+        new_defn->func_params[i] = ((AstNode *)param)->type; // HACK
     }
-    fprintf(stderr, ")\n");
-#endif
+    if (func->ret)
+        new_defn->func_ret = ((AstNode *)func->ret)->type; // HACK
 
-    ((AstNode *)func->ret)->type = defn.func_ret; // HACK
+#if 1
+    fprintf(stderr, "Added new polymorphic function instantiation for %s:\n", func->name->str);
+    fprintf(stderr, "    %s\n", get_type_string(func->type));
+#endif
 
     module->polymorphic_funcs.add(func);
 
