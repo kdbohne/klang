@@ -52,6 +52,9 @@ void string_copy(const char *src, char *dest, int length)
 
 int string_write(char *buf, const char *add)
 {
+    if (!add)
+        return string_write(buf, "(null)");
+
     char *base = buf;
     while (*add)
         *buf++ = *add++;
