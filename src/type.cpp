@@ -676,6 +676,10 @@ static AstFunc *module_get_polymorphic_func(Module *module, AstExpr *name, Type 
     {
         if (strings_match(func->name->str, ident->str))
         {
+            // HACK: the return type doesn't matter, so just set them equal
+            // to each other to ignore any differences.
+            type.defn->func_ret = func->type.defn->func_ret;
+
             if (types_match(func->type, type))
                 return func;
         }
@@ -711,34 +715,17 @@ static AstFunc *gen_polymorphic_func(AstExprCall *call)
 
         Type t = infer_types(arg);
         defn.func_params.add(t);
+    }
 
 #if 0
-        if (param->type->is_polymorphic)
-        {
-            Type t = infer_types(arg);
-            defn.func_params.add(t);
-        }
-        else
-        {
-            Type t = type_from_ast_type(module, arg->type);
-            defn.func_params.add(t);
-        }
-#endif
-    }
-
     if (func->ret)
-    {
-        defn.func_ret = infer_types(func->ret);
-//        defn.func_ret = type_from_ast_type(module, func->ret);
-    }
+        defn.func_ret = type_from_ast_type(module, func->ret);
     else
-    {
         defn.func_ret = type_void;
-    }
+#endif
 
     Type type;
     type.defn = &defn;
-    fprintf(stderr, "[[%s]]\n", get_type_string(type));
     AstFunc *match = module_get_polymorphic_func(module, call->name, type);
     if (match)
     {
