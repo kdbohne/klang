@@ -709,6 +709,10 @@ static AstFunc *gen_polymorphic_func(AstExprCall *call)
         auto param = func->params[i];
         auto arg = call->args[i];
 
+        Type t = infer_types(arg);
+        defn.func_params.add(t);
+
+#if 0
         if (param->type->is_polymorphic)
         {
             Type t = infer_types(arg);
@@ -716,19 +720,25 @@ static AstFunc *gen_polymorphic_func(AstExprCall *call)
         }
         else
         {
-            Type t = type_from_ast_type(module, param->type);
+            Type t = type_from_ast_type(module, arg->type);
             defn.func_params.add(t);
         }
+#endif
     }
 
     if (func->ret)
-        defn.func_ret = type_from_ast_type(module, func->ret);
+    {
+        defn.func_ret = infer_types(func->ret);
+//        defn.func_ret = type_from_ast_type(module, func->ret);
+    }
     else
+    {
         defn.func_ret = type_void;
+    }
 
     Type type;
     type.defn = &defn;
-
+    fprintf(stderr, "[[%s]]\n", get_type_string(type));
     AstFunc *match = module_get_polymorphic_func(module, call->name, type);
     if (match)
     {
@@ -742,6 +752,7 @@ static AstFunc *gen_polymorphic_func(AstExprCall *call)
     assert(module->type_defns_count < (sizeof(module->type_defns) / sizeof(module->type_defns[0])));
     TypeDefn *new_defn = &module->type_defns[module->type_defns_count++];
     *new_defn = defn;
+    type.defn = new_defn;
 
     func = static_cast<AstFunc *>(duplicate_node(func));
     func->type = type;
