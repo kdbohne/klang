@@ -2,11 +2,26 @@
 #include "ast.h"
 #include "string.h"
 
+#define RESET   "\x1B[0m"
+
+#define BOLD    "\x1B[1m"
+
+#define RED     "\x1B[31m"
+#define GREEN   "\x1B[32m"
+#define YELLOW  "\x1B[33m"
+#define BLUE    "\x1B[34m"
+#define MAGENTA "\x1B[35m"
+#define CYAN    "\x1B[36m"
+#define WHITE   "\x1B[37m"
+
 #define report_error(str, ast, ...) \
 do { \
-    fprintf(stderr, "(%s:%d:%d) " str, ast->file.path, ast->line, ast->col, __VA_ARGS__); \
+    fprintf(stderr, BOLD "(%s:%d:%d) " RESET str, ast->file.path, ast->line, ast->col, __VA_ARGS__); \
     int base = print_line(ast->file.src, ast->line); \
+    \
+    fprintf(stderr, BOLD RED); \
     print_underline(base, ast->col, ast->span); \
+    fprintf(stderr, RESET); \
     fprintf(stderr, "\n"); \
     \
     ++global_error_count; \
