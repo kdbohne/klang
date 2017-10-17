@@ -730,7 +730,7 @@ static AstFunc *gen_polymorphic_func(AstExprCall *call)
     if (match)
     {
         fprintf(stderr, "Found matching polymorphic function for %s:\n", func->name->str);
-        fprintf(stderr, "    %s\n", get_type_string(func->type));
+        fprintf(stderr, "    %s\n", get_type_string(match->type));
         return match;
     }
 
