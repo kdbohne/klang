@@ -11,8 +11,9 @@ fn copy(x $T) -> T {
 fn main() {
     let a0 = add(3, 4);
     let a1 = add(5, 7);
-    let a2 = add(3.0, 4.0);
-    let a3 = add(5.0, 7.0);
+    let long_identifier = add(3.0, 4.0);
+    let really_long_identifier = add(5.0, 7.0);
+        let indented_line = add(8.0, 12.0);
 
     let c0 = copy(3);
     let c1 = copy(3.0);

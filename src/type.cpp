@@ -5,7 +5,10 @@
 #define report_error(str, ast, ...) \
 do { \
     fprintf(stderr, "(%s:%d:%d) " str, ast->file.path, ast->line, ast->col, __VA_ARGS__); \
-    print_line(ast->file.src, ast->line); \
+    int base = print_line(ast->file.src, ast->line); \
+    print_underline(base, ast->col, ast->span); \
+    fprintf(stderr, "\n"); \
+    \
     ++global_error_count; \
 } while (0)
 

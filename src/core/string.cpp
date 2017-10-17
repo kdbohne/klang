@@ -93,13 +93,15 @@ char *string_concatenate(const char *a, const char *b)
     return cat;
 }
 
-void print_line(char *src, int line)
+int print_line(char *src, int line)
 {
     if (!src)
     {
         fprintf(stderr, "(line info not set)\n");
-        return;
+        return 0;
     }
+
+    int base = 0;
 
     int cur = 1;
     while (*src)
@@ -107,11 +109,16 @@ void print_line(char *src, int line)
         if (cur == line)
         {
             char *str = src;
+            while (*str && ((*str == ' ') || (*str == '\t')))
+                ++str;
+
+            base = (int)(str - src);
+
             while (*src && (*src != '\n') && (*src != '\r'))
                 ++src;
 
-            fprintf(stderr, "%.*s\n\n", (int)(src - str), str);
-            return;
+            fprintf(stderr, "    %.*s\n", (int)(src - str), str);
+            return base;
         }
 
         if ((*src == '\n') || (*src == '\r'))
@@ -121,4 +128,24 @@ void print_line(char *src, int line)
     }
 
     assert(false);
+    return 0;
+}
+
+// TODO: size?
+static char tmp_buffer[256];
+void print_underline(int base, int col, int span)
+{
+    char *c = tmp_buffer;
+
+    int start = col - base;
+    while (--start)
+        c += string_write(c, " ");
+
+    c += string_write(c, "^");
+    while (--span)
+        c += string_write(c, "~");
+
+    *c = '\0';
+
+    fprintf(stderr, "    %s\n", tmp_buffer);
 }

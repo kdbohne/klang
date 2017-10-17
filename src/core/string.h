@@ -13,4 +13,5 @@ int string_write(char *buf, const char *add);
 char *string_duplicate(const char *str);
 char *string_concatenate(const char *a, const char *b);
 
-void print_line(char *src, int line);
+int print_line(char *src, int line);
+void print_underline(int base, int col, int span);
