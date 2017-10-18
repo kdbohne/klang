@@ -1527,7 +1527,7 @@ static Type infer_types(AstNode *node)
             if (call->func)
             {
                 if (call->func->ret)
-                    call->type = type_from_ast_type(call->func->scope->module, call->func->ret);
+                    call->type = call->func->type.defn->func_ret;
                 else
                     call->type = type_void;
             }
