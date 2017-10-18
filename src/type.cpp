@@ -819,6 +819,13 @@ static AstFunc *gen_polymorphic_func(AstExprCall *call)
                     ((AstNode *)func->ret)->type = ((AstNode *)param)->type; // HACK
             }
         }
+
+        if (!scope_add_var(param->scope, param->name))
+        {
+            report_error("Multiple parameters have the same name: \"%s\".\n",
+                         param->name,
+                         param->name->str);
+        }
     }
 
     for (i64 i = 0; i < func->params.count; ++i)
