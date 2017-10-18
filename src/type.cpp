@@ -786,6 +786,7 @@ static AstFunc *gen_polymorphic_func(AstExprCall *call)
         {
             // FIXME: set param->type? (AstType)
             ((AstNode *)param)->type = new_defn->func_params[i]; // HACK
+            param->type->type = ((AstNode *)param)->type; // HACK
             param->name->type = ((AstNode *)param)->type; // HACK
 
             // Check the rest of the parameters for other uses of this type.
@@ -805,6 +806,7 @@ static AstFunc *gen_polymorphic_func(AstExprCall *call)
                 if (strings_match(cand_name->str, name->str))
                 {
                     ((AstNode *)cand)->type = ((AstNode *)param)->type; // HACK
+                    cand->type->type = ((AstNode *)param)->type; // HACK
                     cand->name->type = ((AstNode *)param)->type; // HACK
                 }
             }
