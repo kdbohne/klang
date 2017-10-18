@@ -680,6 +680,20 @@ static Array<AstNode *> flatten_ast(AstRoot *ast)
     Array<AstNode *> flat;
     flatten_ast_visit(&flat, ast);
 
+#if 0
+    // FIXME
+    // Check for duplicate nodes.
+    for (i64 i = 0; i < flat.count - 1; ++i)
+    {
+        AstNode *a = flat[i];
+        for (i64 j = i + 1; j < flat.count; ++j)
+        {
+            AstNode *b = flat[j];
+            assert(a != b);
+        }
+    }
+#endif
+
     return flat;
 }
 
