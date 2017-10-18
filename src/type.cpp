@@ -725,6 +725,7 @@ static AstFunc *module_get_polymorphic_func(Module *module, AstExpr *name, Type 
 
 static Type infer_types(AstNode *node);
 static AstNode *duplicate_node(AstNode *node);
+static void assign_scopes(AstNode *node, Scope *enclosing, Module *module);
 
 static AstFunc *gen_polymorphic_func(AstExprCall *call)
 {
@@ -775,13 +776,18 @@ static AstFunc *gen_polymorphic_func(AstExprCall *call)
     *new_defn = defn;
     type.defn = new_defn;
 
-    func = static_cast<AstFunc *>(duplicate_node(func));
+    AstFunc *poly_func = func;
+    func = static_cast<AstFunc *>(duplicate_node(poly_func));
     func->type = type;
     func->flags &= ~FUNC_IS_POLYMORPHIC;
+
+    func->scope = make_scope(poly_func->scope->parent);
+    assign_scopes(func, func->scope->parent, global_module);
 
     for (i64 i = 0; i < func->params.count; ++i)
     {
         auto param = func->params[i];
+
         if (param->type->is_polymorphic)
         {
             // FIXME: set param->type? (AstType)
