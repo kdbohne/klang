@@ -747,8 +747,10 @@ static AstFunc *gen_polymorphic_func(AstExprCall *call)
     AstFunc *match = module_get_polymorphic_func(module, call->name, type);
     if (match)
     {
+#if 1
         fprintf(stderr, "Found matching polymorphic function for %s:\n", func->name->str);
         fprintf(stderr, "    %s\n", get_type_string(match->type));
+#endif
         return match;
     }
 
@@ -839,16 +841,14 @@ static void resolve_calls(Array<AstNode *> &ast)
         if (call->func)
         {
             if (call->func->flags & FUNC_IS_POLYMORPHIC)
-            {
                 call->func = gen_polymorphic_func(call);
-            }
+
+#if 0
+            if (call->func->ret)
+                call->type = type_from_ast_type(call->func->scope->module, call->func->ret);
             else
-            {
-                if (call->func->ret)
-                    call->type = type_from_ast_type(call->func->scope->module, call->func->ret);
-                else
-                    call->type = type_void;
-            }
+                call->type = type_void;
+#endif
         }
         else
         {
@@ -856,54 +856,6 @@ static void resolve_calls(Array<AstNode *> &ast)
             // Function pointer.
         }
     }
-}
-
-static void make_polymorphic_funcs(Array<AstNode *> &ast)
-{
-#if 0
-    for (auto &node : ast)
-    {
-        if (node->ast_type != AST_FUNC)
-            continue;
-
-        auto func = static_cast<AstFunc *>(node);
-        if (!(func->flags & FUNC_IS_POLYMORPHIC))
-            continue;
-
-        TypeDefn *stub = func->polymorphic_types.next();
-
-        // TODO: multiple polymorphic types
-        // Get the name of the type that is declared as polymorphic.
-        char *name = NULL;
-        for (auto &param : func->params)
-        {
-            if (param->type->is_polymorphic)
-            {
-                assert(!name);
-                name = param->name->str;
-
-                Type type;
-                type.defn = stub;
-                type.ptr_depth = param->type->ptr_depth;
-                // TODO: func ptr?
-                ((AstNode *)param)->type = type; // FIXME: dumb hack to work around 'type' field shadowing between AstNode and AstParam
-            }
-        }
-        assert(name);
-
-        for (auto &param : func->params)
-        {
-            // Ignore the type that is declared as polymorphic.
-            if (param->type->is_polymorphic)
-                continue;
-
-            /*
-            if (strings_match(param->type->name->str, name))
-                param->type
-                */
-        }
-    }
-#endif
 }
 
 static void assign_scopes(AstNode *node, Scope *enclosing, Module *module)
@@ -1552,11 +1504,7 @@ static Type infer_types(AstNode *node)
             auto call = static_cast<AstExprCall *>(node);
 
             assert(call->func);
-            assert(!type_is_void(call->type));
-            assert(!(call->func->flags & FUNC_IS_POLYMORPHIC));
 
-            // Already handled by resolve_calls().
-#if 0
             for (auto &arg : call->args)
                 infer_types(arg);
 
@@ -1569,9 +1517,9 @@ static Type infer_types(AstNode *node)
             }
             else
             {
+                // TODO: error?
                 call->type = infer_types(call->name);
             }
-#endif
 
             break;
         }
@@ -2284,23 +2232,11 @@ bool type_check(AstRoot *ast)
     assign_scopes(ast, NULL, ast->global_module);
 
     resolve_calls(flat);
-    make_polymorphic_funcs(flat);
-
-//    declare_params(flat);
 
     infer_types(ast);
-//    declare_vars(ast);
 
     make_array_fat_pointers(flat);
     check_array_bounds(flat);
-
-#if 0
-    for (auto &mod : ast->modules)
-    {
-        for (auto &func : mod->funcs)
-            type_check_func(mod, func);
-    }
-#endif
 
     return (global_error_count == 0);
 }
