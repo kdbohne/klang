@@ -43,7 +43,7 @@ int main(int argc, char *argv[])
     if (argc != 2)
     {
         print_help();
-        return 0;
+        return 1;
     }
 
     AstRoot *root = ast_alloc(AstRoot);
