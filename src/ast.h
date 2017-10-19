@@ -470,8 +470,6 @@ struct AstFunc : AstNode
     AstType *ret = NULL;
 
     AstExprBlock *block = NULL;
-
-    Array<TypeDefn> polymorphic_types;
 };
 
 struct AstParam : AstExpr
