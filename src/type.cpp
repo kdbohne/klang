@@ -587,6 +587,7 @@ static void flatten_ast_visit(Array<AstNode *> *ast, AstNode *node)
             auto index = static_cast<AstExprIndex *>(node);
 
             flatten_ast_visit(ast, index->expr);
+            flatten_ast_visit(ast, index->index);
 
             break;
         }
