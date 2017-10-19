@@ -675,7 +675,7 @@ static void flatten_ast_visit(Array<AstNode *> *ast, AstNode *node)
     }
 }
 
-static Array<AstNode *> flatten_ast(AstRoot *ast)
+static Array<AstNode *> flatten_ast(AstNode *ast)
 {
     Array<AstNode *> flat;
     flatten_ast_visit(&flat, ast);
