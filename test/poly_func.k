@@ -5,6 +5,10 @@ fn add(a $T, b T) -> T {
 fn copy(x $T) -> T {
     let y T;
     y = x;
+
+    let z = y;
+    let w = z;
+
     y
 }
 
