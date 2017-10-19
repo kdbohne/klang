@@ -2184,12 +2184,29 @@ void gen_ir(AstRoot *ast)
     for (auto &mod : ast->modules)
     {
         for (auto &func : mod->funcs)
+        {
+            if (func->flags & FUNC_IS_POLYMORPHIC)
+                continue;
+
+            gen_func_prototype(&ir, mod, func);
+        }
+
+        for (auto &func : mod->polymorphic_funcs)
             gen_func_prototype(&ir, mod, func);
     }
 
     for (auto &mod : ast->modules)
     {
         for (auto &func : mod->funcs)
+        {
+            if (func->flags & FUNC_IS_POLYMORPHIC)
+                continue;
+
+            gen_func(&ir, mod, func, func_index);
+            ++func_index;
+        }
+
+        for (auto &func : mod->polymorphic_funcs)
         {
             gen_func(&ir, mod, func, func_index);
             ++func_index;
