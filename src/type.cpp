@@ -2047,6 +2047,8 @@ static AstNode *duplicate_node(AstNode *node)
 
             dup->block = static_cast<AstExprBlock *>(duplicate_node(dup->block));
 
+            assign_scopes(dup, dup->scope->parent, dup->scope->module);
+
             return dup;
         }
         case AST_PARAM:
@@ -2172,11 +2174,6 @@ static AstFunc *gen_polymorphic_func(AstExprCall *call)
     func = static_cast<AstFunc *>(duplicate_node(poly_func));
     func->type = type;
     func->flags &= ~FUNC_IS_POLYMORPHIC;
-
-    // TODO: duplicate block completely
-
-    func->scope = make_scope(poly_func->scope->parent);
-    assign_scopes(func, func->scope->parent, global_module);
 
     Array<AstNode *> block_nodes = flatten_ast(func->block);
 
