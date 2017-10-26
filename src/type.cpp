@@ -2035,12 +2035,22 @@ static AstNode *duplicate_node(AstNode *node)
         case AST_FUNC:
         {
             auto dup = ast_alloc(AstFunc);
-            *dup = *static_cast<AstFunc *>(node);
+            auto old = static_cast<AstFunc *>(node);
+            *dup = *old;
 
             dup->name = static_cast<AstExprIdent *>(duplicate_node(dup->name));
 
-            for (auto &param : dup->params)
-                param = static_cast<AstParam *>(duplicate_node(param));
+            // TODO: move this to array interface? not sure what to call it;
+            // it's not a clear nor a free.
+            dup->params.data = NULL;
+            dup->params.count = 0;
+            dup->params.capacity = 0;
+
+            for (auto &param : old->params)
+            {
+                auto dup_param = static_cast<AstParam *>(duplicate_node(param));
+                dup->params.add(dup_param);
+            }
 
             if (dup->ret)
                 dup->ret = static_cast<AstType *>(duplicate_node(dup->ret));
