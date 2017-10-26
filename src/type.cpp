@@ -2318,7 +2318,19 @@ static void resolve_calls(Array<AstNode *> &ast)
         assert(call->scope);
 
         call->func = module_get_func(call->scope->module, call->name);
-        if (!call->func)
+        if (call->func)
+        {
+            // TODO: overloading?
+            if (call->args.count != call->func->params.count)
+            {
+                report_error("%s arguments in function call. Expected %ld; given %ld.\n",
+                             call->name,
+                             (call->args.count > call->func->params.count) ? "Too many" : "Not enough",
+                             call->func->params.count,
+                             call->args.count);
+            }
+        }
+        else
         {
             // TODO: verify that this is a function pointer!
             // Function pointer.
@@ -2568,9 +2580,13 @@ bool type_check(AstRoot *ast)
     Array<AstNode *> flat = flatten_ast(ast);
 //    fprintf(stderr, "Flattened AST into %d nodes.\n", flat.count);
 
+    // TODO: check error count after each phase
+
     assign_scopes(ast, NULL, ast->global_module);
 
     resolve_calls(flat);
+    if (global_error_count > 0)
+        return false;
 
     infer_types(ast);
 

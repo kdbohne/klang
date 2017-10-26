@@ -1,3 +1,12 @@
+fn test(a $T, b i64) -> T {
+    let c = a;
+    c
+}
+
+fn main() {
+    let x = test(5);
+}
+/*
 fn add(a $T, b T) -> T {
     a + b
 }
@@ -29,3 +38,4 @@ fn main() {
     let c0 = copy(3);
     let c1 = copy(3.0);
 }
+*/
