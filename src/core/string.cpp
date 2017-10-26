@@ -138,11 +138,11 @@ void print_underline(int base, int col, int span)
     char *c = tmp_buffer;
 
     int start = col - base;
-    while (--start)
+    while ((--start) > 0)
         c += string_write(c, " ");
 
     c += string_write(c, "^");
-    while (--span)
+    while ((--span) > 0)
         c += string_write(c, "~");
 
     *c = '\0';
