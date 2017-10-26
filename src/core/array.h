@@ -16,8 +16,8 @@ template<typename T>
 struct Array
 {
     T *data = NULL;
-    i32 count = 0;
-    i32 capacity = 0;
+    i64 count = 0;
+    i64 capacity = 0;
 
     Array() : data(NULL), count(0), capacity(0)
     {
@@ -93,7 +93,7 @@ struct Array
         return &data[count];
     }
 
-    T &operator[](i32 i)
+    T &operator[](i64 i)
     {
         // TODO: bounds checking?
         return data[i];
