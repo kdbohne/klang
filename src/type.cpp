@@ -1828,12 +1828,17 @@ static AstNode *duplicate_node(AstNode *node)
         case AST_EXPR_CALL:
         {
             auto dup = ast_alloc(AstExprCall);
-            *dup = *static_cast<AstExprCall *>(node);
+            auto orig = static_cast<AstExprCall *>(node);
+            *dup = *orig;
 
             dup->name = static_cast<AstExpr *>(duplicate_node(dup->name));
 
-            for (auto &arg : dup->args)
-                arg = static_cast<AstExpr *>(duplicate_node(arg));
+            dup->args.reset();
+            for (auto &arg : orig->args)
+            {
+                auto dup_arg = static_cast<AstExpr *>(duplicate_node(arg));
+                dup->args.add(dup_arg);
+            }
 
             return dup;
         }
@@ -1872,10 +1877,15 @@ static AstNode *duplicate_node(AstNode *node)
         case AST_EXPR_BLOCK:
         {
             auto dup = ast_alloc(AstExprBlock);
-            *dup = *static_cast<AstExprBlock *>(node);
+            auto orig = static_cast<AstExprBlock *>(node);
+            *dup = *orig;
 
-            for (auto &stmt : dup->stmts)
-                stmt = static_cast<AstStmt *>(duplicate_node(stmt));
+            dup->stmts.reset();
+            for (auto &stmt : orig->stmts)
+            {
+                auto dup_stmt = static_cast<AstStmt *>(duplicate_node(stmt));
+                dup->stmts.add(dup_stmt);
+            }
 
             if (dup->expr)
                 dup->expr = static_cast<AstExpr *>(duplicate_node(dup->expr));
@@ -1951,10 +1961,15 @@ static AstNode *duplicate_node(AstNode *node)
         case AST_EXPR_PATH:
         {
             auto dup = ast_alloc(AstExprPath);
-            *dup = *static_cast<AstExprPath *>(node);
+            auto orig = static_cast<AstExprPath *>(node);
+            *dup = *orig;
 
-            for (auto &seg : dup->segments)
-                seg = static_cast<AstExprIdent *>(duplicate_node(seg));
+            dup->segments.reset();
+            for (auto &seg : orig->segments)
+            {
+                auto dup_seg = static_cast<AstExprIdent *>(duplicate_node(seg));
+                dup->segments.add(dup_seg);
+            }
 
             return dup;
         }
@@ -2035,18 +2050,13 @@ static AstNode *duplicate_node(AstNode *node)
         case AST_FUNC:
         {
             auto dup = ast_alloc(AstFunc);
-            auto old = static_cast<AstFunc *>(node);
-            *dup = *old;
+            auto orig = static_cast<AstFunc *>(node);
+            *dup = *orig;
 
             dup->name = static_cast<AstExprIdent *>(duplicate_node(dup->name));
 
-            // TODO: move this to array interface? not sure what to call it;
-            // it's not a clear nor a free.
-            dup->params.data = NULL;
-            dup->params.count = 0;
-            dup->params.capacity = 0;
-
-            for (auto &param : old->params)
+            dup->params.reset();
+            for (auto &param : orig->params)
             {
                 auto dup_param = static_cast<AstParam *>(duplicate_node(param));
                 dup->params.add(dup_param);
@@ -2074,12 +2084,17 @@ static AstNode *duplicate_node(AstNode *node)
         case AST_STRUCT:
         {
             auto dup = ast_alloc(AstStruct);
-            *dup = *static_cast<AstStruct *>(node);
+            auto orig = static_cast<AstStruct *>(node);
+            *dup = *orig;
 
             dup->name = static_cast<AstExprIdent *>(duplicate_node(dup->name));
 
-            for (auto &field : dup->fields)
-                field = static_cast<AstStructField *>(duplicate_node(field));
+            dup->fields.reset();
+            for (auto &field : orig->fields)
+            {
+                auto dup_field = static_cast<AstStructField *>(duplicate_node(field));
+                dup->fields.add(dup_field);
+            }
 
             return dup;
         }

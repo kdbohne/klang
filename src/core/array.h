@@ -74,6 +74,15 @@ struct Array
         return &data[count++];
     }
 
+    // NOTE: This does not free any memory. It is only used when duplicating
+    // an existing array in src/type.cpp:duplicate_node().
+    void reset()
+    {
+        data = NULL;
+        count = 0;
+        capacity = 0;
+    }
+
     T *begin()
     {
         return &data[0];
