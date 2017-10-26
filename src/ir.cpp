@@ -329,7 +329,11 @@ static IrFuncPtr *get_func_ptr(TypeDefn *defn)
 
 char *mangle_type_defn(TypeDefn *defn)
 {
-    assert(defn);
+    if (!defn)
+    {
+        static char *null_type_name = (char *)"(null)";
+        return null_type_name;
+    }
 
     if (defn->flags & TYPE_DEFN_IS_FUNC_PTR)
     {
@@ -2206,13 +2210,11 @@ void gen_ir(AstRoot *ast)
             ++func_index;
         }
 
-#if 0
         for (auto &func : mod->polymorphic_funcs)
         {
             gen_func(&ir, mod, func, func_index);
             ++func_index;
         }
-#endif
     }
 
 //    dump_ir(&ir);
