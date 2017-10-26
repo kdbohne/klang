@@ -2,12 +2,19 @@ fn add(a $T, b T) -> T {
     a + b
 }
 
+fn non_poly_add(a i64, b i64) -> i64 {
+    a + b
+}
+
 fn copy(x $T) -> T {
     let y T;
     y = x;
 
     let z = y;
     let w = z;
+
+    let a = non_poly_add(z, 3);
+    let ap = add(z, 3);
 
     y
 }

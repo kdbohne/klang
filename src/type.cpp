@@ -1154,6 +1154,528 @@ static Type narrow_type(Type target, AstExpr *expr)
     return expr->type;
 }
 
+static AstNode *duplicate_node(AstNode *node)
+{
+    switch (node->ast_type)
+    {
+        case AST_ROOT:
+        {
+            auto dup = ast_alloc(AstRoot);
+            *dup = *static_cast<AstRoot *>(node);
+
+            // FIXME
+            assert(false);
+
+            return dup;
+        }
+        case AST_EXPR_IDENT:
+        {
+            auto dup = ast_alloc(AstExprIdent);
+            *dup = *static_cast<AstExprIdent *>(node);
+
+            // FIXME
+            fprintf(stderr, "Duplicated ident with type %s\n", get_type_string(dup->type));
+
+            return dup;
+        }
+        case AST_EXPR_LIT:
+        {
+            auto dup = ast_alloc(AstExprLit);
+            *dup = *static_cast<AstExprLit *>(node);
+
+            return dup;
+        }
+        case AST_EXPR_BIN:
+        {
+            auto dup = ast_alloc(AstExprBin);
+            *dup = *static_cast<AstExprBin *>(node);
+
+            dup->lhs = static_cast<AstExpr *>(duplicate_node(dup->lhs));
+            dup->rhs = static_cast<AstExpr *>(duplicate_node(dup->rhs));
+
+            return dup;
+        }
+        case AST_EXPR_UN:
+        {
+            auto dup = ast_alloc(AstExprUn);
+            *dup = *static_cast<AstExprUn *>(node);
+
+            dup->expr = static_cast<AstExpr *>(duplicate_node(dup->expr));
+
+            return dup;
+        }
+        case AST_EXPR_CALL:
+        {
+            auto dup = ast_alloc(AstExprCall);
+            auto orig = static_cast<AstExprCall *>(node);
+            *dup = *orig;
+
+            dup->name = static_cast<AstExpr *>(duplicate_node(dup->name));
+
+            dup->args.reset();
+            for (auto &arg : orig->args)
+            {
+                auto dup_arg = static_cast<AstExpr *>(duplicate_node(arg));
+                dup->args.add(dup_arg);
+            }
+
+            return dup;
+        }
+        case AST_EXPR_CAST:
+        {
+            auto dup = ast_alloc(AstExprCast);
+            *dup = *static_cast<AstExprCast *>(node);
+
+            dup->type = static_cast<AstType *>(duplicate_node(dup->type));
+            dup->expr = static_cast<AstExpr *>(duplicate_node(dup->expr));
+
+            return dup;
+        }
+        case AST_EXPR_ASSIGN:
+        {
+            auto dup = ast_alloc(AstExprAssign);
+            *dup = *static_cast<AstExprAssign *>(node);
+
+            dup->lhs = static_cast<AstExpr *>(duplicate_node(dup->lhs));
+            dup->rhs = static_cast<AstExpr *>(duplicate_node(dup->rhs));
+
+            return dup;
+        }
+        case AST_EXPR_IF:
+        {
+            auto dup = ast_alloc(AstExprIf);
+            *dup = *static_cast<AstExprIf *>(node);
+
+            dup->cond = static_cast<AstExprBin *>(duplicate_node(dup->cond));
+            dup->block = static_cast<AstExprBlock *>(duplicate_node(dup->block));
+            if (dup->else_expr)
+                dup->else_expr = static_cast<AstExpr *>(duplicate_node(dup->else_expr));
+
+            return dup;
+        }
+        case AST_EXPR_BLOCK:
+        {
+            auto dup = ast_alloc(AstExprBlock);
+            auto orig = static_cast<AstExprBlock *>(node);
+            *dup = *orig;
+
+            dup->stmts.reset();
+            for (auto &stmt : orig->stmts)
+            {
+                auto dup_stmt = static_cast<AstStmt *>(duplicate_node(stmt));
+                dup->stmts.add(dup_stmt);
+            }
+
+            if (dup->expr)
+                dup->expr = static_cast<AstExpr *>(duplicate_node(dup->expr));
+
+            return dup;
+        }
+        case AST_EXPR_FIELD:
+        {
+            auto dup = ast_alloc(AstExprField);
+            *dup = *static_cast<AstExprField *>(node);
+
+            dup->expr = static_cast<AstExpr *>(duplicate_node(dup->expr));
+            dup->name = static_cast<AstExprIdent *>(duplicate_node(dup->name));
+
+            return dup;
+        }
+        case AST_EXPR_LOOP:
+        {
+            auto dup = ast_alloc(AstExprLoop);
+            *dup = *static_cast<AstExprLoop *>(node);
+
+            dup->block = static_cast<AstExprBlock *>(duplicate_node(dup->block));
+
+            return dup;
+        }
+        case AST_EXPR_BREAK:
+        {
+            auto dup = ast_alloc(AstExprBreak);
+            *dup = *static_cast<AstExprBreak *>(node);
+
+            return dup;
+        }
+        case AST_EXPR_FOR:
+        {
+            auto dup = ast_alloc(AstExprFor);
+            *dup = *static_cast<AstExprFor *>(node);
+
+            dup->it = static_cast<AstExpr *>(duplicate_node(dup->it));
+            dup->range = static_cast<AstExpr *>(duplicate_node(dup->range));
+            dup->block = static_cast<AstExprBlock *>(duplicate_node(dup->block));
+
+            return dup;
+        }
+        case AST_EXPR_RANGE:
+        {
+            auto dup = ast_alloc(AstExprRange);
+            *dup = *static_cast<AstExprRange *>(node);
+
+            dup->start = static_cast<AstExpr *>(duplicate_node(dup->start));
+            dup->end = static_cast<AstExpr *>(duplicate_node(dup->end));
+
+            return dup;
+        }
+        case AST_EXPR_WHILE:
+        {
+            auto dup = ast_alloc(AstExprWhile);
+            *dup = *static_cast<AstExprWhile *>(node);
+
+            dup->cond = static_cast<AstExprBin *>(duplicate_node(dup->cond));
+            dup->block = static_cast<AstExprBlock *>(duplicate_node(dup->block));
+
+            return dup;
+        }
+        case AST_EXPR_PAREN:
+        {
+            auto dup = ast_alloc(AstExprParen);
+            *dup = *static_cast<AstExprParen *>(node);
+
+            dup->expr = static_cast<AstExpr *>(duplicate_node(dup->expr));
+
+            return dup;
+        }
+        case AST_EXPR_PATH:
+        {
+            auto dup = ast_alloc(AstExprPath);
+            auto orig = static_cast<AstExprPath *>(node);
+            *dup = *orig;
+
+            dup->segments.reset();
+            for (auto &seg : orig->segments)
+            {
+                auto dup_seg = static_cast<AstExprIdent *>(duplicate_node(seg));
+                dup->segments.add(dup_seg);
+            }
+
+            return dup;
+        }
+        case AST_EXPR_RETURN:
+        {
+            auto dup = ast_alloc(AstExprReturn);
+            *dup = *static_cast<AstExprReturn *>(node);
+
+            if (dup->expr)
+                dup->expr = static_cast<AstExpr *>(duplicate_node(dup->expr));
+
+            return dup;
+        }
+        case AST_EXPR_INDEX:
+        {
+            auto dup = ast_alloc(AstExprIndex);
+            *dup = *static_cast<AstExprIndex *>(node);
+
+            dup->expr = static_cast<AstExpr *>(duplicate_node(dup->expr));
+            dup->index = static_cast<AstExpr *>(duplicate_node(dup->index));
+
+            return dup;
+        }
+        case AST_EXPR_ARRAY_PARAM_CAST:
+        {
+            auto dup = ast_alloc(AstExprArrayParamCast);
+            *dup = *static_cast<AstExprArrayParamCast *>(node);
+
+            dup->expr = static_cast<AstExpr *>(duplicate_node(dup->expr));
+
+            return dup;
+        }
+        case AST_STMT_EXPR:
+        {
+            auto dup = ast_alloc(AstStmtExpr);
+            *dup = *static_cast<AstStmtExpr *>(node);
+
+            dup->expr = static_cast<AstExpr *>(duplicate_node(dup->expr));
+
+            return dup;
+        }
+        case AST_STMT_SEMI:
+        {
+            auto dup = ast_alloc(AstStmtSemi);
+            *dup = *static_cast<AstStmtSemi *>(node);
+
+            dup->expr = static_cast<AstExpr *>(duplicate_node(dup->expr));
+
+            return dup;
+        }
+        case AST_STMT_DECL:
+        {
+            auto dup = ast_alloc(AstStmtDecl);
+            *dup = *static_cast<AstStmtDecl *>(node);
+
+            dup->bind = static_cast<AstExpr *>(duplicate_node(dup->bind));
+
+            if (dup->type)
+                dup->type = static_cast<AstType *>(duplicate_node(dup->type));
+            if (dup->desugared_rhs)
+                dup->desugared_rhs = static_cast<AstExpr *>(duplicate_node(dup->desugared_rhs));
+
+            return dup;
+        }
+        case AST_TYPE:
+        {
+            auto dup = ast_alloc(AstType);
+            *dup = *static_cast<AstType *>(node);
+
+            if (dup->expr)
+                dup->expr = static_cast<AstExpr *>(duplicate_node(dup->expr));
+
+            // TODO: duplicate function pointer params?
+            // see comment for same case in flatten_ast_visit()
+
+            return dup;
+        }
+        case AST_FUNC:
+        {
+            auto dup = ast_alloc(AstFunc);
+            auto orig = static_cast<AstFunc *>(node);
+            *dup = *orig;
+
+            dup->name = static_cast<AstExprIdent *>(duplicate_node(dup->name));
+
+            dup->params.reset();
+            for (auto &param : orig->params)
+            {
+                auto dup_param = static_cast<AstParam *>(duplicate_node(param));
+                dup->params.add(dup_param);
+            }
+
+            if (dup->ret)
+                dup->ret = static_cast<AstType *>(duplicate_node(dup->ret));
+
+            dup->block = static_cast<AstExprBlock *>(duplicate_node(dup->block));
+
+            assign_scopes(dup, dup->scope->parent, dup->scope->module);
+
+            return dup;
+        }
+        case AST_PARAM:
+        {
+            auto dup = ast_alloc(AstParam);
+            *dup = *static_cast<AstParam *>(node);
+
+            dup->name = static_cast<AstExprIdent *>(duplicate_node(dup->name));
+            dup->type = static_cast<AstType *>(duplicate_node(dup->type));
+
+            return dup;
+        }
+        case AST_STRUCT:
+        {
+            auto dup = ast_alloc(AstStruct);
+            auto orig = static_cast<AstStruct *>(node);
+            *dup = *orig;
+
+            dup->name = static_cast<AstExprIdent *>(duplicate_node(dup->name));
+
+            dup->fields.reset();
+            for (auto &field : orig->fields)
+            {
+                auto dup_field = static_cast<AstStructField *>(duplicate_node(field));
+                dup->fields.add(dup_field);
+            }
+
+            return dup;
+        }
+        case AST_STRUCT_FIELD:
+        {
+            auto dup = ast_alloc(AstStructField);
+            *dup = *static_cast<AstStructField *>(node);
+
+            dup->name = static_cast<AstExprIdent *>(duplicate_node(dup->name));
+            dup->type = static_cast<AstType *>(duplicate_node(dup->type));
+
+            return dup;
+        }
+        case AST_IMPORT:
+        {
+            auto dup = ast_alloc(AstImport);
+            *dup = *static_cast<AstImport *>(node);
+
+            dup->name = static_cast<AstExprIdent *>(duplicate_node(dup->name));
+
+            return dup;
+        }
+        default:
+        {
+            assert(false);
+            return NULL;
+        }
+    }
+}
+
+// TODO: move to module interface in ast.h if needed
+static AstFunc *module_get_polymorphic_func(Module *module, AstExpr *name, Type type)
+{
+    // TODO: path names like in module_get_func()
+    assert(name->ast_type == AST_EXPR_IDENT);
+    auto ident = static_cast<AstExprIdent *>(name);
+
+    for (auto &func : module->polymorphic_funcs)
+    {
+        if (strings_match(func->name->str, ident->str))
+        {
+            // HACK: the return type doesn't matter, so just set them equal
+            // to each other to ignore any differences.
+            type.defn->func_ret = func->type.defn->func_ret;
+
+            if (types_match(func->type, type))
+                return func;
+        }
+    }
+
+    if (module->parent)
+        return module_get_polymorphic_func(module->parent, name, type);
+
+    return NULL;
+}
+
+static Type infer_types(AstNode *node);
+
+static AstFunc *gen_polymorphic_func(AstExprCall *call)
+{
+    assert(call->func);
+    assert(call->func->flags & FUNC_IS_POLYMORPHIC);
+
+    auto func = call->func;
+    auto module = func->scope->module;
+
+    // TODO: this is mostly copy-pasted from register_func()
+    TypeDefn defn;
+    defn.name = func->name->str; // TODO: duplicate? mangle?
+    defn.module = module;
+    defn.flags |= TYPE_DEFN_IS_FUNC_PTR;
+
+    for (i64 i = 0; i < func->params.count; ++i)
+    {
+        auto param = func->params[i];
+        auto arg = call->args[i];
+
+        Type t = infer_types(arg);
+        defn.func_params.add(t);
+    }
+
+    // The return type doesn't matter.
+
+    Type type;
+    type.defn = &defn;
+    AstFunc *match = module_get_polymorphic_func(module, call->name, type);
+    if (match)
+    {
+#if 1
+        fprintf(stderr, "Found matching polymorphic function for %s:\n", func->name->str);
+        fprintf(stderr, "    %s\n", get_type_string(match->type));
+#endif
+        return match;
+    }
+
+    // No match found, so try to generate a new version of the function.
+
+    assert(module->type_defns_count < (sizeof(module->type_defns) / sizeof(module->type_defns[0])));
+    TypeDefn *new_defn = &module->type_defns[module->type_defns_count++];
+    *new_defn = defn;
+    type.defn = new_defn;
+
+    AstFunc *poly_func = func;
+    func = static_cast<AstFunc *>(duplicate_node(poly_func));
+    func->type = type;
+    func->flags &= ~FUNC_IS_POLYMORPHIC;
+
+    Array<AstNode *> block_nodes = flatten_ast(func->block);
+
+    for (i64 i = 0; i < func->params.count; ++i)
+    {
+        auto param = func->params[i];
+
+        if (param->type->is_polymorphic)
+        {
+            Type param_type = new_defn->func_params[i];
+
+            // FIXME: set param->type? (AstType)
+            ((AstNode *)param)->type = param_type; // HACK
+            param->type->type = param_type;
+            param->name->type = param_type;
+
+            // Check the rest of the parameters for other uses of this type.
+            assert(param->type->expr->ast_type == AST_EXPR_IDENT);
+            auto poly_name = static_cast<AstExprIdent *>(param->type->expr);
+
+            for (i64 j = 0; j < func->params.count; ++j)
+            {
+                auto cand = func->params[j];
+                if (i == j)
+                    continue;
+                if (cand->type->is_polymorphic)
+                    continue;
+
+                assert(cand->type->expr->ast_type == AST_EXPR_IDENT);
+                auto cand_name = static_cast<AstExprIdent *>(cand->type->expr);
+                if (strings_match(cand_name->str, poly_name->str))
+                {
+                    ((AstNode *)cand)->type = param_type; // HACK
+                    cand->type->type = param_type;
+                    cand->name->type = param_type;
+                }
+            }
+
+            // Check if the return type is a match.
+            if (func->ret)
+            {
+                assert(func->ret->expr->ast_type == AST_EXPR_IDENT);
+                auto ret_name = static_cast<AstExprIdent *>(func->ret->expr);
+                if (strings_match(ret_name->str, poly_name->str))
+                    ((AstNode *)func->ret)->type = param_type; // HACK
+            }
+
+            // Check the rest of the body as well.
+            for (auto &node : block_nodes)
+            {
+                if (node->ast_type == AST_TYPE)
+                {
+                    auto type_node = static_cast<AstType *>(node);
+
+                    // TODO: more robust
+                    assert(type_node->expr->ast_type == AST_EXPR_IDENT);
+                    auto type_ident = static_cast<AstExprIdent *>(type_node->expr);
+
+                    if (strings_match(type_ident->str, poly_name->str))
+                    {
+//                        fprintf(stderr, "Replaced type %s with type %s in func %s\n", type_ident->str, ((AstNode *)param)->type.defn->name, func->name->str);
+                        type_ident->str = param_type.defn->name; // HACK HACK HACK
+                    }
+                }
+            }
+        }
+
+        if (!scope_add_var(param->scope, param->name))
+        {
+            report_error("Multiple parameters have the same name: \"%s\".\n",
+                         param->name,
+                         param->name->str);
+        }
+    }
+
+    for (i64 i = 0; i < func->params.count; ++i)
+    {
+        auto param = func->params[i];
+        new_defn->func_params[i] = ((AstNode *)param)->type; // HACK
+    }
+    if (func->ret)
+        new_defn->func_ret = ((AstNode *)func->ret)->type; // HACK
+
+    infer_types(func->block);
+
+#if 1
+    fprintf(stderr, "Added new polymorphic function instantiation for %s:\n", func->name->str);
+    fprintf(stderr, "    %s\n", get_type_string(func->type));
+#endif
+
+    module->polymorphic_funcs.add(func);
+//    module->funcs.add(func);
+
+    return func;
+}
+
 static Type infer_types(AstNode *node)
 {
     switch (node->ast_type)
@@ -1344,6 +1866,9 @@ static Type infer_types(AstNode *node)
             auto call = static_cast<AstExprCall *>(node);
 
             assert(call->func);
+
+            if (call->func->flags & FUNC_IS_POLYMORPHIC)
+                call->func = gen_polymorphic_func(call);
 
             for (auto &arg : call->args)
                 infer_types(arg);
@@ -1778,523 +2303,6 @@ static Type infer_types(AstNode *node)
     return node->type;
 }
 
-static AstNode *duplicate_node(AstNode *node)
-{
-    switch (node->ast_type)
-    {
-        case AST_ROOT:
-        {
-            auto dup = ast_alloc(AstRoot);
-            *dup = *static_cast<AstRoot *>(node);
-
-            // FIXME
-            assert(false);
-
-            return dup;
-        }
-        case AST_EXPR_IDENT:
-        {
-            auto dup = ast_alloc(AstExprIdent);
-            *dup = *static_cast<AstExprIdent *>(node);
-
-            return dup;
-        }
-        case AST_EXPR_LIT:
-        {
-            auto dup = ast_alloc(AstExprLit);
-            *dup = *static_cast<AstExprLit *>(node);
-
-            return dup;
-        }
-        case AST_EXPR_BIN:
-        {
-            auto dup = ast_alloc(AstExprBin);
-            *dup = *static_cast<AstExprBin *>(node);
-
-            dup->lhs = static_cast<AstExpr *>(duplicate_node(dup->lhs));
-            dup->rhs = static_cast<AstExpr *>(duplicate_node(dup->rhs));
-
-            return dup;
-        }
-        case AST_EXPR_UN:
-        {
-            auto dup = ast_alloc(AstExprUn);
-            *dup = *static_cast<AstExprUn *>(node);
-
-            dup->expr = static_cast<AstExpr *>(duplicate_node(dup->expr));
-
-            return dup;
-        }
-        case AST_EXPR_CALL:
-        {
-            auto dup = ast_alloc(AstExprCall);
-            auto orig = static_cast<AstExprCall *>(node);
-            *dup = *orig;
-
-            dup->name = static_cast<AstExpr *>(duplicate_node(dup->name));
-
-            dup->args.reset();
-            for (auto &arg : orig->args)
-            {
-                auto dup_arg = static_cast<AstExpr *>(duplicate_node(arg));
-                dup->args.add(dup_arg);
-            }
-
-            return dup;
-        }
-        case AST_EXPR_CAST:
-        {
-            auto dup = ast_alloc(AstExprCast);
-            *dup = *static_cast<AstExprCast *>(node);
-
-            dup->type = static_cast<AstType *>(duplicate_node(dup->type));
-            dup->expr = static_cast<AstExpr *>(duplicate_node(dup->expr));
-
-            return dup;
-        }
-        case AST_EXPR_ASSIGN:
-        {
-            auto dup = ast_alloc(AstExprAssign);
-            *dup = *static_cast<AstExprAssign *>(node);
-
-            dup->lhs = static_cast<AstExpr *>(duplicate_node(dup->lhs));
-            dup->rhs = static_cast<AstExpr *>(duplicate_node(dup->rhs));
-
-            return dup;
-        }
-        case AST_EXPR_IF:
-        {
-            auto dup = ast_alloc(AstExprIf);
-            *dup = *static_cast<AstExprIf *>(node);
-
-            dup->cond = static_cast<AstExprBin *>(duplicate_node(dup->cond));
-            dup->block = static_cast<AstExprBlock *>(duplicate_node(dup->block));
-            if (dup->else_expr)
-                dup->else_expr = static_cast<AstExpr *>(duplicate_node(dup->else_expr));
-
-            return dup;
-        }
-        case AST_EXPR_BLOCK:
-        {
-            auto dup = ast_alloc(AstExprBlock);
-            auto orig = static_cast<AstExprBlock *>(node);
-            *dup = *orig;
-
-            dup->stmts.reset();
-            for (auto &stmt : orig->stmts)
-            {
-                auto dup_stmt = static_cast<AstStmt *>(duplicate_node(stmt));
-                dup->stmts.add(dup_stmt);
-            }
-
-            if (dup->expr)
-                dup->expr = static_cast<AstExpr *>(duplicate_node(dup->expr));
-
-            return dup;
-        }
-        case AST_EXPR_FIELD:
-        {
-            auto dup = ast_alloc(AstExprField);
-            *dup = *static_cast<AstExprField *>(node);
-
-            dup->expr = static_cast<AstExpr *>(duplicate_node(dup->expr));
-            dup->name = static_cast<AstExprIdent *>(duplicate_node(dup->name));
-
-            return dup;
-        }
-        case AST_EXPR_LOOP:
-        {
-            auto dup = ast_alloc(AstExprLoop);
-            *dup = *static_cast<AstExprLoop *>(node);
-
-            dup->block = static_cast<AstExprBlock *>(duplicate_node(dup->block));
-
-            return dup;
-        }
-        case AST_EXPR_BREAK:
-        {
-            auto dup = ast_alloc(AstExprBreak);
-            *dup = *static_cast<AstExprBreak *>(node);
-
-            return dup;
-        }
-        case AST_EXPR_FOR:
-        {
-            auto dup = ast_alloc(AstExprFor);
-            *dup = *static_cast<AstExprFor *>(node);
-
-            dup->it = static_cast<AstExpr *>(duplicate_node(dup->it));
-            dup->range = static_cast<AstExpr *>(duplicate_node(dup->range));
-            dup->block = static_cast<AstExprBlock *>(duplicate_node(dup->block));
-
-            return dup;
-        }
-        case AST_EXPR_RANGE:
-        {
-            auto dup = ast_alloc(AstExprRange);
-            *dup = *static_cast<AstExprRange *>(node);
-
-            dup->start = static_cast<AstExpr *>(duplicate_node(dup->start));
-            dup->end = static_cast<AstExpr *>(duplicate_node(dup->end));
-
-            return dup;
-        }
-        case AST_EXPR_WHILE:
-        {
-            auto dup = ast_alloc(AstExprWhile);
-            *dup = *static_cast<AstExprWhile *>(node);
-
-            dup->cond = static_cast<AstExprBin *>(duplicate_node(dup->cond));
-            dup->block = static_cast<AstExprBlock *>(duplicate_node(dup->block));
-
-            return dup;
-        }
-        case AST_EXPR_PAREN:
-        {
-            auto dup = ast_alloc(AstExprParen);
-            *dup = *static_cast<AstExprParen *>(node);
-
-            dup->expr = static_cast<AstExpr *>(duplicate_node(dup->expr));
-
-            return dup;
-        }
-        case AST_EXPR_PATH:
-        {
-            auto dup = ast_alloc(AstExprPath);
-            auto orig = static_cast<AstExprPath *>(node);
-            *dup = *orig;
-
-            dup->segments.reset();
-            for (auto &seg : orig->segments)
-            {
-                auto dup_seg = static_cast<AstExprIdent *>(duplicate_node(seg));
-                dup->segments.add(dup_seg);
-            }
-
-            return dup;
-        }
-        case AST_EXPR_RETURN:
-        {
-            auto dup = ast_alloc(AstExprReturn);
-            *dup = *static_cast<AstExprReturn *>(node);
-
-            if (dup->expr)
-                dup->expr = static_cast<AstExpr *>(duplicate_node(dup->expr));
-
-            return dup;
-        }
-        case AST_EXPR_INDEX:
-        {
-            auto dup = ast_alloc(AstExprIndex);
-            *dup = *static_cast<AstExprIndex *>(node);
-
-            dup->expr = static_cast<AstExpr *>(duplicate_node(dup->expr));
-            dup->index = static_cast<AstExpr *>(duplicate_node(dup->index));
-
-            return dup;
-        }
-        case AST_EXPR_ARRAY_PARAM_CAST:
-        {
-            auto dup = ast_alloc(AstExprArrayParamCast);
-            *dup = *static_cast<AstExprArrayParamCast *>(node);
-
-            dup->expr = static_cast<AstExpr *>(duplicate_node(dup->expr));
-
-            return dup;
-        }
-        case AST_STMT_EXPR:
-        {
-            auto dup = ast_alloc(AstStmtExpr);
-            *dup = *static_cast<AstStmtExpr *>(node);
-
-            dup->expr = static_cast<AstExpr *>(duplicate_node(dup->expr));
-
-            return dup;
-        }
-        case AST_STMT_SEMI:
-        {
-            auto dup = ast_alloc(AstStmtSemi);
-            *dup = *static_cast<AstStmtSemi *>(node);
-
-            dup->expr = static_cast<AstExpr *>(duplicate_node(dup->expr));
-
-            return dup;
-        }
-        case AST_STMT_DECL:
-        {
-            auto dup = ast_alloc(AstStmtDecl);
-            *dup = *static_cast<AstStmtDecl *>(node);
-
-            dup->bind = static_cast<AstExpr *>(duplicate_node(dup->bind));
-
-            if (dup->type)
-                dup->type = static_cast<AstType *>(duplicate_node(dup->type));
-            if (dup->desugared_rhs)
-                dup->desugared_rhs = static_cast<AstExpr *>(duplicate_node(dup->desugared_rhs));
-
-            return dup;
-        }
-        case AST_TYPE:
-        {
-            auto dup = ast_alloc(AstType);
-            *dup = *static_cast<AstType *>(node);
-
-            if (dup->expr)
-                dup->expr = static_cast<AstExpr *>(duplicate_node(dup->expr));
-
-            // TODO: duplicate function pointer params?
-            // see comment for same case in flatten_ast_visit()
-
-            return dup;
-        }
-        case AST_FUNC:
-        {
-            auto dup = ast_alloc(AstFunc);
-            auto orig = static_cast<AstFunc *>(node);
-            *dup = *orig;
-
-            dup->name = static_cast<AstExprIdent *>(duplicate_node(dup->name));
-
-            dup->params.reset();
-            for (auto &param : orig->params)
-            {
-                auto dup_param = static_cast<AstParam *>(duplicate_node(param));
-                dup->params.add(dup_param);
-            }
-
-            if (dup->ret)
-                dup->ret = static_cast<AstType *>(duplicate_node(dup->ret));
-
-            dup->block = static_cast<AstExprBlock *>(duplicate_node(dup->block));
-
-            assign_scopes(dup, dup->scope->parent, dup->scope->module);
-
-            return dup;
-        }
-        case AST_PARAM:
-        {
-            auto dup = ast_alloc(AstParam);
-            *dup = *static_cast<AstParam *>(node);
-
-            dup->name = static_cast<AstExprIdent *>(duplicate_node(dup->name));
-            dup->type = static_cast<AstType *>(duplicate_node(dup->type));
-
-            return dup;
-        }
-        case AST_STRUCT:
-        {
-            auto dup = ast_alloc(AstStruct);
-            auto orig = static_cast<AstStruct *>(node);
-            *dup = *orig;
-
-            dup->name = static_cast<AstExprIdent *>(duplicate_node(dup->name));
-
-            dup->fields.reset();
-            for (auto &field : orig->fields)
-            {
-                auto dup_field = static_cast<AstStructField *>(duplicate_node(field));
-                dup->fields.add(dup_field);
-            }
-
-            return dup;
-        }
-        case AST_STRUCT_FIELD:
-        {
-            auto dup = ast_alloc(AstStructField);
-            *dup = *static_cast<AstStructField *>(node);
-
-            dup->name = static_cast<AstExprIdent *>(duplicate_node(dup->name));
-            dup->type = static_cast<AstType *>(duplicate_node(dup->type));
-
-            return dup;
-        }
-        case AST_IMPORT:
-        {
-            auto dup = ast_alloc(AstImport);
-            *dup = *static_cast<AstImport *>(node);
-
-            dup->name = static_cast<AstExprIdent *>(duplicate_node(dup->name));
-
-            return dup;
-        }
-        default:
-        {
-            assert(false);
-            return NULL;
-        }
-    }
-}
-
-// TODO: move to module interface in ast.h if needed
-static AstFunc *module_get_polymorphic_func(Module *module, AstExpr *name, Type type)
-{
-    // TODO: path names like in module_get_func()
-    assert(name->ast_type == AST_EXPR_IDENT);
-    auto ident = static_cast<AstExprIdent *>(name);
-
-    for (auto &func : module->polymorphic_funcs)
-    {
-        if (strings_match(func->name->str, ident->str))
-        {
-            // HACK: the return type doesn't matter, so just set them equal
-            // to each other to ignore any differences.
-            type.defn->func_ret = func->type.defn->func_ret;
-
-            if (types_match(func->type, type))
-                return func;
-        }
-    }
-
-    if (module->parent)
-        return module_get_polymorphic_func(module->parent, name, type);
-
-    return NULL;
-}
-
-static AstFunc *gen_polymorphic_func(AstExprCall *call)
-{
-    assert(call->func);
-    assert(call->func->flags & FUNC_IS_POLYMORPHIC);
-
-    auto func = call->func;
-    auto module = func->scope->module;
-
-    // TODO: this is mostly copy-pasted from register_func()
-    TypeDefn defn;
-    defn.name = func->name->str; // TODO: duplicate? mangle?
-    defn.module = module;
-    defn.flags |= TYPE_DEFN_IS_FUNC_PTR;
-
-    for (i64 i = 0; i < func->params.count; ++i)
-    {
-        auto param = func->params[i];
-        auto arg = call->args[i];
-
-        Type t = infer_types(arg);
-        defn.func_params.add(t);
-    }
-
-    // The return type doesn't matter.
-
-    Type type;
-    type.defn = &defn;
-    AstFunc *match = module_get_polymorphic_func(module, call->name, type);
-    if (match)
-    {
-#if 1
-        fprintf(stderr, "Found matching polymorphic function for %s:\n", func->name->str);
-        fprintf(stderr, "    %s\n", get_type_string(match->type));
-#endif
-        return match;
-    }
-
-    // No match found, so try to generate a new version of the function.
-
-    assert(module->type_defns_count < (sizeof(module->type_defns) / sizeof(module->type_defns[0])));
-    TypeDefn *new_defn = &module->type_defns[module->type_defns_count++];
-    *new_defn = defn;
-    type.defn = new_defn;
-
-    AstFunc *poly_func = func;
-    func = static_cast<AstFunc *>(duplicate_node(poly_func));
-    func->type = type;
-    func->flags &= ~FUNC_IS_POLYMORPHIC;
-
-    Array<AstNode *> block_nodes = flatten_ast(func->block);
-
-    for (i64 i = 0; i < func->params.count; ++i)
-    {
-        auto param = func->params[i];
-
-        if (param->type->is_polymorphic)
-        {
-            Type param_type = new_defn->func_params[i];
-
-            // FIXME: set param->type? (AstType)
-            ((AstNode *)param)->type = param_type; // HACK
-            param->type->type = param_type;
-            param->name->type = param_type;
-
-            // Check the rest of the parameters for other uses of this type.
-            assert(param->type->expr->ast_type == AST_EXPR_IDENT);
-            auto poly_name = static_cast<AstExprIdent *>(param->type->expr);
-
-            for (i64 j = 0; j < func->params.count; ++j)
-            {
-                auto cand = func->params[j];
-                if (i == j)
-                    continue;
-                if (cand->type->is_polymorphic)
-                    continue;
-
-                assert(cand->type->expr->ast_type == AST_EXPR_IDENT);
-                auto cand_name = static_cast<AstExprIdent *>(cand->type->expr);
-                if (strings_match(cand_name->str, poly_name->str))
-                {
-                    ((AstNode *)cand)->type = param_type; // HACK
-                    cand->type->type = param_type;
-                    cand->name->type = param_type;
-                }
-            }
-
-            // Check if the return type is a match.
-            if (func->ret)
-            {
-                assert(func->ret->expr->ast_type == AST_EXPR_IDENT);
-                auto ret_name = static_cast<AstExprIdent *>(func->ret->expr);
-                if (strings_match(ret_name->str, poly_name->str))
-                    ((AstNode *)func->ret)->type = param_type; // HACK
-            }
-
-            // Check the rest of the body as well.
-            for (auto &node : block_nodes)
-            {
-                if (node->ast_type == AST_TYPE)
-                {
-                    auto type_node = static_cast<AstType *>(node);
-
-                    // TODO: more robust
-                    assert(type_node->expr->ast_type == AST_EXPR_IDENT);
-                    auto type_ident = static_cast<AstExprIdent *>(type_node->expr);
-
-                    if (strings_match(type_ident->str, poly_name->str))
-                    {
-                        fprintf(stderr, "Replaced type %s with type %s in func %s\n", type_ident->str, ((AstNode *)param)->type.defn->name, func->name->str);
-                        type_ident->str = param_type.defn->name; // HACK HACK HACK
-                    }
-                }
-            }
-        }
-
-        if (!scope_add_var(param->scope, param->name))
-        {
-            report_error("Multiple parameters have the same name: \"%s\".\n",
-                         param->name,
-                         param->name->str);
-        }
-    }
-
-    for (i64 i = 0; i < func->params.count; ++i)
-    {
-        auto param = func->params[i];
-        new_defn->func_params[i] = ((AstNode *)param)->type; // HACK
-    }
-    if (func->ret)
-        new_defn->func_ret = ((AstNode *)func->ret)->type; // HACK
-
-    infer_types(func->block);
-
-#if 1
-    fprintf(stderr, "Added new polymorphic function instantiation for %s:\n", func->name->str);
-    fprintf(stderr, "    %s\n", get_type_string(func->type));
-#endif
-
-    module->polymorphic_funcs.add(func);
-//    module->funcs.add(func);
-
-    return func;
-}
-
 static void resolve_calls(Array<AstNode *> &ast)
 {
     for (auto &node : ast)
@@ -2303,26 +2311,14 @@ static void resolve_calls(Array<AstNode *> &ast)
             continue;
 
         auto call = static_cast<AstExprCall *>(node);
+//        assert(!call->func); TODO?
         if (call->func)
             continue;
-//        assert(!call->func);
 
         assert(call->scope);
 
         call->func = module_get_func(call->scope->module, call->name);
-        if (call->func)
-        {
-            if (call->func->flags & FUNC_IS_POLYMORPHIC)
-                call->func = gen_polymorphic_func(call);
-
-#if 0
-            if (call->func->ret)
-                call->type = type_from_ast_type(call->func->scope->module, call->func->ret);
-            else
-                call->type = type_void;
-#endif
-        }
-        else
+        if (!call->func)
         {
             // TODO: verify that this is a function pointer!
             // Function pointer.
