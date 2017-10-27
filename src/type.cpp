@@ -1173,9 +1173,6 @@ static AstNode *duplicate_node(AstNode *node)
             auto dup = ast_alloc(AstExprIdent);
             *dup = *static_cast<AstExprIdent *>(node);
 
-            // FIXME
-            fprintf(stderr, "Duplicated ident with type %s\n", get_type_string(dup->type));
-
             return dup;
         }
         case AST_EXPR_LIT:
@@ -1646,12 +1643,22 @@ static AstFunc *gen_polymorphic_func(AstExprCall *call)
                 }
             }
         }
+    }
 
-        if (!scope_add_var(param->scope, param->name))
+    for (auto &param : func->params)
+    {
+        if (type_is_null(((AstNode *)param)->type)) // HACK
         {
-            report_error("Multiple parameters have the same name: \"%s\".\n",
-                         param->name,
-                         param->name->str);
+            infer_types(param);
+        }
+        else
+        {
+            if (!scope_add_var(param->scope, param->name))
+            {
+                report_error("Multiple parameters have the same name: \"%s\".\n",
+                            param->name,
+                            param->name->str);
+            }
         }
     }
 
