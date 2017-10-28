@@ -12,8 +12,14 @@ struct Parser
 #include <stdlib.h>
 #define report_error(str__, tok__, ...) \
 do { \
-    fprintf(stderr, "(%s:%d:%d) Parse error: " str__ "\n", tok__.file.path, tok__.line, tok__.col, __VA_ARGS__); \
-    fprintf(stderr, "    %.*s\n", tok__.len, tok__.str); \
+    fprintf(stderr, PRINT_BOLD "(%s:%d:%d)" PRINT_RESET " Parse error: " str__ "\n", tok__.file.path, tok__.line, tok__.col, __VA_ARGS__); \
+    \
+    int base = print_line(tok__.file.src, tok__.line); \
+    \
+    fprintf(stderr, PRINT_BOLD PRINT_RED); \
+    print_underline(base, tok__.col, tok__.len); \
+    fprintf(stderr, PRINT_RESET); \
+    \
     fprintf(stderr, "\nExiting.\n"); \
     exit(1); \
 } while (0)
