@@ -608,12 +608,12 @@ static void parse_stmt(Parser *parser, AstExprBlock *block)
         //                             x = 5;
         if (rhs)
         {
-            decl->desugared_rhs = rhs;
-
             AstExprAssign *assign = ast_alloc(AstExprAssign);
             assign->lhs = bind;
             assign->rhs = rhs;
             assign->flags |= ASSIGN_IS_DECL_DESUGARED_RHS;
+
+            decl->desugared_assign = assign;
 
             copy_loc(assign, ident);
 
@@ -814,8 +814,28 @@ void parse_file(AstRoot *root, Array<Token> *tokens)
 
             if (eat_optional(&parser, TOK_EQ))
             {
+                // TODO: handle assignments in global scope
+                assert(false);
+#if 0
                 AstExpr *rhs = parse_expr(&parser);
-                decl->desugared_rhs = rhs;
+
+                // TODO: this is copy-pasted from parse_stmt()
+                AstExprAssign *assign = ast_alloc(AstExprAssign);
+                assign->lhs = bind;
+                assign->rhs = rhs;
+                assign->flags |= ASSIGN_IS_DECL_DESUGARED_RHS;
+
+                decl->desugared_assign = assign;
+
+                copy_loc(assign, ident);
+
+                AstStmtSemi *semi = ast_alloc(AstStmtSemi);
+                semi->expr = assign;
+
+                // TODO: copy_loc for statement?
+
+                block->stmts.add(semi);
+#endif
             }
 
             mod->vars.add(decl);

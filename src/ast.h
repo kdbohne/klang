@@ -427,8 +427,7 @@ struct AstStmtDecl : AstStmt
     AstExpr *bind = NULL;
     AstType *type = NULL;
 
-    // TODO: is this used? remove?
-    AstExpr *desugared_rhs = NULL;
+    AstExprAssign *desugared_assign = NULL;
 };
 
 struct AstType : AstNode

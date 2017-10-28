@@ -603,8 +603,8 @@ static void flatten_ast_visit(Array<AstNode *> *ast, AstNode *node)
 
             if (decl->type)
                 flatten_ast_visit(ast, decl->type);
-            if (decl->desugared_rhs)
-                flatten_ast_visit(ast, decl->desugared_rhs);
+            if (decl->desugared_assign)
+                flatten_ast_visit(ast, decl->desugared_assign);
 
             break;
         }
@@ -926,8 +926,8 @@ static void assign_scopes(AstNode *node, Scope *enclosing, Module *module)
 
             if (decl->type)
                 assign_scopes(decl->type, enclosing, module);
-            if (decl->desugared_rhs)
-                assign_scopes(decl->desugared_rhs, enclosing, module);
+            if (decl->desugared_assign)
+                assign_scopes(decl->desugared_assign, enclosing, module);
 
             break;
         }
@@ -1393,8 +1393,8 @@ static AstNode *duplicate_node(AstNode *node)
 
             if (dup->type)
                 dup->type = static_cast<AstType *>(duplicate_node(dup->type));
-            if (dup->desugared_rhs)
-                dup->desugared_rhs = static_cast<AstExpr *>(duplicate_node(dup->desugared_rhs));
+            if (dup->desugared_assign)
+                dup->desugared_assign = static_cast<AstExprAssign *>(duplicate_node(dup->desugared_assign));
 
             return dup;
         }
@@ -1624,10 +1624,7 @@ static AstFunc *gen_polymorphic_func(AstExprCall *call)
                     auto type_ident = static_cast<AstExprIdent *>(type_node->expr);
 
                     if (strings_match(type_ident->str, poly_name->str))
-                    {
-//                        fprintf(stderr, "Replaced type %s with type %s in func %s\n", type_ident->str, ((AstNode *)param)->type.defn->name, func->name->str);
                         type_ident->str = param_type.defn->name; // HACK HACK HACK
-                    }
                 }
             }
         }
@@ -1900,11 +1897,6 @@ static Type infer_types(AstNode *node)
         {
             auto assign = static_cast<AstExprAssign *>(node);
 
-            // The type of the desugared RHS has already been determined
-            // by the AST_STMT_DECL case, so don't do anything here.
-            if (assign->flags & ASSIGN_IS_DECL_DESUGARED_RHS)
-                break;
-
             Type lhs = infer_types(assign->lhs);
             Type rhs = infer_types(assign->rhs);
             if (!types_match(lhs, rhs))
@@ -2175,18 +2167,32 @@ static Type infer_types(AstNode *node)
         {
             auto decl = static_cast<AstStmtDecl *>(node);
 
+            // TODO: multiple decls, patterns, etc.
+            assert(decl->bind->ast_type == AST_EXPR_IDENT);
+            auto ident = static_cast<AstExprIdent *>(decl->bind);
+
             if (decl->type)
+                ident->type = infer_types(decl->type);
+
+            if (decl->desugared_assign)
             {
-                Type lhs = infer_types(decl->type);
+                auto assign = decl->desugared_assign;
+                assert(assign->flags & ASSIGN_IS_DECL_DESUGARED_RHS);
+
+                Type type = infer_types(assign->rhs);
+                assign->lhs->type = type;
+                assign->type = type;
+                ident->type = type;
 
                 // If an explicit type is given, make sure the optional assignment
                 // expression matches matches that type.
-                if (decl->desugared_rhs)
+                if (decl->type)
                 {
-                    Type rhs = infer_types(decl->desugared_rhs);
+                    Type lhs = decl->type->type;
+                    Type rhs = assign->rhs->type;
                     if (!types_match(lhs, rhs))
                     {
-                        rhs = narrow_type(lhs, decl->desugared_rhs);
+                        rhs = narrow_type(lhs, assign->rhs);
                         if (!types_match(lhs, rhs))
                         {
                             report_error("Type mismatch in declaration. Assigning rvalue \"%s\" to lvalue \"%s\".\n",
@@ -2196,17 +2202,9 @@ static Type infer_types(AstNode *node)
                         }
                     }
                 }
-
-                node->type = lhs; // FIXME
-            }
-            else
-            {
-                // Infer the type from the rhs of the assignment expression.
-                assert(decl->desugared_rhs);
-                node->type = infer_types(decl->desugared_rhs); // FIXME
             }
 
-            if (!node->type.defn)
+            if (!ident->type.defn)
             {
                 report_error("Unknown type \"%s\".\n",
                              decl->bind,
@@ -2214,17 +2212,14 @@ static Type infer_types(AstNode *node)
                 break;
             }
 
-            // TODO: multiple decls, patterns, etc.
-            assert(decl->bind->ast_type == AST_EXPR_IDENT);
-            auto ident = static_cast<AstExprIdent *>(decl->bind);
-            ident->type = node->type; // FIXME
-
             if (!scope_add_var(decl->scope, ident))
             {
                 report_error("Redeclaring existing identifier \"%s\".\n",
                              ident,
                              ident->str);
             }
+
+            ((AstNode *)decl)->type = type_void; // HACK
 
             break;
         }

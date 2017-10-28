@@ -1,10 +1,12 @@
 fn test(a $T, b i64) -> T {
-    let c = a + b;
+    let c = a;
+    let d = b;
     c
 }
 
 fn main() {
     let x = test(5, 4);
+    let y = test(5.0, 4);
 }
 /*
 fn add(a $T, b T) -> T {

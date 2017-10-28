@@ -2167,8 +2167,8 @@ void gen_ir(AstRoot *ast)
             decl->tmp = tmp;
             decl->prefix = mod->name; // TODO: copy?
 
-            if (var->desugared_rhs)
-                decl->init = gen_expr(&ir, mod, var->desugared_rhs);
+            if (var->desugared_assign)
+                decl->init = gen_expr(&ir, mod, var->desugared_assign);
 
             if (var->bind->ast_type == AST_EXPR_IDENT)
             {
