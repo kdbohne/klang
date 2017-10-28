@@ -40,6 +40,7 @@ static Token next(Parser *parser)
     return parser->tokens->data[parser->index++];
 }
 
+// TODO: improve this by allowing error message to be specified
 static Token expect(Parser *parser, TokenType type)
 {
     Token tok = next(parser);
@@ -585,8 +586,16 @@ static void parse_stmt(Parser *parser, AstExprBlock *block)
             type = parse_type(parser);
 
         AstExpr *rhs = NULL;
-        if (eat_optional(parser, TOK_EQ))
+        if (type)
+        {
+            if (eat_optional(parser, TOK_EQ))
+                rhs = parse_expr(parser);
+        }
+        else
+        {
+            expect(parser, TOK_EQ);
             rhs = parse_expr(parser);
+        }
 
         AstStmtDecl *decl = ast_alloc(AstStmtDecl);
         decl->bind = bind;
