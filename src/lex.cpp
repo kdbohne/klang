@@ -365,8 +365,8 @@ static Token get_token(Lexer *lex)
             }
             advance(lex);
 
-            int raw_len = lex->cur - tok.str - 2;
-            char *raw_str = tok.str + 1;
+            int raw_len = lex->cur - tok.str;
+            char *raw_str = tok.str;
 
             // TODO: leak, free after parsing
             tok.len = raw_len - escape_count;

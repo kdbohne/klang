@@ -323,9 +323,15 @@ AstExprLit *make_lit_str(Token tok)
 {
     AstExprLit *lit = ast_alloc(AstExprLit);
     lit->lit_type = LIT_STR;
+
+    // Ignore the double quotes when allocating the string, but keep the
+    // original token around for location copying.
+    Token old = tok;
+    tok.str += 1;
+    tok.len -= 2;
     lit->value_str = make_str_from_token(tok);
 
-    copy_loc(lit, tok);
+    copy_loc(lit, old);
 
     return lit;
 }
