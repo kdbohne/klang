@@ -2259,6 +2259,7 @@ static Type infer_types(AstNode *node)
 
             // FIXME: use param->type without shadowing
             Type type = type_from_ast_type(param->scope->module, param->type);
+            ((AstNode *)param)->type = type; // HACK
 
             // NOTE: This variable binding uses the type from param->name,
             // not from param itself, so it must be copied here.
