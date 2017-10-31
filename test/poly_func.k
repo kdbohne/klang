@@ -26,12 +26,12 @@ fn copy(x $T) -> T {
 }
 
 fn main() {
-//    let x = non_poly_add(3.0, "test");
+    let x = non_poly_add(3.0, "test");
 
-//    let a0 = add(3, 4);
-//    let a1 = add(5, 7);
+    let a0 = add(3, 4);
+    let a1 = add(5, 7);
     let a2 = add(5, 7.0);
-//    let a3 = add(9.0, 11);
+    let a3 = add(9.0, 11);
     /*
     let long_identifier = add(3.0, 4.0);
     let really_long_identifier = add(5.0, 7.0);

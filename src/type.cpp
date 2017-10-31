@@ -1903,12 +1903,12 @@ static Type infer_types(AstNode *node)
                                      get_type_string(arg->type));
                     }
                 }
-
-                if (call->func->ret)
-                    call->type = call->func->type.defn->func_ret;
-                else
-                    call->type = type_void;
             }
+
+            if (call->func->ret)
+                call->type = call->func->type.defn->func_ret;
+            else
+                call->type = type_void;
 
             break;
         }
