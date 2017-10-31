@@ -591,7 +591,7 @@ static void debug_validate_bb(IrBb *bb)
 static void debug_validate_func(IrFunc *func)
 {
     // TODO: should anything else be done here other than validating bbs?
-    for (auto &bb : func->bbs)
+    for (auto bb : func->bbs)
         debug_validate_bb(&bb);
 }
 
@@ -664,7 +664,7 @@ static IrExpr *gen_expr(Ir *ir, Module *module, AstExpr *expr)
             }
 
             // No matching variable, so check if it's the name of a function.
-            for (auto &func : ident->scope->module->funcs)
+            for (auto func : ident->scope->module->funcs)
             {
                 if (strings_match(func->name->str, ident->str))
                 {
@@ -779,7 +779,7 @@ static IrExpr *gen_expr(Ir *ir, Module *module, AstExpr *expr)
                 call->func_ptr_expr = gen_expr(ir, module, ast_call->name);
             }
 
-            for (auto &ast_arg : ast_call->args)
+            for (auto ast_arg : ast_call->args)
             {
                 IrExpr *arg = gen_expr(ir, module, ast_arg);
 
@@ -899,7 +899,7 @@ static IrExpr *gen_expr(Ir *ir, Module *module, AstExpr *expr)
         case AST_EXPR_BLOCK:
         {
             auto block = static_cast<AstExprBlock *>(expr);
-            for (auto &stmt : block->stmts)
+            for (auto stmt : block->stmts)
             {
                 switch (stmt->ast_type)
                 {
@@ -1076,7 +1076,7 @@ static IrExpr *gen_expr(Ir *ir, Module *module, AstExpr *expr)
             if_->else_expr = else_block;
 
             // Generate the main body.
-            for (auto &stmt : ast_for->block->stmts)
+            for (auto stmt : ast_for->block->stmts)
                 if_->block->stmts.add(stmt);
 
             // TODO: avoid allocating 'one' each time!
@@ -1145,7 +1145,7 @@ static IrExpr *gen_expr(Ir *ir, Module *module, AstExpr *expr)
             if_->else_expr = else_block;
 
             // Generate the main body.
-            for (auto &stmt : ast_while->block->stmts)
+            for (auto stmt : ast_while->block->stmts)
                 if_->block->stmts.add(stmt);
 
             // Make the desugared loop.
@@ -1257,7 +1257,7 @@ static void gen_func_prototype(Ir *ir, Module *module, AstFunc *ast_func)
             ++func->tmp_counter;
     }
 
-    for (auto &ast_param : ast_func->params)
+    for (auto ast_param : ast_func->params)
     {
         IrParam *param = func->params.next();
 
@@ -2148,14 +2148,14 @@ void gen_ir(AstRoot *ast)
 {
     Ir ir;
 
-    for (auto &mod : ast->modules)
+    for (auto mod : ast->modules)
     {
-        for (auto &struct_ : mod->structs)
+        for (auto struct_ : mod->structs)
             gen_struct(&ir, mod, struct_);
 
         // TODO: multiple decls, patterns, etc.
         // Declare global variables.
-        for (auto &var : mod->vars)
+        for (auto var : mod->vars)
         {
             // FIXME: dumb hack to work around 'type' field shadowing between AstNode and AstStmtDecl
             IrType type = ir_type_from_type(((AstNode *)var)->type);
@@ -2185,9 +2185,9 @@ void gen_ir(AstRoot *ast)
     }
 
     i64 func_index = 0;
-    for (auto &mod : ast->modules)
+    for (auto mod : ast->modules)
     {
-        for (auto &func : mod->funcs)
+        for (auto func : mod->funcs)
         {
             if (func->flags & FUNC_IS_POLYMORPHIC)
                 continue;
@@ -2195,13 +2195,13 @@ void gen_ir(AstRoot *ast)
             gen_func_prototype(&ir, mod, func);
         }
 
-        for (auto &func : mod->polymorphic_funcs)
+        for (auto func : mod->polymorphic_funcs)
             gen_func_prototype(&ir, mod, func);
     }
 
-    for (auto &mod : ast->modules)
+    for (auto mod : ast->modules)
     {
-        for (auto &func : mod->funcs)
+        for (auto func : mod->funcs)
         {
             if (func->flags & FUNC_IS_POLYMORPHIC)
                 continue;
@@ -2210,7 +2210,7 @@ void gen_ir(AstRoot *ast)
             ++func_index;
         }
 
-        for (auto &func : mod->polymorphic_funcs)
+        for (auto func : mod->polymorphic_funcs)
         {
             gen_func(&ir, mod, func, func_index);
             ++func_index;

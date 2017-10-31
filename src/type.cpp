@@ -311,7 +311,7 @@ static TypeDefn *register_struct(Module *module, AstStruct *struct_)
     // the struct's size and alignment.
     defn->size = 0;
     defn->alignment = 0;
-    for (auto &field : struct_->fields)
+    for (auto field : struct_->fields)
     {
         field->offset = defn->size;
 
@@ -375,7 +375,7 @@ static TypeDefn *register_func(Module *module, AstFunc *func)
     defn->module = module;
     defn->flags |= TYPE_DEFN_IS_FUNC_PTR;
 
-    for (auto &param : func->params)
+    for (auto param : func->params)
     {
         Type t = type_from_ast_type(module, param->type);
         assert(!type_is_void(t));
@@ -410,9 +410,9 @@ static void flatten_ast_visit(Array<AstNode *> *ast, AstNode *node)
         {
             auto root = static_cast<AstRoot *>(node);
 
-            for (auto &mod : root->modules)
+            for (auto mod : root->modules)
             {
-                for (auto &func : mod->funcs)
+                for (auto func : mod->funcs)
                     flatten_ast_visit(ast, func);
             }
 
@@ -449,7 +449,7 @@ static void flatten_ast_visit(Array<AstNode *> *ast, AstNode *node)
 
             flatten_ast_visit(ast, call->name);
 
-            for (auto &arg : call->args)
+            for (auto arg : call->args)
                 flatten_ast_visit(ast, arg);
 
             break;
@@ -487,7 +487,7 @@ static void flatten_ast_visit(Array<AstNode *> *ast, AstNode *node)
         {
             auto block = static_cast<AstExprBlock *>(node);
 
-            for (auto &stmt : block->stmts)
+            for (auto stmt : block->stmts)
                 flatten_ast_visit(ast, stmt);
 
             if (block->expr)
@@ -556,7 +556,7 @@ static void flatten_ast_visit(Array<AstNode *> *ast, AstNode *node)
         {
             auto path = static_cast<AstExprPath *>(node);
 
-            for (auto &seg : path->segments)
+            for (auto seg : path->segments)
                 flatten_ast_visit(ast, seg);
 
             break;
@@ -625,7 +625,7 @@ static void flatten_ast_visit(Array<AstNode *> *ast, AstNode *node)
         {
             auto func = static_cast<AstFunc *>(node);
 
-            for (auto &param : func->params)
+            for (auto param : func->params)
                 flatten_ast_visit(ast, param);
 
             if (func->block)
@@ -696,14 +696,14 @@ static void assign_scopes(AstNode *node, Scope *enclosing, Module *module)
             root->scope = make_scope(NULL); // NOTE: Could pass 'enclosing' here but it should be NULL anyway.
             root->scope->module = root->global_module;
 
-            for (auto &mod : root->modules)
+            for (auto mod : root->modules)
             {
                 mod->scope = make_scope(root->scope);
                 mod->scope->module = mod;
 
-                for (auto &func : mod->funcs)
+                for (auto func : mod->funcs)
                     assign_scopes(func, mod->scope, mod);
-                for (auto &var : mod->vars)
+                for (auto var : mod->vars)
                     assign_scopes(var, mod->scope, mod);
             }
 
@@ -749,7 +749,7 @@ static void assign_scopes(AstNode *node, Scope *enclosing, Module *module)
 
             assign_scopes(call->name, enclosing, module);
 
-            for (auto &arg : call->args)
+            for (auto arg : call->args)
                 assign_scopes(arg, enclosing, module);
 
             break;
@@ -793,7 +793,7 @@ static void assign_scopes(AstNode *node, Scope *enclosing, Module *module)
             block->scope = make_scope(enclosing);
             block->scope->module = module;
 
-            for (auto &stmt : block->stmts)
+            for (auto stmt : block->stmts)
                 assign_scopes(stmt, block->scope, module);
 
             if (block->expr)
@@ -874,7 +874,7 @@ static void assign_scopes(AstNode *node, Scope *enclosing, Module *module)
             auto path = static_cast<AstExprPath *>(node);
             path->scope = enclosing;
 
-            for (auto &seg : path->segments)
+            for (auto seg : path->segments)
                 assign_scopes(seg, enclosing, module);
 
             break;
@@ -947,7 +947,7 @@ static void assign_scopes(AstNode *node, Scope *enclosing, Module *module)
             func->scope = make_scope(enclosing);
             func->scope->module = module;
 
-            for (auto &param : func->params)
+            for (auto param : func->params)
                 assign_scopes(param, func->scope, module);
 
             if (func->block)
@@ -1198,7 +1198,7 @@ static AstNode *duplicate_node(AstNode *node)
             dup->name = static_cast<AstExpr *>(duplicate_node(dup->name));
 
             dup->args.reset();
-            for (auto &arg : orig->args)
+            for (auto arg : orig->args)
             {
                 auto dup_arg = static_cast<AstExpr *>(duplicate_node(arg));
                 dup->args.add(dup_arg);
@@ -1245,7 +1245,7 @@ static AstNode *duplicate_node(AstNode *node)
             *dup = *orig;
 
             dup->stmts.reset();
-            for (auto &stmt : orig->stmts)
+            for (auto stmt : orig->stmts)
             {
                 auto dup_stmt = static_cast<AstStmt *>(duplicate_node(stmt));
                 dup->stmts.add(dup_stmt);
@@ -1329,7 +1329,7 @@ static AstNode *duplicate_node(AstNode *node)
             *dup = *orig;
 
             dup->segments.reset();
-            for (auto &seg : orig->segments)
+            for (auto seg : orig->segments)
             {
                 auto dup_seg = static_cast<AstExprIdent *>(duplicate_node(seg));
                 dup->segments.add(dup_seg);
@@ -1420,7 +1420,7 @@ static AstNode *duplicate_node(AstNode *node)
             dup->name = static_cast<AstExprIdent *>(duplicate_node(dup->name));
 
             dup->params.reset();
-            for (auto &param : orig->params)
+            for (auto param : orig->params)
             {
                 auto dup_param = static_cast<AstParam *>(duplicate_node(param));
                 dup->params.add(dup_param);
@@ -1454,7 +1454,7 @@ static AstNode *duplicate_node(AstNode *node)
             dup->name = static_cast<AstExprIdent *>(duplicate_node(dup->name));
 
             dup->fields.reset();
-            for (auto &field : orig->fields)
+            for (auto field : orig->fields)
             {
                 auto dup_field = static_cast<AstStructField *>(duplicate_node(field));
                 dup->fields.add(dup_field);
@@ -1496,7 +1496,7 @@ static AstFunc *module_get_polymorphic_func(Module *module, AstExpr *name, Type 
     assert(name->ast_type == AST_EXPR_IDENT);
     auto ident = static_cast<AstExprIdent *>(name);
 
-    for (auto &func : module->polymorphic_funcs)
+    for (auto func : module->polymorphic_funcs)
     {
         if (strings_match(func->name->str, ident->str))
         {
@@ -1618,7 +1618,7 @@ static AstFunc *gen_polymorphic_func(AstExprCall *call)
             }
 
             // Check the rest of the body as well.
-            for (auto &node : block_nodes)
+            for (auto node : block_nodes)
             {
                 if (node->ast_type == AST_TYPE)
                 {
@@ -1635,7 +1635,7 @@ static AstFunc *gen_polymorphic_func(AstExprCall *call)
         }
     }
 
-    for (auto &param : func->params)
+    for (auto param : func->params)
     {
         if (type_is_null(((AstNode *)param)->type)) // HACK
         {
@@ -1693,11 +1693,11 @@ static Type infer_types(AstNode *node)
         {
             auto root = static_cast<AstRoot *>(node);
 
-            for (auto &mod : root->modules)
+            for (auto mod : root->modules)
             {
-                for (auto &var : mod->vars)
+                for (auto var : mod->vars)
                     infer_types(var);
-                for (auto &func : mod->funcs)
+                for (auto func : mod->funcs)
                     infer_types(func);
             }
 
@@ -1720,7 +1720,7 @@ static Type infer_types(AstNode *node)
             }
 
             // No matching variable, so check if it's the name of a function.
-            for (auto &func : ident->scope->module->funcs)
+            for (auto func : ident->scope->module->funcs)
             {
                 if (strings_match(func->name->str, ident->str))
                 {
@@ -1982,7 +1982,7 @@ static Type infer_types(AstNode *node)
         {
             auto block = static_cast<AstExprBlock *>(node);
 
-            for (auto &stmt : block->stmts)
+            for (auto stmt : block->stmts)
                 infer_types(stmt);
 
             if (block->expr)
@@ -2277,7 +2277,7 @@ static Type infer_types(AstNode *node)
             if (func->flags & FUNC_IS_POLYMORPHIC)
                 break;
 
-            for (auto &param : func->params)
+            for (auto param : func->params)
                 infer_types(param);
 
             if (func->block)
@@ -2332,7 +2332,7 @@ static Type infer_types(AstNode *node)
 
 static void resolve_calls(Array<AstNode *> &ast)
 {
-    for (auto &node : ast)
+    for (auto node : ast)
     {
         if (node->ast_type != AST_EXPR_CALL)
             continue;
@@ -2368,7 +2368,7 @@ static void resolve_calls(Array<AstNode *> &ast)
 static void check_array_bounds(Array<AstNode *> &ast)
 {
     // Check for negative or zero-capacity array declarations.
-    for (auto &node : ast)
+    for (auto node : ast)
     {
         if (node->ast_type != AST_STMT_DECL)
             continue;
@@ -2395,7 +2395,7 @@ static void check_array_bounds(Array<AstNode *> &ast)
     }
 
     // Check array indexing bounds.
-    for (auto &node : ast)
+    for (auto node : ast)
     {
         if (node->ast_type != AST_EXPR_INDEX)
             continue;
@@ -2438,13 +2438,13 @@ static void check_array_bounds(Array<AstNode *> &ast)
 
 static void make_array_fat_pointers(Array<AstNode *> &ast)
 {
-    for (auto &node : ast)
+    for (auto node : ast)
     {
         if (node->ast_type != AST_EXPR_CALL)
             continue;
 
         auto call = static_cast<AstExprCall *>(node);
-        for (auto &arg : call->args)
+        for (auto arg : call->args)
         {
             if (type_is_array(arg->type))
             {
@@ -2586,18 +2586,18 @@ bool type_check(AstRoot *ast)
         ast->modules[ast->modules.count - 1] = global;
     }
 
-    for (auto &mod : ast->modules)
+    for (auto mod : ast->modules)
     {
-        for (auto &struct_ : mod->structs)
+        for (auto struct_ : mod->structs)
         {
             struct_->type.defn = register_struct(mod, struct_);
             struct_->type.ptr_depth = 0;
         }
     }
 
-    for (auto &mod : ast->modules)
+    for (auto mod : ast->modules)
     {
-        for (auto &func : mod->funcs)
+        for (auto func : mod->funcs)
         {
             func->type.defn = register_func(mod, func);
             func->type.ptr_depth = 0;

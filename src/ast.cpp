@@ -85,7 +85,7 @@ AstFunc *module_get_func(Module *module, AstExpr *name)
         case AST_EXPR_IDENT:
         {
             auto ident = static_cast<AstExprIdent *>(name);
-            for (auto &func : module->funcs)
+            for (auto func : module->funcs)
             {
                 if (strings_match(func->name->str, ident->str))
                     return func;
@@ -123,10 +123,10 @@ Module *resolve_path_into_module(Module *module, AstExprPath *path)
 {
     auto mod = module;
 
-    for (auto &seg : path->segments)
+    for (auto seg : path->segments)
     {
         bool resolved = false;
-        for (auto &child : mod->children)
+        for (auto child : mod->children)
         {
             if (strings_match(child->name, seg->str))
             {
