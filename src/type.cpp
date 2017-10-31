@@ -1531,17 +1531,16 @@ static AstFunc *gen_polymorphic_func(AstExprCall *call)
     defn.module = module;
     defn.flags |= TYPE_DEFN_IS_FUNC_PTR;
 
-    for (i64 i = 0; i < func->params.count; ++i)
+    // TODO: literal narrowing?
+    for (auto arg : call->args)
     {
-        auto param = func->params[i];
-        auto arg = call->args[i];
-
         Type t = infer_types(arg);
         defn.func_params.add(t);
     }
 
     // The return type doesn't matter.
 
+    // TODO CLEANUP: this 'type' local is ugly and confusing in the rest of the block
     Type type;
     type.defn = &defn;
     AstFunc *match = module_get_polymorphic_func(module, call->name, type);
@@ -1555,11 +1554,7 @@ static AstFunc *gen_polymorphic_func(AstExprCall *call)
     }
 
     // No match found, so try to generate a new version of the function.
-
-    assert(module->type_defns_count < (sizeof(module->type_defns) / sizeof(module->type_defns[0])));
-    TypeDefn *new_defn = &module->type_defns[module->type_defns_count++];
-    *new_defn = defn;
-    type.defn = new_defn;
+    bool success = true;
 
     AstFunc *poly_func = func;
     func = static_cast<AstFunc *>(duplicate_node(poly_func));
@@ -1574,7 +1569,7 @@ static AstFunc *gen_polymorphic_func(AstExprCall *call)
 
         if (param->type->is_polymorphic)
         {
-            Type param_type = new_defn->func_params[i];
+            Type param_type = defn.func_params[i];
 
             // FIXME: set param->type? (AstType)
             ((AstNode *)param)->type = param_type; // HACK
@@ -1600,6 +1595,16 @@ static AstFunc *gen_polymorphic_func(AstExprCall *call)
                     ((AstNode *)cand)->type = param_type; // HACK
                     cand->type->type = param_type;
                     cand->name->type = param_type;
+
+                    auto arg = call->args[j];
+                    if (!types_match(arg->type, param_type))
+                    {
+                        report_error("Invalid argument type. Expected %s; given %s.\n",
+                                     arg,
+                                     get_type_string(param_type),
+                                     get_type_string(arg->type));
+                        success = false;
+                    }
                 }
             }
 
@@ -1647,6 +1652,19 @@ static AstFunc *gen_polymorphic_func(AstExprCall *call)
         }
     }
 
+    if (!success)
+    {
+        // TODO: better error message; show candidate function (call->func)
+        report_error("Failed to generate polymorphic instantiation.%s\n",
+                     call->name, ""); // HACK
+        return NULL;
+    }
+
+    assert(module->type_defns_count < (sizeof(module->type_defns) / sizeof(module->type_defns[0])));
+    TypeDefn *new_defn = &module->type_defns[module->type_defns_count++];
+    *new_defn = defn;
+    func->type.defn = new_defn;
+
     for (i64 i = 0; i < func->params.count; ++i)
     {
         auto param = func->params[i];
@@ -1655,15 +1673,14 @@ static AstFunc *gen_polymorphic_func(AstExprCall *call)
     if (func->ret)
         new_defn->func_ret = ((AstNode *)func->ret)->type; // HACK
 
-    infer_types(func->block);
+    module->polymorphic_funcs.add(func);
 
 #if 1
     fprintf(stderr, "Added new polymorphic function instantiation for %s:\n", func->name->str);
     fprintf(stderr, "    %s\n", get_type_string(func->type));
 #endif
 
-    module->polymorphic_funcs.add(func);
-//    module->funcs.add(func);
+    infer_types(func->block);
 
     return func;
 }
@@ -1860,22 +1877,37 @@ static Type infer_types(AstNode *node)
             assert(call->func);
 
             if (call->func->flags & FUNC_IS_POLYMORPHIC)
-                call->func = gen_polymorphic_func(call);
-
-            for (auto &arg : call->args)
-                infer_types(arg);
-
-            if (call->func)
             {
+                auto func = gen_polymorphic_func(call);
+
+                // If a polymorphic instantiation couldn't be generated, then
+                // don't overwrite the polymorphic function stub.
+                if (func)
+                    call->func = func;
+            }
+            else
+            {
+                for (i64 i = 0; i < call->args.count; ++i)
+                {
+                    auto arg = call->args[i];
+                    auto param = call->func->params[i];
+                    Type param_type = ((AstNode *)param)->type; // HACK
+
+                    Type type = infer_types(arg);
+
+                    if (!types_match(arg->type, param_type))
+                    {
+                        report_error("Invalid argument type. Expected %s; given %s.\n",
+                                     arg,
+                                     get_type_string(param_type),
+                                     get_type_string(arg->type));
+                    }
+                }
+
                 if (call->func->ret)
                     call->type = call->func->type.defn->func_ret;
                 else
                     call->type = type_void;
-            }
-            else
-            {
-                // TODO: error?
-                call->type = infer_types(call->name);
             }
 
             break;
