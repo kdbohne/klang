@@ -89,6 +89,9 @@ int main(int argc, char *argv[])
 
             Token tok = tokens[i + 1];
             assert(tok.type == TOK_STR);
+            // Ignore the double quotes.
+            tok.str += 1;
+            tok.len -= 2;
 
             static char buf[256];
             if (dir)
