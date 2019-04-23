@@ -1,7 +1,7 @@
 klang
 =====
 
-[klang](https://github.com/kdbohne/klang) is an offline path tracer based on
+[klang](https://github.com/kdbohne/klang) is a compiler for an experimental programming language.
 
 Building klang
 --------------
